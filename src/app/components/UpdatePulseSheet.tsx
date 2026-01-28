@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BottomSheet } from '@/app/components/BottomSheet';
 import { Button } from '@/app/components/Button';
 import { Smile, MessageCircle, Palette } from 'lucide-react';
+import { EnhancedEmojiPicker } from '@/app/components/EnhancedEmojiPicker';
 
 interface UpdatePulseSheetProps {
   isOpen: boolean;
@@ -33,6 +34,7 @@ export function UpdatePulseSheet({ isOpen, onClose, onUpdate, onOpenDoodle }: Up
   const [selectedMood, setSelectedMood] = useState('');
   const [intensity, setIntensity] = useState('Medium');
   const [message, setMessage] = useState('');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   const handleSend = () => {
     const data: any = {};
@@ -100,7 +102,15 @@ export function UpdatePulseSheet({ isOpen, onClose, onUpdate, onOpenDoodle }: Up
           <div className="space-y-6">
             {/* Mood Grid */}
             <div>
-              <label className="text-sm font-medium mb-3 block">Select Mood</label>
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-sm font-medium">Select Mood</label>
+                <button
+                  onClick={() => setShowEmojiPicker(true)}
+                  className="text-sm text-[#A83FFF] font-medium hover:underline"
+                >
+                  More Emojis →
+                </button>
+              </div>
               <div className="grid grid-cols-5 gap-3">
                 {MOODS.map((mood) => (
                   <button
@@ -215,6 +225,17 @@ export function UpdatePulseSheet({ isOpen, onClose, onUpdate, onOpenDoodle }: Up
           </Button>
         )}
       </div>
+
+      {/* Enhanced Emoji Picker */}
+      {showEmojiPicker && (
+        <EnhancedEmojiPicker
+          onSelect={(emoji) => {
+            setSelectedMood(emoji);
+            setShowEmojiPicker(false);
+          }}
+          onClose={() => setShowEmojiPicker(false)}
+        />
+      )}
     </BottomSheet>
   );
 }

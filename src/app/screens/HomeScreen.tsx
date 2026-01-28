@@ -40,6 +40,52 @@ export function HomeScreen({
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotificationPanel, setShowNotificationPanel] = useState(false);
   const [allNotifications, setAllNotifications] = useState<any[]>([]);
+  const previousNotificationIdsRef = React.useRef<Set<string>>(new Set());
+
+  // Create notification sound
+  const notificationSound = React.useMemo(() => {
+    // Using a pleasant notification tone (Web Audio API)
+    return () => {
+      try {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        // Pleasant double beep sound
+        oscillator.frequency.value = 800;
+        oscillator.type = 'sine';
+
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.1);
+
+        // Second beep
+        setTimeout(() => {
+          const oscillator2 = audioContext.createOscillator();
+          const gainNode2 = audioContext.createGain();
+
+          oscillator2.connect(gainNode2);
+          gainNode2.connect(audioContext.destination);
+
+          oscillator2.frequency.value = 1000;
+          oscillator2.type = 'sine';
+
+          gainNode2.gain.setValueAtTime(0.3, audioContext.currentTime);
+          gainNode2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+
+          oscillator2.start(audioContext.currentTime);
+          oscillator2.stop(audioContext.currentTime + 0.1);
+        }, 150);
+      } catch (error) {
+        console.error('Error playing notification sound:', error);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     fetchTodayCard();
@@ -70,8 +116,30 @@ export function HomeScreen({
       const unreadNotifications = response.notifications?.filter((n: any) => !n.read) || [];
       setNotifications(unreadNotifications);
       setAllNotifications(response.notifications || []);
+      
+      // Check for NEW notification IDs that weren't in the previous set
+      const newNotificationIds = new Set(unreadNotifications.map((n: any) => n.id));
+      const previousNotificationIds = previousNotificationIdsRef.current;
+      
+      // Find truly new notifications (IDs that exist now but didn't exist before)
+      let hasNewNotifications = false;
+      newNotificationIds.forEach((id) => {
+        if (!previousNotificationIds.has(id)) {
+          hasNewNotifications = true;
+        }
+      });
+      
+      // Only play sound if there are actually new notifications
+      if (hasNewNotifications && previousNotificationIds.size > 0) {
+        notificationSound();
+      }
+      
+      // Update the set for the next check
+      previousNotificationIdsRef.current = newNotificationIds;
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      // Silently handle notification errors - they're not critical to app functionality
+      // Only log to console for debugging purposes
+      console.log('Unable to fetch notifications (non-critical):', error);
     }
   };
 
@@ -106,7 +174,9 @@ export function HomeScreen({
       await notificationAPI.markAsRead(notificationId);
       setNotifications(notifications.filter((n) => n.id !== notificationId));
     } catch (error) {
-      console.error('Error dismissing notification:', error);
+      console.log('Unable to dismiss notification (non-critical):', error);
+      // Still remove it from UI even if server update fails
+      setNotifications(notifications.filter((n) => n.id !== notificationId));
     }
   };
 
@@ -281,11 +351,11 @@ export function HomeScreen({
 
               {/* Partner's Doodle */}
               {partnerDoodle && (
-                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4">
+                <div className="rounded-2xl p-4">
                   <img
                     src={partnerDoodle}
                     alt="Doodle"
-                    className="w-full h-48 object-contain rounded-xl"
+                    className="w-full h-48 object-contain"
                   />
                 </div>
               )}

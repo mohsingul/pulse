@@ -1,0 +1,53 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Gradient Definitions -->
+  <defs>
+    <linearGradient id="pulseGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FB3094;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#A83FFF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2571FF;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Glow filter -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background circle with gradient -->
+  <circle cx="256" cy="256" r="240" fill="url(#pulseGradient)" opacity="0.15"/>
+  
+  <!-- Two overlapping hearts representing a couple -->
+  <!-- Left heart (slightly rotated left) -->
+  <g transform="translate(180, 200) rotate(-10)" filter="url(#glow)">
+    <path d="M 0,40 C 0,20 15,0 35,0 C 50,0 60,10 60,10 C 60,10 70,0 85,0 C 105,0 120,20 120,40 C 120,80 60,130 60,130 C 60,130 0,80 0,40 Z" 
+          fill="url(#pulseGradient)" 
+          opacity="0.9"/>
+  </g>
+  
+  <!-- Right heart (slightly rotated right, overlapping) -->
+  <g transform="translate(212, 200) rotate(10)" filter="url(#glow)">
+    <path d="M 0,40 C 0,20 15,0 35,0 C 50,0 60,10 60,10 C 60,10 70,0 85,0 C 105,0 120,20 120,40 C 120,80 60,130 60,130 C 60,130 0,80 0,40 Z" 
+          fill="url(#pulseGradient)" 
+          opacity="0.9"/>
+  </g>
+  
+  <!-- Pulse wave line connecting the hearts -->
+  <path d="M 100,256 L 140,256 L 160,220 L 180,290 L 200,240 L 220,256 L 280,256 L 300,220 L 320,290 L 340,240 L 360,256 L 412,256" 
+        stroke="url(#pulseGradient)" 
+        stroke-width="6" 
+        fill="none" 
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        filter="url(#glow)"/>
+  
+  <!-- Small decorative dots/sparkles -->
+  <circle cx="140" cy="180" r="6" fill="#FB3094" opacity="0.6" filter="url(#glow)"/>
+  <circle cx="372" cy="180" r="6" fill="#2571FF" opacity="0.6" filter="url(#glow)"/>
+  <circle cx="256" cy="360" r="8" fill="#A83FFF" opacity="0.5" filter="url(#glow)"/>
+  <circle cx="180" cy="380" r="5" fill="#FB3094" opacity="0.4"/>
+  <circle cx="332" cy="380" r="5" fill="#2571FF" opacity="0.4"/>
+</svg>

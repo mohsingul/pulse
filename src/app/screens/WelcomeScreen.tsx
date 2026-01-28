@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from '@/app/components/Button';
 import { GradientBlob } from '@/app/components/GradientBlob';
+import { userAPI } from '@/utils/api';
 
 interface WelcomeScreenProps {
   onGetStarted: () => void;

@@ -44,6 +44,97 @@ app.get("/make-server-494d91eb/health", (c) => {
   return c.json({ status: "ok" });
 });
 
+// Initialize demo data endpoint (for testing)
+app.post("/make-server-494d91eb/init-demo", async (c) => {
+  try {
+    // Check if demo users already exist
+    const existingUsers = await kv.getByPrefix("user:");
+    console.log(`[Init Demo] Found ${existingUsers.length} existing users`);
+    
+    const demoUser1Exists = existingUsers.some((u: any) => u.username === "demo");
+    const demoUser2Exists = existingUsers.some((u: any) => u.username === "demo2");
+    
+    const createdUsers = [];
+    
+    // Create demo user 1 if doesn't exist
+    if (!demoUser1Exists) {
+      const userId1 = generateId();
+      const passwordHash1 = await hashPassword("password123");
+      const demoUser1 = {
+        userId: userId1,
+        username: "demo",
+        passwordHash: passwordHash1,
+        displayName: "Demo User",
+        createdAt: new Date().toISOString(),
+      };
+      await kv.set(`user:${userId1}`, demoUser1);
+      createdUsers.push("demo");
+      console.log("[Init Demo] Created demo user: demo / password123");
+    } else {
+      console.log("[Init Demo] User 'demo' already exists");
+    }
+    
+    // Create demo user 2 if doesn't exist
+    if (!demoUser2Exists) {
+      const userId2 = generateId();
+      const passwordHash2 = await hashPassword("password123");
+      const demoUser2 = {
+        userId: userId2,
+        username: "demo2",
+        passwordHash: passwordHash2,
+        displayName: "Demo Partner",
+        createdAt: new Date().toISOString(),
+      };
+      await kv.set(`user:${userId2}`, demoUser2);
+      createdUsers.push("demo2");
+      console.log("[Init Demo] Created demo user: demo2 / password123");
+    } else {
+      console.log("[Init Demo] User 'demo2' already exists");
+    }
+    
+    // Get all users after creation
+    const allUsers = await kv.getByPrefix("user:");
+    console.log(`[Init Demo] Total users in database: ${allUsers.length}`);
+    console.log(`[Init Demo] Usernames: ${allUsers.map((u: any) => u.username).join(', ')}`);
+    
+    return c.json({
+      success: true,
+      message: "Demo data initialized",
+      created: createdUsers,
+      existingCount: existingUsers.length,
+      totalUsers: allUsers.length,
+      usernames: allUsers.map((u: any) => u.username),
+    });
+  } catch (error) {
+    console.log(`Error initializing demo data: ${error}`);
+    return c.json({ error: "Failed to initialize demo data" }, 500);
+  }
+});
+
+// Debug endpoint to list all users (for testing)
+app.get("/make-server-494d91eb/debug/users", async (c) => {
+  try {
+    const users = await kv.getByPrefix("user:");
+    const userList = users.map((u: any) => ({
+      userId: u.userId,
+      username: u.username,
+      displayName: u.displayName,
+      createdAt: u.createdAt,
+    }));
+    
+    console.log(`[Debug] Found ${userList.length} users:`, userList.map(u => u.username).join(', '));
+    
+    return c.json({
+      success: true,
+      count: userList.length,
+      users: userList,
+    });
+  } catch (error) {
+    console.log(`Error fetching users: ${error}`);
+    return c.json({ error: "Failed to fetch users" }, 500);
+  }
+});
+
 // USER ROUTES
 app.post("/make-server-494d91eb/users/create", async (c) => {
   try {
@@ -51,6 +142,10 @@ app.post("/make-server-494d91eb/users/create", async (c) => {
     
     if (!username || !password || !displayName) {
       return c.json({ error: "Username, password, and display name are required" }, 400);
+    }
+
+    if (password.length < 6) {
+      return c.json({ error: "Password must be at least 6 characters" }, 400);
     }
 
     // Check if username exists
@@ -73,6 +168,8 @@ app.post("/make-server-494d91eb/users/create", async (c) => {
     };
 
     await kv.set(`user:${userId}`, user);
+    
+    console.log(`[Create User] User created successfully: ${username}`);
     
     return c.json({
       success: true,
@@ -135,6 +232,51 @@ app.get("/make-server-494d91eb/users/:userId", async (c) => {
   } catch (error) {
     console.log(`Error getting user: ${error}`);
     return c.json({ error: "Failed to get user" }, 500);
+  }
+});
+
+// Reset password endpoint
+app.post("/make-server-494d91eb/users/reset-password", async (c) => {
+  try {
+    const { username, newPassword } = await c.req.json();
+    
+    if (!username || !newPassword) {
+      return c.json({ error: "Username and new password are required" }, 400);
+    }
+
+    if (newPassword.length < 6) {
+      return c.json({ error: "Password must be at least 6 characters" }, 400);
+    }
+
+    // Find user by username
+    const users = await kv.getByPrefix("user:");
+    const user = users.find((u: any) => u.username === username);
+    
+    if (!user) {
+      console.log(`[Reset Password] User not found: ${username}`);
+      return c.json({ error: "No account found with this username. Please check your username and try again." }, 404);
+    }
+
+    // Hash new password
+    const newPasswordHash = await hashPassword(newPassword);
+    
+    // Update user with new password
+    const updatedUser = {
+      ...user,
+      passwordHash: newPasswordHash,
+    };
+    
+    await kv.set(`user:${user.userId}`, updatedUser);
+
+    console.log(`[Reset Password] Password successfully reset for user: ${username}`);
+
+    return c.json({
+      success: true,
+      message: "Password updated successfully",
+    });
+  } catch (error) {
+    console.log(`Error resetting password: ${error}`);
+    return c.json({ error: "Failed to reset password" }, 500);
   }
 });
 
@@ -373,6 +515,17 @@ app.post("/make-server-494d91eb/today/:coupleId", async (c) => {
       updates[`${userPrefix}Message`] = message;
     }
     if (doodle !== undefined) {
+      // Add doodle to gallery array instead of overwriting
+      const doodleGalleryKey = `${userPrefix}DoodleGallery`;
+      const existingGallery = existingCard[doodleGalleryKey] || [];
+      const newDoodleEntry = {
+        doodle,
+        timestamp: new Date().toISOString(),
+        userId,
+      };
+      updates[doodleGalleryKey] = [...existingGallery, newDoodleEntry];
+      
+      // Also update the single doodle field for backward compatibility
       updates[`${userPrefix}Doodle`] = doodle;
     }
     

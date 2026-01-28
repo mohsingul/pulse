@@ -7,7 +7,19 @@ interface DoodleCanvasScreenProps {
   onSave: (dataUrl: string) => void;
 }
 
-const COLORS = ['#000000', '#FB3094', '#A83FFF', '#2571FF', '#FF6B6B', '#4ECDC4', '#FFE66D'];
+const COLOR_PALETTE = {
+  warm: ['#FF6B6B', '#FF8E53', '#FFB627', '#FFA07A', '#FF69B4', '#FF1493'],
+  cool: ['#2571FF', '#4ECDC4', '#45B7D1', '#96CEB4', '#A8E6CF', '#00CED1'],
+  neutral: ['#000000', '#4A4A4A', '#8B8B8B', '#C0C0C0', '#E8E8E8', '#FFFFFF'],
+  vibrant: ['#FB3094', '#A83FFF', '#FF0080', '#00D9FF', '#FFE66D', '#7FFF00'],
+};
+
+const ALL_COLORS = [
+  ...COLOR_PALETTE.vibrant,
+  ...COLOR_PALETTE.warm,
+  ...COLOR_PALETTE.cool,
+  ...COLOR_PALETTE.neutral,
+];
 
 export function DoodleCanvasScreen({ onClose, onSave }: DoodleCanvasScreenProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -25,9 +37,12 @@ export function DoodleCanvasScreen({ onClose, onSave }: DoodleCanvasScreenProps)
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas size
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
+    // Set canvas size - make it much larger for better drawing experience
+    const container = canvas.parentElement;
+    if (container) {
+      canvas.width = container.clientWidth;
+      canvas.height = container.clientHeight;
+    }
 
     // Don't fill with white - leave transparent for gradient background
     // Just save initial state
@@ -181,8 +196,8 @@ export function DoodleCanvasScreen({ onClose, onSave }: DoodleCanvasScreenProps)
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Clear to transparent instead of white
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     saveToHistory();
   };
 
@@ -190,28 +205,29 @@ export function DoodleCanvasScreen({ onClose, onSave }: DoodleCanvasScreenProps)
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    // Save with transparency - no white background
     const dataUrl = canvas.toDataURL('image/png');
     onSave(dataUrl);
   };
 
   return (
     <div className="fixed inset-0 bg-background z-50 flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border">
-        <h2 className="text-xl font-semibold">Doodle Canvas</h2>
+      {/* Header - Compact */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <h2 className="text-lg font-semibold">Doodle Canvas</h2>
         <button
           onClick={onClose}
           className="p-2 hover:bg-accent rounded-full transition-colors"
         >
-          <X className="w-6 h-6" />
+          <X className="w-5 h-5" />
         </button>
       </div>
 
-      {/* Canvas */}
-      <div className="flex-1 p-4 overflow-hidden relative">
+      {/* Canvas - Maximized */}
+      <div className="flex-1 p-2 overflow-hidden relative">
         {/* Gradient background */}
-        <div className="absolute inset-4 rounded-3xl bg-[image:var(--pulse-gradient)] opacity-30" />
-        <div className="absolute inset-4 rounded-3xl bg-white/80 dark:bg-background/80 backdrop-blur-xl" />
+        <div className="absolute inset-2 rounded-3xl bg-[image:var(--pulse-gradient)] opacity-30" />
+        <div className="absolute inset-2 rounded-3xl bg-white/80 dark:bg-background/80 backdrop-blur-xl" />
         
         <canvas
           ref={canvasRef}
@@ -226,78 +242,88 @@ export function DoodleCanvasScreen({ onClose, onSave }: DoodleCanvasScreenProps)
         />
       </div>
 
-      {/* Tools */}
-      <div className="p-4 border-t border-border space-y-4">
-        {/* Tool Selection */}
-        <div className="flex items-center justify-center space-x-3">
-          <button
-            onClick={() => setTool('pen')}
-            className={`p-3 rounded-full transition-all ${
-              tool === 'pen'
-                ? 'bg-[image:var(--pulse-gradient)] text-white shadow-lg'
-                : 'bg-accent'
-            }`}
-          >
-            <Pen className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => setTool('eraser')}
-            className={`p-3 rounded-full transition-all ${
-              tool === 'eraser'
-                ? 'bg-foreground text-background shadow-lg'
-                : 'bg-accent'
-            }`}
-          >
-            <Eraser className="w-5 h-5" />
-          </button>
-          <div className="w-px h-8 bg-border" />
-          <button
-            onClick={handleUndo}
-            disabled={historyStep <= 0}
-            className="p-3 rounded-full bg-accent disabled:opacity-50"
-          >
-            <Undo className="w-5 h-5" />
-          </button>
-          <button
-            onClick={handleRedo}
-            disabled={historyStep >= history.length - 1}
-            className="p-3 rounded-full bg-accent disabled:opacity-50"
-          >
-            <Redo className="w-5 h-5" />
-          </button>
-          <button
-            onClick={handleClear}
-            className="p-3 rounded-full bg-destructive/10 text-destructive"
-          >
-            <Trash2 className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Colors */}
-        <div className="flex items-center justify-center space-x-2">
-          {COLORS.map((c) => (
+      {/* Tools - Compact */}
+      <div className="px-4 py-3 border-t border-border space-y-3">
+        {/* Tool Selection - Single Row */}
+        <div className="flex items-center justify-between gap-2">
+          {/* Drawing Tools */}
+          <div className="flex items-center gap-2">
             <button
-              key={c}
-              onClick={() => setColor(c)}
-              className={`w-10 h-10 rounded-full border-2 transition-all ${
-                color === c ? 'border-foreground scale-110' : 'border-transparent'
+              onClick={() => setTool('pen')}
+              className={`p-2.5 rounded-full transition-all ${
+                tool === 'pen'
+                  ? 'bg-[image:var(--pulse-gradient)] text-white shadow-lg'
+                  : 'bg-accent'
               }`}
-              style={{ backgroundColor: c }}
-            />
-          ))}
+            >
+              <Pen className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setTool('eraser')}
+              className={`p-2.5 rounded-full transition-all ${
+                tool === 'eraser'
+                  ? 'bg-foreground text-background shadow-lg'
+                  : 'bg-accent'
+              }`}
+            >
+              <Eraser className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* History Controls */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleUndo}
+              disabled={historyStep <= 0}
+              className="p-2.5 rounded-full bg-accent disabled:opacity-50"
+            >
+              <Undo className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleRedo}
+              disabled={historyStep >= history.length - 1}
+              className="p-2.5 rounded-full bg-accent disabled:opacity-50"
+            >
+              <Redo className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleClear}
+              className="p-2.5 rounded-full bg-destructive/10 text-destructive"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
-        {/* Line Width */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Thickness</label>
+        {/* Colors - Compact Horizontal Scroll */}
+        <div className="flex items-center gap-3 overflow-x-auto pb-1 scrollbar-hide">
+          <span className="text-xs text-muted-foreground whitespace-nowrap">Colors:</span>
+          <div className="flex gap-2">
+            {ALL_COLORS.map((c) => (
+              <button
+                key={c}
+                onClick={() => setColor(c)}
+                className={`w-8 h-8 rounded-full border-2 transition-all hover:scale-110 flex-shrink-0 ${
+                  color === c ? 'border-foreground scale-110 shadow-lg' : 'border-border'
+                }`}
+                style={{ backgroundColor: c }}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Line Width - Compact */}
+        <div className="flex items-center gap-3">
+          <label className="text-xs font-medium whitespace-nowrap">Thickness:</label>
           <input
             type="range"
             min="1"
             max="20"
             value={lineWidth}
             onChange={(e) => setLineWidth(Number(e.target.value))}
-            className="w-full"
+            className="flex-1"
           />
+          <span className="text-xs text-muted-foreground w-6 text-right">{lineWidth}</span>
         </div>
 
         {/* Save Button */}

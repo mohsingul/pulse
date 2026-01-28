@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/app/components/Button';
 import { Card } from '@/app/components/Card';
-import { ArrowLeft, Copy, Share2, Settings, AlertTriangle, UserX } from 'lucide-react';
+import { ArrowLeft, Copy, Share2, Settings, AlertTriangle, UserX, Image, MessageSquare, Smile } from 'lucide-react';
 import { pairingAPI, coupleAPI } from '@/utils/api';
 import { storage } from '@/utils/storage';
 import { copyToClipboard } from '@/utils/clipboard';
@@ -15,6 +15,9 @@ interface ProfileScreenProps {
   onSettings: () => void;
   onUnpair: () => void;
   onLogout: () => void;
+  onDoodleGallery?: () => void;
+  onMessageArchive?: () => void;
+  onMoodArchive?: () => void;
 }
 
 export function ProfileScreen({
@@ -26,6 +29,9 @@ export function ProfileScreen({
   onSettings,
   onUnpair,
   onLogout,
+  onDoodleGallery,
+  onMessageArchive,
+  onMoodArchive,
 }: ProfileScreenProps) {
   const [codeData, setCodeData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -233,6 +239,39 @@ export function ProfileScreen({
           >
             Log Out
           </button>
+        </div>
+
+        {/* Additional Actions */}
+        <div className="space-y-3 pt-4">
+          {onDoodleGallery && (
+            <button
+              onClick={onDoodleGallery}
+              className="w-full px-4 py-3 bg-accent hover:bg-accent/80 rounded-2xl transition-colors flex items-center justify-center space-x-2"
+            >
+              <Image className="w-5 h-5" />
+              <span>Doodle Gallery</span>
+            </button>
+          )}
+
+          {onMessageArchive && (
+            <button
+              onClick={onMessageArchive}
+              className="w-full px-4 py-3 bg-accent hover:bg-accent/80 rounded-2xl transition-colors flex items-center justify-center space-x-2"
+            >
+              <MessageSquare className="w-5 h-5" />
+              <span>Message Archive</span>
+            </button>
+          )}
+
+          {onMoodArchive && (
+            <button
+              onClick={onMoodArchive}
+              className="w-full px-4 py-3 bg-accent hover:bg-accent/80 rounded-2xl transition-colors flex items-center justify-center space-x-2"
+            >
+              <Smile className="w-5 h-5" />
+              <span>Mood Archive</span>
+            </button>
+          )}
         </div>
       </div>
 

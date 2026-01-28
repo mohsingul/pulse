@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { storage } from '@/utils/storage';
-import { coupleAPI, todayAPI, notificationAPI } from '@/utils/api';
+import { coupleAPI, todayAPI, notificationAPI, userAPI } from '@/utils/api';
 import { projectId, publicAnonKey } from '/utils/supabase/info';
 
 // Screens
@@ -16,9 +16,13 @@ import { ProfileScreen } from '@/app/screens/ProfileScreen';
 import { SettingsScreen } from '@/app/screens/SettingsScreen';
 import { HistoryScreen } from '@/app/screens/HistoryScreen';
 import { DoodleCanvasScreen } from '@/app/screens/DoodleCanvasScreen';
+import { DoodleGalleryScreen } from '@/app/screens/DoodleGalleryScreen';
+import { MessageArchiveScreen } from '@/app/screens/MessageArchiveScreen';
+import { MoodArchiveScreen } from '@/app/screens/MoodArchiveScreen';
 
 // Components
 import { UpdatePulseSheet } from '@/app/components/UpdatePulseSheet';
+import { DoodleExpandedView } from '@/app/components/DoodleExpandedView';
 
 type Screen = 
   | 'welcome'
@@ -32,13 +36,17 @@ type Screen =
   | 'profile'
   | 'settings'
   | 'history'
-  | 'doodle';
+  | 'doodle'
+  | 'doodle-gallery'
+  | 'message-archive'
+  | 'mood-archive';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
   const [user, setUser] = useState<any>(null);
   const [couple, setCouple] = useState<any>(null);
   const [showUpdateSheet, setShowUpdateSheet] = useState(false);
+  const [expandedDoodle, setExpandedDoodle] = useState<any>(null);
 
   useEffect(() => {
     // Initialize theme
@@ -69,6 +77,29 @@ export default function App() {
       );
       const data = await response.json();
       console.log('[Backend Health Check]', data);
+      
+      // Initialize demo users for testing
+      try {
+        console.log('[Demo Data] Initializing demo users...');
+        const demoResponse = await userAPI.initDemo();
+        console.log('[Demo Data] Response:', demoResponse);
+        
+        if (demoResponse.created && demoResponse.created.length > 0) {
+          console.log('✅ Demo users created successfully!');
+          console.log(`📊 Total users in database: ${demoResponse.totalUsers}`);
+          console.log(`📝 Usernames available: ${demoResponse.usernames.join(', ')}`);
+          console.log('');
+          console.log('🔑 You can now test password reset with:');
+          console.log('   Username: demo');
+          console.log('   Password: password123');
+        } else {
+          console.log('ℹ️ Demo users already exist');
+          console.log(`📊 Total users in database: ${demoResponse.totalUsers}`);
+          console.log(`📝 Usernames available: ${demoResponse.usernames.join(', ')}`);
+        }
+      } catch (demoError: any) {
+        console.log('[Demo Data] Error:', demoError.message || demoError);
+      }
     } catch (error) {
       console.error('[Backend Health Check Failed]', error);
       console.error('Make sure the Supabase Edge Function is deployed');
@@ -121,7 +152,7 @@ export default function App() {
             data.intensity
           );
         } catch (notificationError) {
-          console.error('Error sending mood notification:', notificationError);
+          console.log('Unable to send mood notification (non-critical):', notificationError);
           // Don't fail the update if notification fails
         }
       }
@@ -135,7 +166,7 @@ export default function App() {
             data.message
           );
         } catch (notificationError) {
-          console.error('Error sending message notification:', notificationError);
+          console.log('Unable to send message notification (non-critical):', notificationError);
           // Don't fail the update if notification fails
         }
       }
@@ -149,7 +180,7 @@ export default function App() {
             data.doodle
           );
         } catch (notificationError) {
-          console.error('Error sending doodle notification:', notificationError);
+          console.log('Unable to send doodle notification (non-critical):', notificationError);
           // Don't fail the update if notification fails
         }
       }
@@ -279,6 +310,9 @@ export default function App() {
             onSettings={() => setCurrentScreen('settings')}
             onUnpair={handleUnpair}
             onLogout={handleLogout}
+            onDoodleGallery={() => setCurrentScreen('doodle-gallery')}
+            onMessageArchive={() => setCurrentScreen('message-archive')}
+            onMoodArchive={() => setCurrentScreen('mood-archive')}
           />
         );
 
@@ -291,14 +325,24 @@ export default function App() {
 
       case 'history':
         return (
-          <HistoryScreen
-            coupleId={couple.coupleId}
-            userId={user.userId}
-            user1Id={couple.user1Id}
-            user2Id={couple.user2Id}
-            partnerName={couple.partner.displayName}
-            onBack={() => setCurrentScreen('home')}
-          />
+          <>
+            <HistoryScreen
+              coupleId={couple.coupleId}
+              userId={user.userId}
+              user1Id={couple.user1Id}
+              user2Id={couple.user2Id}
+              userName={user.displayName}
+              partnerName={couple.partner.displayName}
+              onBack={() => setCurrentScreen('home')}
+              onDoodleClick={(doodle) => setExpandedDoodle(doodle)}
+            />
+            {expandedDoodle && (
+              <DoodleExpandedView
+                doodle={expandedDoodle}
+                onClose={() => setExpandedDoodle(null)}
+              />
+            )}
+          </>
         );
 
       case 'doodle':
@@ -306,6 +350,54 @@ export default function App() {
           <DoodleCanvasScreen
             onClose={() => setCurrentScreen('home')}
             onSave={handleDoodleSave}
+          />
+        );
+
+      case 'doodle-gallery':
+        return (
+          <>
+            <DoodleGalleryScreen
+              coupleId={couple.coupleId}
+              userId={user.userId}
+              user1Id={couple.user1Id}
+              user2Id={couple.user2Id}
+              userName={user.displayName}
+              partnerName={couple.partner.displayName}
+              onBack={() => setCurrentScreen('profile')}
+              onDoodleClick={(doodle) => setExpandedDoodle(doodle)}
+            />
+            {expandedDoodle && (
+              <DoodleExpandedView
+                doodle={expandedDoodle}
+                onClose={() => setExpandedDoodle(null)}
+              />
+            )}
+          </>
+        );
+
+      case 'message-archive':
+        return (
+          <MessageArchiveScreen
+            coupleId={couple.coupleId}
+            userId={user.userId}
+            user1Id={couple.user1Id}
+            user2Id={couple.user2Id}
+            userName={user.displayName}
+            partnerName={couple.partner.displayName}
+            onBack={() => setCurrentScreen('profile')}
+          />
+        );
+
+      case 'mood-archive':
+        return (
+          <MoodArchiveScreen
+            coupleId={couple.coupleId}
+            userId={user.userId}
+            user1Id={couple.user1Id}
+            user2Id={couple.user2Id}
+            userName={user.displayName}
+            partnerName={couple.partner.displayName}
+            onBack={() => setCurrentScreen('profile')}
           />
         );
 
