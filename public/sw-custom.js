@@ -2,7 +2,8 @@
 // Handles push notifications, offline support, and caching
 
 // Workbox manifest injection point - DO NOT REMOVE
-self.__WB_MANIFEST;
+// This will be replaced by Workbox during build with the precache manifest
+const precacheManifest = self.__WB_MANIFEST || [];
 
 const CACHE_NAME = 'aimo-pulse-v1';
 const STATIC_CACHE = 'aimo-pulse-static-v1';
