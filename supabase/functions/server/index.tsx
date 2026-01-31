@@ -16,7 +16,6 @@ app.use(
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     exposeHeaders: ["Content-Length", "Content-Type"],
     maxAge: 600,
-    credentials: true,
   }),
 );
 
@@ -945,4 +944,30 @@ app.notFound((c) => {
   return c.json({ error: "Not found" }, 404);
 });
 
-Deno.serve(app.fetch);
+// Start the server with error handling
+Deno.serve({
+  handler: async (req: Request) => {
+    try {
+      return await app.fetch(req);
+    } catch (error) {
+      console.error('[Server] Unhandled error:', error);
+      return new Response(
+        JSON.stringify({ error: 'Internal server error' }),
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+    }
+  },
+  onError: (error) => {
+    console.error('[Deno.serve] Error:', error);
+    return new Response(
+      JSON.stringify({ error: 'Service error' }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+  }
+});

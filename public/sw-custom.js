@@ -1,6 +1,9 @@
 // Custom Service Worker for Aimo Pulse
 // Handles push notifications, offline support, and caching
 
+// Workbox manifest injection point - DO NOT REMOVE
+self.__WB_MANIFEST;
+
 const CACHE_NAME = 'aimo-pulse-v1';
 const STATIC_CACHE = 'aimo-pulse-static-v1';
 const DYNAMIC_CACHE = 'aimo-pulse-dynamic-v1';
@@ -9,22 +12,25 @@ const DYNAMIC_CACHE = 'aimo-pulse-dynamic-v1';
 self.addEventListener('install', (event) => {
   console.log('[SW] Installing service worker...');
   
-  event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => {
-      console.log('[SW] Caching static assets');
-      return cache.addAll([
-        '/',
-        '/index.html',
-        '/logo.svg',
-        '/manifest.json'
-      ]);
-    }).catch((error) => {
-      console.error('[SW] Cache installation failed:', error);
-    })
-  );
-  
-  // Force the waiting service worker to become the active service worker
+  // Skip waiting immediately - don't block on caching
   self.skipWaiting();
+  
+  // Try to cache, but don't fail if it doesn't work
+  event.waitUntil(
+    caches.open(STATIC_CACHE)
+      .then((cache) => {
+        console.log('[SW] Caching static assets');
+        // Cache each file individually to avoid total failure
+        return Promise.allSettled([
+          cache.add('/').catch(e => console.log('[SW] Failed to cache /:', e)),
+          cache.add('/index.html').catch(e => console.log('[SW] Failed to cache /index.html:', e)),
+          cache.add('/logo.svg').catch(e => console.log('[SW] Failed to cache /logo.svg:', e))
+        ]);
+      })
+      .catch((error) => {
+        console.error('[SW] Cache opening failed:', error);
+      })
+  );
 });
 
 // Activate event - clean up old caches
@@ -75,9 +81,19 @@ self.addEventListener('fetch', (event) => {
           
           return response;
         })
-        .catch(() => {
+        .catch((error) => {
+          console.error('[SW] Network request failed:', error);
           // If network fails, try cache
-          return caches.match(request);
+          return caches.match(request).then((cachedResponse) => {
+            if (cachedResponse) {
+              return cachedResponse;
+            }
+            // Return a basic response if no cache available
+            return new Response('{"error": "Offline"}', {
+              status: 503,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          });
         })
     );
     return;
@@ -92,6 +108,11 @@ self.addEventListener('fetch', (event) => {
       
       // If not in cache, fetch from network
       return fetch(request).then((response) => {
+        // Don't cache failed responses
+        if (!response || response.status !== 200 || response.type === 'error') {
+          return response;
+        }
+        
         // Clone the response
         const responseClone = response.clone();
         
@@ -101,6 +122,13 @@ self.addEventListener('fetch', (event) => {
         });
         
         return response;
+      }).catch((error) => {
+        console.error('[SW] Fetch failed:', error);
+        // Return a fallback response
+        return new Response('Offline', {
+          status: 503,
+          statusText: 'Service Unavailable'
+        });
       });
     })
   );
