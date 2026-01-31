@@ -850,6 +850,89 @@ app.post("/make-server-494d91eb/notifications/:notificationId/read", async (c) =
   }
 });
 
+// PUSH SUBSCRIPTION ROUTES
+app.post("/make-server-494d91eb/push/subscribe", async (c) => {
+  try {
+    const { userId, endpoint, keys, userAgent, deviceType } = await c.req.json();
+    
+    if (!userId || !endpoint || !keys) {
+      return c.json({ error: "Missing required fields" }, 400);
+    }
+
+    const subscriptionId = generateId();
+    const subscription = {
+      subscriptionId,
+      userId,
+      endpoint,
+      keys,
+      userAgent: userAgent || 'unknown',
+      deviceType: deviceType || 'unknown',
+      createdAt: new Date().toISOString(),
+      revokedAt: null,
+    };
+
+    // Save subscription to KV store
+    await kv.set(`push_subscription:${subscriptionId}`, subscription);
+    await kv.set(`user_push:${userId}`, subscriptionId);
+
+    console.log(`[Push] Subscription created for user ${userId}`);
+    return c.json({ success: true, subscriptionId });
+  } catch (error: any) {
+    console.error("[Push] Error creating subscription:", error);
+    return c.json({ error: error.message || "Failed to create subscription" }, 500);
+  }
+});
+
+app.delete("/make-server-494d91eb/push/unsubscribe/:userId", async (c) => {
+  try {
+    const userId = c.req.param("userId");
+
+    // Get subscription ID for user
+    const subscriptionId = await kv.get(`user_push:${userId}`);
+    
+    if (subscriptionId) {
+      // Get subscription and mark as revoked
+      const subscription = await kv.get(`push_subscription:${subscriptionId}`);
+      if (subscription) {
+        subscription.revokedAt = new Date().toISOString();
+        await kv.set(`push_subscription:${subscriptionId}`, subscription);
+      }
+      
+      // Remove user mapping
+      await kv.del(`user_push:${userId}`);
+    }
+
+    console.log(`[Push] Subscription revoked for user ${userId}`);
+    return c.json({ success: true });
+  } catch (error: any) {
+    console.error("[Push] Error revoking subscription:", error);
+    return c.json({ error: error.message || "Failed to revoke subscription" }, 500);
+  }
+});
+
+app.get("/make-server-494d91eb/push/subscription/:userId", async (c) => {
+  try {
+    const userId = c.req.param("userId");
+    
+    const subscriptionId = await kv.get(`user_push:${userId}`);
+    
+    if (!subscriptionId) {
+      return c.json({ subscription: null });
+    }
+
+    const subscription = await kv.get(`push_subscription:${subscriptionId}`);
+    
+    if (!subscription || subscription.revokedAt) {
+      return c.json({ subscription: null });
+    }
+
+    return c.json({ subscription });
+  } catch (error: any) {
+    console.error("[Push] Error getting subscription:", error);
+    return c.json({ error: error.message || "Failed to get subscription" }, 500);
+  }
+});
+
 // Global error handler
 app.onError((err, c) => {
   console.error(`[Server Error] ${err.message}`, err);
