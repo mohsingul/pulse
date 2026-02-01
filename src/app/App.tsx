@@ -20,6 +20,7 @@ import { DoodleGalleryScreen } from '@/app/screens/DoodleGalleryScreen';
 import { MessageArchiveScreen } from '@/app/screens/MessageArchiveScreen';
 import { MoodArchiveScreen } from '@/app/screens/MoodArchiveScreen';
 import { SharkModeArchiveScreen } from '@/app/screens/SharkModeArchiveScreen';
+import { DailyChallengeArchiveScreen } from '@/app/screens/DailyChallengeArchiveScreen';
 
 // Components
 import { UpdatePulseSheet } from '@/app/components/UpdatePulseSheet';
@@ -41,7 +42,8 @@ type Screen =
   | 'doodle-gallery'
   | 'message-archive'
   | 'mood-archive'
-  | 'shark-mode-archive';
+  | 'shark-mode-archive'
+  | 'daily-challenge-archive';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
@@ -284,6 +286,7 @@ export default function App() {
               onUpdatePulse={() => setShowUpdateSheet(true)}
               onViewHistory={() => setCurrentScreen('history')}
               onViewProfile={() => setCurrentScreen('profile')}
+              onViewDailyChallengeArchive={() => setCurrentScreen('daily-challenge-archive')}
             />
             <UpdatePulseSheet
               isOpen={showUpdateSheet}
@@ -316,6 +319,7 @@ export default function App() {
             onMessageArchive={() => setCurrentScreen('message-archive')}
             onMoodArchive={() => setCurrentScreen('mood-archive')}
             onSharkModeArchive={() => setCurrentScreen('shark-mode-archive')}
+            onDailyChallengeArchive={() => setCurrentScreen('daily-challenge-archive')}
           />
         );
 
@@ -411,6 +415,19 @@ export default function App() {
           <SharkModeArchiveScreen
             coupleId={couple.coupleId}
             userId={user.userId}
+            userName={user.displayName}
+            partnerName={couple.partner.displayName}
+            onBack={() => setCurrentScreen('profile')}
+          />
+        );
+
+      case 'daily-challenge-archive':
+        return (
+          <DailyChallengeArchiveScreen
+            coupleId={couple.coupleId}
+            userId={user.userId}
+            user1Id={couple.user1Id}
+            user2Id={couple.user2Id}
             userName={user.displayName}
             partnerName={couple.partner.displayName}
             onBack={() => setCurrentScreen('profile')}

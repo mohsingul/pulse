@@ -5,6 +5,7 @@ import { LoadingSpinner } from '@/app/components/LoadingSpinner';
 import { NotificationPanel } from '@/app/components/NotificationPanel';
 import { InstallPrompt } from '@/app/components/InstallPrompt';
 import { SharkModeHomeCard } from '@/app/components/SharkModeHomeCard';
+import { DailyChallenge } from '@/app/components/DailyChallenge';
 import { Heart, SmilePlus, Sparkles, Clock, History, User, Bell, X } from 'lucide-react';
 import { todayAPI, notificationAPI, sharkModeAPI } from '@/utils/api';
 import { formatDistanceToNow } from 'date-fns';
@@ -19,6 +20,7 @@ interface HomeScreenProps {
   onUpdatePulse: () => void;
   onViewHistory: () => void;
   onViewProfile: () => void;
+  onViewDailyChallengeArchive?: () => void;
 }
 
 const REACTIONS = ['❤️', '🫶', '😘', '😄', '🥺'];
@@ -33,6 +35,7 @@ export function HomeScreen({
   onUpdatePulse,
   onViewHistory,
   onViewProfile,
+  onViewDailyChallengeArchive,
 }: HomeScreenProps) {
   const [todayCard, setTodayCard] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -293,6 +296,17 @@ export function HomeScreen({
             onSendReassurance={handleSendReassurance}
           />
         )}
+
+        {/* Daily Challenge */}
+        <DailyChallenge
+          coupleId={coupleId}
+          userId={userId}
+          user1Id={user1Id}
+          user2Id={user2Id}
+          userName={userName}
+          partnerName={partnerName}
+          onViewArchive={() => onViewDailyChallengeArchive?.()}
+        />
 
         {/* Your Mood Summary - Show ONLY the current user's mood */}
         {myMood && myUpdatedAt && (

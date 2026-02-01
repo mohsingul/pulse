@@ -297,5 +297,20 @@ export const challengesAPI = {
     apiRequest(`/challenges/history/${coupleId}`),
 };
 
+// Daily Challenge API
+export const dailyChallengeAPI = {
+  getCurrent: (coupleId: string) =>
+    apiRequest(`/daily-challenge/${coupleId}`),
+
+  submitAnswer: (coupleId: string, userId: string, answer: string) =>
+    apiRequest('/daily-challenge/answer', {
+      method: 'POST',
+      body: JSON.stringify({ coupleId, userId, answer }),
+    }),
+
+  getArchive: (coupleId: string) =>
+    apiRequest(`/daily-challenge/archive/${coupleId}`),
+};
+
 // Export health check function
 export { checkServerHealth };

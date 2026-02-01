@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/app/components/Button';
 import { Card } from '@/app/components/Card';
 import { SharkModeSheet } from '@/app/components/SharkModeSheet';
-import { ArrowLeft, Copy, Share2, Settings, AlertTriangle, UserX, Image, MessageSquare, Smile, Waves } from 'lucide-react';
+import { ArrowLeft, Copy, Share2, Settings, AlertTriangle, UserX, Image, MessageSquare, Smile, Waves, Sparkles } from 'lucide-react';
 import { pairingAPI, coupleAPI, sharkModeAPI } from '@/utils/api';
 import { storage } from '@/utils/storage';
 import { copyToClipboard } from '@/utils/clipboard';
@@ -20,6 +20,7 @@ interface ProfileScreenProps {
   onMessageArchive?: () => void;
   onMoodArchive?: () => void;
   onSharkModeArchive?: () => void;
+  onDailyChallengeArchive?: () => void;
 }
 
 export function ProfileScreen({
@@ -35,6 +36,7 @@ export function ProfileScreen({
   onMessageArchive,
   onMoodArchive,
   onSharkModeArchive,
+  onDailyChallengeArchive,
 }: ProfileScreenProps) {
   const [codeData, setCodeData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -342,6 +344,16 @@ export function ProfileScreen({
             >
               <Waves className="w-5 h-5" />
               <span>Shark Mode Archive</span>
+            </button>
+          )}
+
+          {onDailyChallengeArchive && (
+            <button
+              onClick={onDailyChallengeArchive}
+              className="w-full px-4 py-3 bg-accent hover:bg-accent/80 rounded-2xl transition-colors flex items-center justify-center space-x-2"
+            >
+              <Sparkles className="w-5 h-5" />
+              <span>Daily Challenge Archive</span>
             </button>
           )}
         </div>

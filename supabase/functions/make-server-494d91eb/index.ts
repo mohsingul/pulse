@@ -1,7 +1,7 @@
 import { Hono } from "npm:hono";
 import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
-import * as kv from "./kv_store.tsx";
+import * as kv from "./kv_store.ts";
 const app = new Hono();
 
 // Enable logger
@@ -84,7 +84,7 @@ app.post("/make-server-494d91eb/init-demo", async (c) => {
       await kv.set(`user:${userId1}`, demoUser1);
       createdUsers.push("demo");
       console.log("[Init Demo] Created demo user: demo / password123");
-    } else {
+    } else{ 
       console.log("[Init Demo] User 'demo' already exists");
     }
     
@@ -713,17 +713,22 @@ app.post("/make-server-494d91eb/notifications/nudge", async (c) => {
     
     const { coupleId, senderId } = body;
     
+    console.log(`[Nudge Notification] Received request - coupleId: ${coupleId}, senderId: ${senderId}`);
+    
     if (!coupleId || !senderId) {
       return c.json({ error: "Couple ID and sender ID are required" }, 400);
     }
 
     const couple = await kv.get(`couple:${coupleId}`);
     if (!couple) {
+      console.log(`[Nudge Notification] Couple not found: ${coupleId}`);
       return c.json({ error: "Couple not found" }, 404);
     }
 
     // Get receiver ID (the partner)
     const receiverId = couple.user1Id === senderId ? couple.user2Id : couple.user1Id;
+    
+    console.log(`[Nudge Notification] Receiver identified: ${receiverId}`);
     
     // Get sender info
     const sender = await kv.get(`user:${senderId}`);
@@ -744,19 +749,30 @@ app.post("/make-server-494d91eb/notifications/nudge", async (c) => {
     await kv.set(`notification:${notificationId}`, notification);
     await kv.set(`notification:user:${receiverId}:${notificationId}`, notificationId);
 
+    console.log(`[Nudge Notification] Successfully created notification ${notificationId} for receiver ${receiverId}`);
+
     return c.json({
       success: true,
       notification,
     });
   } catch (error) {
-    console.log(`Error sending nudge notification: ${error}`);
+    console.log(`[Nudge Notification] Error sending nudge notification: ${error}`);
+    console.log(`[Nudge Notification] Error stack:`, error?.stack);
     return c.json({ error: "Failed to send nudge" }, 500);
   }
 });
 
 app.post("/make-server-494d91eb/notifications/mood-update", async (c) => {
   try {
-    const { coupleId, senderId, mood, intensity } = await c.req.json();
+    let body;
+    try {
+      body = await c.req.json();
+    } catch (parseError) {
+      console.log(`[Mood Update Notification] Failed to parse JSON body: ${parseError}`);
+      return c.json({ error: "Invalid JSON in request body" }, 400);
+    }
+    
+    const { coupleId, senderId, mood, intensity } = body;
     
     if (!coupleId || !senderId || !mood) {
       return c.json({ error: "Couple ID, sender ID, and mood are required" }, 400);
@@ -905,11 +921,16 @@ app.get("/make-server-494d91eb/notifications/:userId", async (c) => {
   try {
     const userId = c.req.param("userId");
     
+    console.log(`[Notifications] Fetching notifications for user: ${userId}`);
+    
     if (!userId) {
+      console.log('[Notifications] No userId provided, returning empty array');
       return c.json({ notifications: [] });
     }
     
     const notificationIds = await kv.getByPrefix(`notification:user:${userId}:`);
+    
+    console.log(`[Notifications] Found ${notificationIds?.length || 0} notification pointers for user ${userId}`);
     
     if (!notificationIds || notificationIds.length === 0) {
       return c.json({ notifications: [] });
@@ -918,9 +939,11 @@ app.get("/make-server-494d91eb/notifications/:userId", async (c) => {
     const notifications = await Promise.all(
       notificationIds.map(async (id: string) => {
         try {
-          return await kv.get(`notification:${id}`);
+          const notification = await kv.get(`notification:${id}`);
+          console.log(`[Notifications] Retrieved notification ${id}:`, notification ? 'found' : 'not found');
+          return notification;
         } catch (err) {
-          console.log(`Error fetching notification ${id}: ${err}`);
+          console.log(`[Notifications] Error fetching notification ${id}: ${err}`);
           return null;
         }
       })
@@ -933,9 +956,11 @@ app.get("/make-server-494d91eb/notifications/:userId", async (c) => {
         return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
       });
 
+    console.log(`[Notifications] Returning ${validNotifications.length} valid notifications`);
     return c.json({ notifications: validNotifications });
   } catch (error) {
-    console.log(`Error getting notifications: ${error}`);
+    console.log(`[Notifications] Error getting notifications: ${error}`);
+    console.log(`[Notifications] Error stack:`, error?.stack);
     return c.json({ error: "Failed to get notifications" }, 500);
   }
 });
@@ -943,18 +968,25 @@ app.get("/make-server-494d91eb/notifications/:userId", async (c) => {
 app.post("/make-server-494d91eb/notifications/:notificationId/read", async (c) => {
   try {
     const notificationId = c.req.param("notificationId");
+    
+    console.log(`[Notifications] Marking notification as read: ${notificationId}`);
+    
     const notification = await kv.get(`notification:${notificationId}`);
     
     if (!notification) {
+      console.log(`[Notifications] Notification not found: ${notificationId}`);
       return c.json({ error: "Notification not found" }, 404);
     }
 
     notification.read = true;
     await kv.set(`notification:${notificationId}`, notification);
 
+    console.log(`[Notifications] Successfully marked notification ${notificationId} as read`);
+
     return c.json({ success: true });
   } catch (error) {
-    console.log(`Error marking notification as read: ${error}`);
+    console.log(`[Notifications] Error marking notification as read: ${error}`);
+    console.log(`[Notifications] Error stack:`, error?.stack);
     return c.json({ error: "Failed to mark notification as read" }, 500);
   }
 });
@@ -964,7 +996,15 @@ app.post("/make-server-494d91eb/notifications/:notificationId/read", async (c) =
 // Activate Shark Mode
 app.post("/make-server-494d91eb/shark-mode/activate", async (c) => {
   try {
-    const { coupleId, userId, durationDays, note } = await c.req.json();
+    let body;
+    try {
+      body = await c.req.json();
+    } catch (parseError) {
+      console.log(`[Shark Mode Activate] Failed to parse JSON body: ${parseError}`);
+      return c.json({ error: "Invalid JSON in request body" }, 400);
+    }
+    
+    const { coupleId, userId, durationDays, note } = body;
     
     if (!coupleId || !userId || !durationDays) {
       return c.json({ error: "Couple ID, user ID, and duration are required" }, 400);
@@ -1020,7 +1060,15 @@ app.post("/make-server-494d91eb/shark-mode/activate", async (c) => {
 // Extend Shark Mode
 app.post("/make-server-494d91eb/shark-mode/extend", async (c) => {
   try {
-    const { coupleId, userId, additionalDays } = await c.req.json();
+    let body;
+    try {
+      body = await c.req.json();
+    } catch (parseError) {
+      console.log(`[Shark Mode Extend] Failed to parse JSON body: ${parseError}`);
+      return c.json({ error: "Invalid JSON in request body" }, 400);
+    }
+    
+    const { coupleId, userId, additionalDays } = body;
     
     if (!coupleId || !userId || !additionalDays) {
       return c.json({ error: "Couple ID, user ID, and additional days are required" }, 400);
@@ -1064,7 +1112,15 @@ app.post("/make-server-494d91eb/shark-mode/extend", async (c) => {
 // Deactivate Shark Mode
 app.post("/make-server-494d91eb/shark-mode/deactivate", async (c) => {
   try {
-    const { coupleId, userId } = await c.req.json();
+    let body;
+    try {
+      body = await c.req.json();
+    } catch (parseError) {
+      console.log(`[Shark Mode Deactivate] Failed to parse JSON body: ${parseError}`);
+      return c.json({ error: "Invalid JSON in request body" }, 400);
+    }
+    
+    const { coupleId, userId } = body;
     
     if (!coupleId || !userId) {
       return c.json({ error: "Couple ID and user ID are required" }, 400);
@@ -1351,7 +1407,15 @@ app.get("/make-server-494d91eb/challenges/current/:coupleId", async (c) => {
 // Mark challenge as complete
 app.post("/make-server-494d91eb/challenges/complete", async (c) => {
   try {
-    const { coupleId, userId, response } = await c.req.json();
+    let body;
+    try {
+      body = await c.req.json();
+    } catch (parseError) {
+      console.log(`[Challenge Complete] Failed to parse JSON body: ${parseError}`);
+      return c.json({ error: "Invalid JSON in request body" }, 400);
+    }
+    
+    const { coupleId, userId, response } = body;
     
     if (!coupleId || !userId) {
       return c.json({ error: "Couple ID and User ID are required" }, 400);
@@ -1486,6 +1550,286 @@ function getWeekEnd(date: Date): Date {
 }
 
 // ===== END COUPLE CHALLENGES ENDPOINTS =====
+
+// ===== DAILY CHALLENGE ENDPOINTS =====
+
+// Daily Challenge Question Library (100 curated questions)
+const DAILY_QUESTIONS = [
+  // 💗 Emotional Connection (20)
+  "Send one word that describes how you feel about your partner today",
+  "Share one thing you appreciate about them",
+  "Draw how your heart feels today",
+  "Send a comfort emoji without explanation",
+  "Write a message starting with \"I feel safe when…\"",
+  "Share a memory that made you smile",
+  "Send a color that matches your mood",
+  "Write one sentence you wish they knew",
+  "Share today's emotional weather (sunny, cloudy, stormy)",
+  "Send a hug emoji at a random time",
+  "Share something you're proud of today",
+  "Write a one-word intention for your relationship today",
+  "Send a song lyric that matches your mood",
+  "Share what you miss about them right now",
+  "Draw your energy level today",
+  "Send one thing that made today better",
+  "Share something you're grateful for together",
+  "Describe today in one emoji",
+  "Send a calming message",
+  "Say \"thank you\" for something specific",
+  
+  // 😄 Fun & Playful (20)
+  "Draw something silly",
+  "Send your current face emoji",
+  "Use only emojis to describe your day",
+  "Draw a tiny version of your partner",
+  "Share your snack mood",
+  "Send the funniest emoji combo you can",
+  "Draw a random shape and name it",
+  "Share today's vibe animal 🐢🐱🦊",
+  "Send a surprise heart at a random hour",
+  "Share your \"today energy\" emoji",
+  "Draw your mood without lifting your finger",
+  "Send an emoji that makes no sense",
+  "Share your current comfort thing",
+  "Draw a smile in under 5 seconds",
+  "Send a \"guess my mood\" emoji",
+  "Share a color that matches your energy",
+  "Draw something abstract",
+  "Send a playful tease (kind only!)",
+  "Share your current obsession",
+  "Send an emoji you rarely use",
+  
+  // 💬 Communication & Reflection (20)
+  "Answer: \"What's on your mind today?\"",
+  "Share one small worry",
+  "Write something you're working through",
+  "Share something you need today",
+  "Write one boundary you value",
+  "Answer: \"What do you need more of right now?\"",
+  "Share one thing you learned today",
+  "Write a sentence starting with \"Lately I've been…\"",
+  "Share a feeling you had but didn't say",
+  "Describe today in one sentence",
+  "Share one thing you'd like support with",
+  "Write something you'd like to talk about soon",
+  "Share something you're avoiding",
+  "Answer: \"What made today hard?\"",
+  "Share one win from today",
+  "Write something you're excited about",
+  "Share one thing you want more of together",
+  "Write a gentle check-in message",
+  "Share today's emotional high",
+  "Share today's emotional low",
+  
+  // 💞 Intimacy & Affection (20)
+  "Send a loving emoji",
+  "Write one thing you adore about your partner",
+  "Share a moment you felt close",
+  "Draw a heart your way",
+  "Write \"I love when you…\"",
+  "Send a kiss emoji unexpectedly",
+  "Share one way they make you feel seen",
+  "Draw something soft",
+  "Share something you find attractive",
+  "Write a cozy message",
+  "Send an emoji that feels intimate to you",
+  "Share a comforting word",
+  "Draw closeness",
+  "Send a sweet reminder",
+  "Share a future moment you look forward to",
+  "Write a sentence just for them",
+  "Send a warm emoji combo",
+  "Share something that makes you feel connected",
+  "Write a gentle compliment",
+  "Send a \"thinking of you\" moment",
+  
+  // 🌱 Care & Growth (20)
+  "Share one thing you're doing for yourself today",
+  "Write a kind message to yourself",
+  "Share how you're taking care of your energy",
+  "Send a reminder to rest",
+  "Draw your stress level",
+  "Share one thing you're letting go of",
+  "Write a small intention for tomorrow",
+  "Share one healthy habit today",
+  "Send a grounding emoji",
+  "Write something that helps you reset",
+  "Share your sleep mood",
+  "Send a gentle check-in emoji",
+  "Write something you forgive yourself for",
+  "Share how full your cup feels",
+  "Draw balance",
+  "Share one thing you're proud of surviving",
+  "Write a reminder you need to hear",
+  "Share something that soothes you",
+  "Send a calm emoji",
+  "Write one thing you're hopeful about"
+];
+
+// Get today's daily challenge
+app.get("/make-server-494d91eb/daily-challenge/:coupleId", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    
+    if (!coupleId) {
+      return c.json({ error: "Couple ID is required" }, 400);
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Try to get existing challenge for today
+    let dailyChallenge = await kv.get(`daily_challenge:${coupleId}:${today}`);
+    
+    if (!dailyChallenge) {
+      // Generate a new challenge for today
+      // Use date-based deterministic selection so both users see same question
+      const dateNum = new Date(today).getTime();
+      const questionIndex = Math.floor((dateNum / 86400000) % DAILY_QUESTIONS.length);
+      const question = DAILY_QUESTIONS[questionIndex];
+      
+      dailyChallenge = {
+        coupleId,
+        date: today,
+        question,
+        questionIndex,
+        user1Answer: null,
+        user2Answer: null,
+        user1AnsweredAt: null,
+        user2AnsweredAt: null,
+        bothAnswered: false,
+        bothAnsweredAt: null,
+        createdAt: new Date().toISOString(),
+      };
+      
+      await kv.set(`daily_challenge:${coupleId}:${today}`, dailyChallenge);
+      console.log(`[Daily Challenge] New challenge for ${coupleId} on ${today}: ${question}`);
+    }
+
+    return c.json({ challenge: dailyChallenge });
+  } catch (error: any) {
+    console.error(`[Daily Challenge] Error getting challenge:`, error);
+    return c.json({ error: error.message || "Failed to get daily challenge" }, 500);
+  }
+});
+
+// Submit answer to daily challenge
+app.post("/make-server-494d91eb/daily-challenge/answer", async (c) => {
+  try {
+    let body;
+    try {
+      body = await c.req.json();
+    } catch (parseError) {
+      console.log(`[Daily Challenge Answer] Failed to parse JSON body: ${parseError}`);
+      return c.json({ error: "Invalid JSON in request body" }, 400);
+    }
+    
+    const { coupleId, userId, answer } = body;
+    
+    if (!coupleId || !userId || !answer) {
+      return c.json({ error: "Couple ID, User ID, and answer are required" }, 400);
+    }
+
+    // Get couple to determine if user1 or user2
+    const couple = await kv.get(`couple:${coupleId}`);
+    if (!couple) {
+      return c.json({ error: "Couple not found" }, 404);
+    }
+    
+    const isUser1 = couple.user1Id === userId;
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Get today's challenge
+    const dailyChallenge = await kv.get(`daily_challenge:${coupleId}:${today}`);
+    if (!dailyChallenge) {
+      return c.json({ error: "No daily challenge found for today" }, 404);
+    }
+    
+    // Update answer
+    if (isUser1) {
+      dailyChallenge.user1Answer = answer;
+      dailyChallenge.user1AnsweredAt = new Date().toISOString();
+    } else {
+      dailyChallenge.user2Answer = answer;
+      dailyChallenge.user2AnsweredAt = new Date().toISOString();
+    }
+    
+    // Check if both answered
+    if (dailyChallenge.user1Answer && dailyChallenge.user2Answer && !dailyChallenge.bothAnswered) {
+      dailyChallenge.bothAnswered = true;
+      dailyChallenge.bothAnsweredAt = new Date().toISOString();
+      
+      // Save to archive
+      const archiveKey = `daily_challenge_archive:${coupleId}:${today}`;
+      await kv.set(archiveKey, dailyChallenge);
+      
+      console.log(`[Daily Challenge] Both partners answered for ${today}`);
+    }
+    
+    await kv.set(`daily_challenge:${coupleId}:${today}`, dailyChallenge);
+
+    return c.json({ 
+      success: true, 
+      challenge: dailyChallenge,
+      justCompleted: dailyChallenge.bothAnswered && dailyChallenge.bothAnsweredAt === (isUser1 ? dailyChallenge.user1AnsweredAt : dailyChallenge.user2AnsweredAt)
+    });
+  } catch (error: any) {
+    console.error(`[Daily Challenge] Error submitting answer:`, error);
+    return c.json({ error: error.message || "Failed to submit answer" }, 500);
+  }
+});
+
+// Get daily challenge archive
+app.get("/make-server-494d91eb/daily-challenge/archive/:coupleId", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    
+    if (!coupleId) {
+      return c.json({ error: "Couple ID is required" }, 400);
+    }
+
+    const archive = await kv.getByPrefix(`daily_challenge_archive:${coupleId}:`);
+    
+    // Sort by date descending (newest first)
+    const sortedArchive = archive.sort((a: any, b: any) => {
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
+
+    // Calculate stats
+    const totalAnswered = sortedArchive.length;
+    let currentStreak = 0;
+    
+    // Calculate streak (consecutive days)
+    if (sortedArchive.length > 0) {
+      const today = new Date().toISOString().split('T')[0];
+      let checkDate = new Date(today);
+      
+      for (const entry of sortedArchive) {
+        const entryDate = entry.date;
+        const expectedDate = checkDate.toISOString().split('T')[0];
+        
+        if (entryDate === expectedDate) {
+          currentStreak++;
+          checkDate.setDate(checkDate.getDate() - 1);
+        } else {
+          break;
+        }
+      }
+    }
+
+    return c.json({ 
+      archive: sortedArchive,
+      stats: {
+        totalAnswered,
+        currentStreak,
+      }
+    });
+  } catch (error: any) {
+    console.error(`[Daily Challenge] Error getting archive:`, error);
+    return c.json({ error: error.message || "Failed to get archive" }, 500);
+  }
+});
+
+// ===== END DAILY CHALLENGE ENDPOINTS =====
 
 // 404 handler
 app.notFound((c) => {

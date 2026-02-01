@@ -1,0 +1,72 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- High-res definitions -->
+  <defs>
+    <!-- Background gradient (brand colors) -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FB3094;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#A83FFF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2571FF;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Heart 1 gradient (warm red-pink) -->
+    <linearGradient id="heartGradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6B9D;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FEC5E5;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Heart 2 gradient (vibrant pink-orange) -->
+    <linearGradient id="heartGradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFE5E5;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FFB3D9;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Glow filter for hearts -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background with rounded corners for iOS/Android -->
+  <rect width="1024" height="1024" fill="url(#bgGradient)" rx="220"/>
+  
+  <!-- Left heart - Pink/Red gradient with glow -->
+  <g transform="translate(240, 260) scale(2.2) rotate(-10)" filter="url(#glow)">
+    <path d="M 0,40 C 0,18 15,0 35,0 C 50,0 60,10 60,10 C 60,10 70,0 85,0 C 105,0 120,18 120,40 C 120,75 60,130 60,130 C 60,130 0,75 0,40 Z" 
+          fill="url(#heartGradient1)" 
+          stroke="#FFFFFF"
+          stroke-width="4"
+          stroke-linejoin="round"/>
+  </g>
+  
+  <!-- Right heart - Light pink gradient with glow -->
+  <g transform="translate(420, 260) scale(2.2) rotate(10)" filter="url(#glow)">
+    <path d="M 0,40 C 0,18 15,0 35,0 C 50,0 60,10 60,10 C 60,10 70,0 85,0 C 105,0 120,18 120,40 C 120,75 60,130 60,130 C 60,130 0,75 0,40 Z" 
+          fill="url(#heartGradient2)" 
+          stroke="#FFFFFF"
+          stroke-width="4"
+          stroke-linejoin="round"/>
+  </g>
+  
+  <!-- Pulse wave - Bold white line -->
+  <path d="M 140,660 L 240,660 L 290,560 L 340,760 L 390,600 L 440,660 L 560,660 L 610,560 L 660,760 L 710,600 L 760,660 L 884,660" 
+        stroke="white" 
+        stroke-width="20" 
+        fill="none" 
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        opacity="0.95"
+        style="filter: drop-shadow(0px 4px 8px rgba(0,0,0,0.3))"/>
+  
+  <!-- Decorative sparkles/dots -->
+  <circle cx="200" cy="800" r="18" fill="white" opacity="0.7"/>
+  <circle cx="512" cy="850" r="22" fill="white" opacity="0.8"/>
+  <circle cx="824" cy="800" r="18" fill="white" opacity="0.7"/>
+  
+  <!-- Small sparkles -->
+  <circle cx="320" cy="220" r="12" fill="white" opacity="0.6"/>
+  <circle cx="720" cy="240" r="14" fill="white" opacity="0.6"/>
+</svg>
