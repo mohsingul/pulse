@@ -206,11 +206,11 @@
 
   /* Safe Area Utilities - for iOS notch/home indicator */
   .safe-top {
-    padding-top: max(12px, env(safe-area-inset-top));
+    padding-top: env(safe-area-inset-top);
   }
 
   .safe-bottom {
-    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
   .safe-left {

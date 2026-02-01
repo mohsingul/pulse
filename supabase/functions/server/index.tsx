@@ -209,7 +209,15 @@ app.post("/make-server-494d91eb/users/create", async (c) => {
 
 app.post("/make-server-494d91eb/users/login", async (c) => {
   try {
-    const { username, password } = await c.req.json();
+    let body;
+    try {
+      body = await c.req.json();
+    } catch (parseError) {
+      console.log(`[Login] Failed to parse JSON body: ${parseError}`);
+      return c.json({ error: "Invalid JSON in request body" }, 400);
+    }
+    
+    const { username, password } = body;
     
     if (!username || !password) {
       return c.json({ error: "Username and password are required" }, 400);
@@ -260,7 +268,15 @@ app.get("/make-server-494d91eb/users/:userId", async (c) => {
 // Reset password endpoint
 app.post("/make-server-494d91eb/users/reset-password", async (c) => {
   try {
-    const { username, newPassword } = await c.req.json();
+    let body;
+    try {
+      body = await c.req.json();
+    } catch (parseError) {
+      console.log(`[Reset Password] Failed to parse JSON body: ${parseError}`);
+      return c.json({ error: "Invalid JSON in request body" }, 400);
+    }
+    
+    const { username, newPassword } = body;
     
     if (!username || !newPassword) {
       return c.json({ error: "Username and new password are required" }, 400);
@@ -305,7 +321,15 @@ app.post("/make-server-494d91eb/users/reset-password", async (c) => {
 // PAIRING ROUTES
 app.post("/make-server-494d91eb/pairing/generate", async (c) => {
   try {
-    const { userId } = await c.req.json();
+    let body;
+    try {
+      body = await c.req.json();
+    } catch (parseError) {
+      console.log(`[Pairing Generate] Failed to parse JSON body: ${parseError}`);
+      return c.json({ error: "Invalid JSON in request body" }, 400);
+    }
+    
+    const { userId } = body;
     
     if (!userId) {
       return c.json({ error: "User ID is required" }, 400);
@@ -352,7 +376,15 @@ app.post("/make-server-494d91eb/pairing/generate", async (c) => {
 
 app.post("/make-server-494d91eb/pairing/join", async (c) => {
   try {
-    const { userId, code } = await c.req.json();
+    let body;
+    try {
+      body = await c.req.json();
+    } catch (parseError) {
+      console.log(`[Pairing Join] Failed to parse JSON body: ${parseError}`);
+      return c.json({ error: "Invalid JSON in request body" }, 400);
+    }
+    
+    const { userId, code } = body;
     
     if (!userId || !code) {
       return c.json({ error: "User ID and code are required" }, 400);

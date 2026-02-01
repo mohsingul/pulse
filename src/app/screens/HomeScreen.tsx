@@ -253,32 +253,34 @@ export function HomeScreen({
       )}
 
       {/* Header */}
-      <div className="px-6 py-6 flex items-center justify-between border-b border-border safe-top flex-shrink-0">
-        <h1 className="text-2xl font-bold">Today</h1>
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => setShowNotificationPanel(true)}
-            className="p-2 hover:bg-accent rounded-full transition-colors relative"
-          >
-            <Bell className="w-5 h-5" />
-            {notifications.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#FB3094] text-white text-xs font-bold rounded-full flex items-center justify-center">
-                {notifications.length}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={onViewHistory}
-            className="p-2 hover:bg-accent rounded-full transition-colors"
-          >
-            <History className="w-5 h-5" />
-          </button>
-          <button
-            onClick={onViewProfile}
-            className="p-2 hover:bg-accent rounded-full transition-colors"
-          >
-            <User className="w-5 h-5" />
-          </button>
+      <div className="bg-background border-b border-border flex-shrink-0">
+        <div className="px-6 py-6 flex items-center justify-between safe-top">
+          <h1 className="text-2xl font-bold">Today</h1>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setShowNotificationPanel(true)}
+              className="p-2 hover:bg-accent rounded-full transition-colors relative"
+            >
+              <Bell className="w-5 h-5" />
+              {notifications.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#FB3094] text-white text-xs font-bold rounded-full flex items-center justify-center">
+                  {notifications.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={onViewHistory}
+              className="p-2 hover:bg-accent rounded-full transition-colors"
+            >
+              <History className="w-5 h-5" />
+            </button>
+            <button
+              onClick={onViewProfile}
+              className="p-2 hover:bg-accent rounded-full transition-colors"
+            >
+              <User className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </div>
 
