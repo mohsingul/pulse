@@ -54,6 +54,17 @@ export const userAPI = {
 
   get: (userId: string) =>
     apiRequest(`/users/${userId}`),
+
+  resetPassword: (username: string, newPassword: string) =>
+    apiRequest('/users/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ username, newPassword }),
+    }),
+
+  initDemo: () =>
+    apiRequest('/init-demo', {
+      method: 'POST',
+    }),
 };
 
 // Pairing API

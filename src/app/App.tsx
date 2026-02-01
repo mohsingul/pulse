@@ -319,6 +319,7 @@ export default function App() {
       case 'settings':
         return (
           <SettingsScreen
+            userId={user!.userId}
             onBack={() => setCurrentScreen('profile')}
           />
         );

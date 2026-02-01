@@ -3,16 +3,13 @@ import { Button } from '@/app/components/Button';
 import { Card } from '@/app/components/Card';
 import { ArrowLeft, Sun, Moon, Bell, BellOff, Smartphone, AlertCircle } from 'lucide-react';
 import { storage } from '@/utils/storage';
-import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 interface SettingsScreenProps {
   onBack: () => void;
   userId: string;
-  onSaveSubscription?: (subscriptionData: any) => Promise<void>;
-  onDeleteSubscription?: () => Promise<void>;
 }
 
-export function SettingsScreen({ onBack, userId, onSaveSubscription, onDeleteSubscription }: SettingsScreenProps) {
+export function SettingsScreen({ onBack, userId }: SettingsScreenProps) {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [notifications, setNotifications] = useState({
     morning: { enabled: true, time: '09:00' },
@@ -20,8 +17,6 @@ export function SettingsScreen({ onBack, userId, onSaveSubscription, onDeleteSub
     evening: { enabled: true, time: '19:00' },
   });
   
-  const pushNotifications = usePushNotifications(userId);
-
   useEffect(() => {
     setTheme(storage.getTheme());
     setNotifications(storage.getNotifications());
@@ -206,43 +201,6 @@ export function SettingsScreen({ onBack, userId, onSaveSubscription, onDeleteSub
                 onChange={(e) => handleTimeChange('evening', e.target.value)}
                 className="w-full px-4 py-2 rounded-xl bg-accent border-2 border-transparent focus:border-[#A83FFF] focus:outline-none"
               />
-            )}
-          </Card>
-        </div>
-
-        {/* Push Notifications */}
-        <div className="space-y-3">
-          <h3 className="text-lg font-semibold">Push Notifications</h3>
-          <p className="text-sm text-muted-foreground">
-            Get notified on your device
-          </p>
-
-          <Card>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h4 className="font-medium">Push Notifications</h4>
-                <p className="text-sm text-muted-foreground">Receive notifications on your device</p>
-              </div>
-              <button
-                onClick={pushNotifications.isSubscribed ? pushNotifications.unsubscribe : pushNotifications.subscribe}
-                className={`w-12 h-7 rounded-full transition-all ${
-                  pushNotifications.isSubscribed
-                    ? 'bg-[image:var(--pulse-gradient)]'
-                    : 'bg-muted'
-                }`}
-              >
-                <div
-                  className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                    pushNotifications.isSubscribed ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
-            </div>
-            {!pushNotifications.isSupported && (
-              <div className="text-sm text-red-500">
-                <AlertCircle className="w-4 h-4 inline-block mr-1" />
-                Push notifications are not supported on this device.
-              </div>
             )}
           </Card>
         </div>
