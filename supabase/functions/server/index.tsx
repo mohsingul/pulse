@@ -1413,44 +1413,36 @@ app.notFound((c) => {
 });
 
 // Start the server with error handling
-Deno.serve({
-  handler: async (req: Request) => {
-    try {
-      // Always return a response, no timeout to avoid connection closures
-      const response = await app.fetch(req);
-      
-      // Ensure we always have proper headers
-      if (!response.headers.get('Content-Type')) {
-        const newHeaders = new Headers(response.headers);
-        newHeaders.set('Content-Type', 'application/json');
-        return new Response(response.body, {
-          status: response.status,
-          statusText: response.statusText,
-          headers: newHeaders
-        });
-      }
-      
-      return response;
-    } catch (error: any) {
-      console.error('[Server] Unhandled error:', error);
-      return new Response(
-        JSON.stringify({ error: 'Internal server error', message: error?.message || 'Unknown error' }),
-        {
-          status: 500,
-          headers: { 
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, PATCH',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With'
-          }
-        }
-      );
+Deno.serve(async (req: Request) => {
+  try {
+    // Log the incoming request
+    const url = new URL(req.url);
+    console.log(`[Server] ${req.method} ${url.pathname}`);
+    
+    // Handle the request with Hono
+    const response = await app.fetch(req);
+    
+    // Ensure Content-Type is set
+    if (!response.headers.get('Content-Type')) {
+      const newHeaders = new Headers(response.headers);
+      newHeaders.set('Content-Type', 'application/json');
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: newHeaders
+      });
     }
-  },
-  onError: (error) => {
-    console.error('[Deno.serve] Error:', error);
+    
+    return response;
+  } catch (error: any) {
+    console.error('[Server] Unhandled error:', error);
+    console.error('[Server] Error stack:', error?.stack);
     return new Response(
-      JSON.stringify({ error: 'Service error', message: error?.message || 'Unknown error' }),
+      JSON.stringify({ 
+        error: 'Internal server error', 
+        message: error?.message || 'Unknown error',
+        timestamp: new Date().toISOString()
+      }),
       {
         status: 500,
         headers: { 
@@ -1461,8 +1453,5 @@ Deno.serve({
         }
       }
     );
-  },
-  onListen: ({ port, hostname }) => {
-    console.log(`[Server] Listening on http://${hostname}:${port}`);
   }
 });

@@ -132,7 +132,7 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col px-6 py-8">
+    <div className="h-full w-full flex flex-col px-6 py-8 safe-top safe-bottom overflow-y-auto">
       {/* Header */}
       <div className="flex items-center mb-8">
         <button

@@ -10,7 +10,7 @@ interface WelcomeScreenProps {
 
 export function WelcomeScreen({ onGetStarted, onLogin }: WelcomeScreenProps) {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 relative">
+    <div className="h-full w-full flex flex-col items-center justify-center px-6 relative safe-top safe-bottom">
       <GradientBlob />
       
       <div className="text-center space-y-8 z-10 max-w-md">

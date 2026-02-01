@@ -211,24 +211,32 @@ export function DoodleCanvasScreen({ onClose, onSave }: DoodleCanvasScreenProps)
   };
 
   return (
-    <div className="fixed inset-0 bg-background z-50 flex flex-col">
-      {/* Header - Compact */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <h2 className="text-lg font-semibold">Doodle Canvas</h2>
+    <div className="fixed inset-0 z-50 bg-background flex flex-col" style={{ 
+      width: '100vw',
+      height: '100vh',
+      maxWidth: '100vw',
+      maxHeight: '100vh',
+      overflow: 'hidden'
+    }}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card safe-top" style={{ flexShrink: 0 }}>
+        <h2 className="text-lg font-bold">Draw a Doodle</h2>
         <button
           onClick={onClose}
           className="p-2 hover:bg-accent rounded-full transition-colors"
+          style={{ touchAction: 'manipulation' }}
         >
           <X className="w-5 h-5" />
         </button>
       </div>
 
-      {/* Canvas - Maximized */}
-      <div className="flex-1 p-2 overflow-hidden relative">
-        {/* Gradient background */}
-        <div className="absolute inset-2 rounded-3xl bg-[image:var(--pulse-gradient)] opacity-30" />
-        <div className="absolute inset-2 rounded-3xl bg-white/80 dark:bg-background/80 backdrop-blur-xl" />
-        
+      {/* Canvas */}
+      <div className="flex-1 relative" style={{ 
+        touchAction: 'none',
+        overflow: 'hidden',
+        minHeight: 0,
+        width: '100%'
+      }}>
         <canvas
           ref={canvasRef}
           onMouseDown={startDrawing}
@@ -238,7 +246,16 @@ export function DoodleCanvasScreen({ onClose, onSave }: DoodleCanvasScreenProps)
           onTouchStart={startDrawing}
           onTouchMove={draw}
           onTouchEnd={stopDrawing}
-          className="relative w-full h-full rounded-3xl shadow-2xl touch-none"
+          className="w-full h-full cursor-crosshair bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 dark:from-purple-950/20 dark:via-pink-950/20 dark:to-blue-950/20"
+          style={{ 
+            display: 'block',
+            touchAction: 'none',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+            WebkitTouchCallout: 'none',
+            maxWidth: '100%',
+            maxHeight: '100%'
+          }}
         />
       </div>
 

@@ -10,7 +10,7 @@ interface ConnectScreenProps {
 
 export function ConnectScreen({ onCreateCouple, onJoinCouple }: ConnectScreenProps) {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6">
+    <div className="h-full w-full flex flex-col items-center justify-center px-6 safe-top safe-bottom">
       <div className="max-w-md w-full space-y-8">
         {/* Header */}
         <div className="text-center space-y-3">

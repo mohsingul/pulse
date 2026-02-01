@@ -1,22 +1,20 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Button } from '@/app/components/Button';
 
 interface SuccessScreenProps {
-  partnerName: string;
+  title: string;
+  message: string;
+  emoji: string;
   onContinue: () => void;
 }
 
-export function SuccessScreen({ partnerName, onContinue }: SuccessScreenProps) {
-  useEffect(() => {
-    // Optional confetti effect could go here
-  }, []);
-
+export function SuccessScreen({ title, message, emoji, onContinue }: SuccessScreenProps) {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6">
+    <div className="h-full w-full flex flex-col items-center justify-center px-6 safe-top safe-bottom">
       <div className="max-w-md w-full text-center space-y-8">
         {/* Success Animation */}
         <div className="relative">
-          <div className="text-8xl animate-bounce">💕</div>
+          <div className="text-8xl animate-bounce">{emoji}</div>
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-32 h-32 bg-[#FB3094]/20 rounded-full animate-ping" />
           </div>
@@ -24,9 +22,9 @@ export function SuccessScreen({ partnerName, onContinue }: SuccessScreenProps) {
 
         {/* Message */}
         <div className="space-y-3">
-          <h1 className="text-4xl font-bold">You're Connected!</h1>
+          <h1 className="text-4xl font-bold">{title}</h1>
           <p className="text-lg text-muted-foreground">
-            You and <span className="font-semibold text-foreground">{partnerName}</span> can now share your daily pulse.
+            {message}
           </p>
         </div>
 

@@ -131,7 +131,7 @@ export function HistoryScreen({ coupleId, userId, user1Id, user2Id, userName, pa
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="h-full w-full flex flex-col bg-background safe-top safe-bottom">
       {/* Header */}
       <div className="px-6 py-6 border-b border-border">
         <div className="flex items-center mb-4">

@@ -40,26 +40,45 @@ export function NotificationPanel({
       <div 
         className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity"
         onClick={onClose}
+        style={{ touchAction: 'none', width: '100vw', height: '100vh' }}
       />
       
       {/* Panel */}
-      <div className="fixed top-0 right-0 h-full w-full max-w-md bg-background dark:bg-card z-50 shadow-2xl transform transition-transform duration-300 ease-out overflow-hidden">
+      <div 
+        className="fixed top-0 right-0 h-full w-full max-w-md bg-background dark:bg-card z-50 shadow-2xl transform transition-transform duration-300 ease-out overflow-hidden"
+        style={{ 
+          touchAction: 'pan-y',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          WebkitTouchCallout: 'none',
+          height: '100vh',
+          maxHeight: '100vh'
+        }}
+      >
         {/* Header */}
-        <div className="px-6 py-6 border-b border-border flex items-center justify-between bg-[image:var(--pulse-gradient)] text-white">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-[image:var(--pulse-gradient)] text-white safe-top" style={{ flexShrink: 0 }}>
           <div>
-            <h2 className="text-2xl font-bold">Notifications</h2>
+            <h2 className="text-xl font-bold">Notifications</h2>
             <p className="text-sm text-white/80">{notifications.length} total</p>
           </div>
           <button
             onClick={onClose}
             className="p-2 hover:bg-white/20 rounded-full transition-colors"
+            style={{ touchAction: 'manipulation' }}
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="h-[calc(100%-5rem)] overflow-y-auto px-6 py-6 space-y-3">
+        <div 
+          className="overflow-y-auto px-6 py-6 space-y-3"
+          style={{ 
+            height: 'calc(100vh - 7rem)',
+            WebkitOverflowScrolling: 'touch',
+            overscrollBehavior: 'contain'
+          }}
+        >
           {notifications.length === 0 ? (
             <div className="text-center py-12">
               <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-accent flex items-center justify-center">

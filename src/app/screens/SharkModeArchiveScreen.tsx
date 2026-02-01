@@ -83,7 +83,7 @@ export function SharkModeArchiveScreen({
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="h-full w-full flex flex-col bg-background safe-top safe-bottom">
       {/* Header */}
       <div className="px-6 py-6 flex items-center justify-between border-b border-border">
         <button

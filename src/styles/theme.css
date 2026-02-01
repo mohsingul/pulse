@@ -130,13 +130,27 @@
     @apply border-border outline-ring/50;
   }
 
+  /* Prevent zoom on mobile/PWA */
+  html {
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
   body {
     @apply bg-background text-foreground;
-    /* iOS Safe Area - Reduced padding to prevent too much space */
-    padding-top: max(12px, env(safe-area-inset-top));
-    padding-bottom: env(safe-area-inset-bottom);
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  #root {
+    /* Height handled in index.html */
+  }
+
+  /* Fast tap response on interactive elements */
+  button,
+  a {
+    touch-action: manipulation;
   }
 
   /**
@@ -188,5 +202,32 @@
     font-size: var(--text-base);
     font-weight: var(--font-weight-normal);
     line-height: 1.5;
+  }
+
+  /* Safe Area Utilities - for iOS notch/home indicator */
+  .safe-top {
+    padding-top: max(12px, env(safe-area-inset-top));
+  }
+
+  .safe-bottom {
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+
+  .safe-left {
+    padding-left: env(safe-area-inset-left);
+  }
+
+  .safe-right {
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* Hide scrollbars for scrollable elements */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 }

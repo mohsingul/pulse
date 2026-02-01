@@ -423,7 +423,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="h-full w-full bg-background text-foreground overflow-auto">
       {renderScreen()}
     </div>
   );

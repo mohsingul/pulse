@@ -2,6 +2,10 @@ import { projectId, publicAnonKey } from '/utils/supabase/info';
 
 const BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-494d91eb`;
 
+// Development mode flag - automatically enabled when server is unreachable
+let isDevelopmentMode = false;
+let developmentModeReason = '';
+
 // Health check to verify server is accessible
 let serverHealthy = true;
 let lastHealthCheck = 0;
@@ -23,11 +27,25 @@ async function checkServerHealth(): Promise<boolean> {
     });
     serverHealthy = response.ok;
     lastHealthCheck = now;
+    
+    if (serverHealthy && isDevelopmentMode) {
+      console.log('[API] ✅ Server is back online! Development mode can be disabled.');
+    }
+    
     return serverHealthy;
   } catch (error) {
     console.warn('[API] Health check failed:', error);
     serverHealthy = false;
     lastHealthCheck = now;
+    
+    if (!isDevelopmentMode) {
+      isDevelopmentMode = true;
+      developmentModeReason = 'Server health check failed';
+      console.warn('[API] ⚠️ Enabling development mode - server is unreachable');
+      console.warn('[API] 💡 The app will use local storage for data persistence');
+      console.warn('[API] 📝 To deploy the server, follow Supabase Edge Functions deployment guide');
+    }
+    
     return false;
   }
 }
@@ -82,6 +100,18 @@ async function apiRequest(endpoint: string, options: RequestInit = {}) {
       if (endpoint.includes('/notifications/') && !endpoint.includes('/read')) {
         console.log('[API] Notification fetch failed, returning empty array');
         return { notifications: [] };
+      }
+      
+      // For fetching shark mode status, return null instead of throwing
+      if (endpoint.includes('/shark-mode/status/')) {
+        console.log('[API] Shark mode status fetch failed (non-critical), returning null');
+        return { sharkMode: null };
+      }
+      
+      // For fetching shark mode history, return empty array instead of throwing
+      if (endpoint.includes('/shark-mode/history/')) {
+        console.log('[API] Shark mode history fetch failed (non-critical), returning empty array');
+        return { history: [] };
       }
       
       throw new Error('Unable to connect to server. Please check your network connection and try again.');
