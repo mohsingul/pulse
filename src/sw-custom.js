@@ -1,9 +1,17 @@
 // Custom Service Worker for Aimo Pulse
 // Handles push notifications, offline support, and caching
 
-// Workbox manifest injection point - DO NOT REMOVE
-// This will be replaced by Workbox during build with the precache manifest
-const precacheManifest = self.__WB_MANIFEST || [];
+// ✅ Workbox manifest injection point (REQUIRED for injectManifest)
+// Workbox will replace `self.__WB_MANIFEST` at build time.
+// Custom Service Worker for Aimo Pulse
+// Handles push notifications, offline support, and caching
+
+import { precacheAndRoute } from "workbox-precaching";
+
+// ✅ REQUIRED: Workbox will inject the manifest array here at build time.
+// This line must exist exactly like this for injectManifest to work.
+precacheAndRoute(self.__WB_MANIFEST);
+
 
 const CACHE_NAME = 'aimo-pulse-v1';
 const STATIC_CACHE = 'aimo-pulse-static-v1';
@@ -12,10 +20,10 @@ const DYNAMIC_CACHE = 'aimo-pulse-dynamic-v1';
 // Install event - cache static assets
 self.addEventListener('install', (event) => {
   console.log('[SW] Installing service worker...');
-  
+
   // Skip waiting immediately - don't block on caching
   self.skipWaiting();
-  
+
   // Try to cache, but don't fail if it doesn't work
   event.waitUntil(
     caches.open(STATIC_CACHE)
@@ -37,7 +45,7 @@ self.addEventListener('install', (event) => {
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
   console.log('[SW] Activating service worker...');
-  
+
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -46,11 +54,12 @@ self.addEventListener('activate', (event) => {
             console.log('[SW] Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
+          return undefined;
         })
       );
     })
   );
-  
+
   // Claim all clients immediately
   return self.clients.claim();
 });
@@ -59,37 +68,30 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
-  
+
   // Skip non-GET requests
-  if (request.method !== 'GET') {
-    return;
-  }
-  
+  if (request.method !== 'GET') return;
+
   // For API requests, use Network First strategy
   if (url.hostname.includes('supabase.co')) {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          // Clone the response
           const responseClone = response.clone();
-          
+
           // Cache successful responses
           if (response.status === 200) {
             caches.open(DYNAMIC_CACHE).then((cache) => {
               cache.put(request, responseClone);
             });
           }
-          
           return response;
         })
         .catch((error) => {
           console.error('[SW] Network request failed:', error);
-          // If network fails, try cache
           return caches.match(request).then((cachedResponse) => {
-            if (cachedResponse) {
-              return cachedResponse;
-            }
-            // Return a basic response if no cache available
+            if (cachedResponse) return cachedResponse;
+
             return new Response('{"error": "Offline"}', {
               status: 503,
               headers: { 'Content-Type': 'application/json' }
@@ -99,38 +101,33 @@ self.addEventListener('fetch', (event) => {
     );
     return;
   }
-  
+
   // For static assets, use Cache First strategy
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      
-      // If not in cache, fetch from network
-      return fetch(request).then((response) => {
-        // Don't cache failed responses
-        if (!response || response.status !== 200 || response.type === 'error') {
+      if (cachedResponse) return cachedResponse;
+
+      return fetch(request)
+        .then((response) => {
+          // Don't cache failed responses
+          if (!response || response.status !== 200 || response.type === 'error') {
+            return response;
+          }
+
+          const responseClone = response.clone();
+          caches.open(DYNAMIC_CACHE).then((cache) => {
+            cache.put(request, responseClone);
+          });
+
           return response;
-        }
-        
-        // Clone the response
-        const responseClone = response.clone();
-        
-        // Cache the new response
-        caches.open(DYNAMIC_CACHE).then((cache) => {
-          cache.put(request, responseClone);
+        })
+        .catch((error) => {
+          console.error('[SW] Fetch failed:', error);
+          return new Response('Offline', {
+            status: 503,
+            statusText: 'Service Unavailable'
+          });
         });
-        
-        return response;
-      }).catch((error) => {
-        console.error('[SW] Fetch failed:', error);
-        // Return a fallback response
-        return new Response('Offline', {
-          status: 503,
-          statusText: 'Service Unavailable'
-        });
-      });
     })
   );
 });
@@ -138,7 +135,7 @@ self.addEventListener('fetch', (event) => {
 // Push event - handle incoming push notifications
 self.addEventListener('push', (event) => {
   console.log('[SW] Push notification received:', event);
-  
+
   let notificationData = {
     title: 'Aimo Pulse',
     body: 'You have a new update',
@@ -146,11 +143,9 @@ self.addEventListener('push', (event) => {
     badge: '/logo.svg',
     tag: 'aimo-pulse-notification',
     requireInteraction: false,
-    data: {
-      url: '/'
-    }
+    data: { url: '/' }
   };
-  
+
   // Parse push data if available
   if (event.data) {
     try {
@@ -164,7 +159,7 @@ self.addEventListener('push', (event) => {
         requireInteraction: data.requireInteraction || false,
         data: {
           url: data.url || '/',
-          ...data.data
+          ...(data.data || {})
         },
         actions: data.actions || []
       };
@@ -173,7 +168,7 @@ self.addEventListener('push', (event) => {
       notificationData.body = event.data.text();
     }
   }
-  
+
   event.waitUntil(
     self.registration.showNotification(notificationData.title, notificationData)
   );
@@ -182,68 +177,48 @@ self.addEventListener('push', (event) => {
 // Notification click event - handle user clicking on notification
 self.addEventListener('notificationclick', (event) => {
   console.log('[SW] Notification clicked:', event);
-  
+
   event.notification.close();
-  
   const urlToOpen = event.notification.data?.url || '/';
-  
-  // Handle action button clicks
-  if (event.action) {
-    console.log('[SW] Notification action clicked:', event.action);
-    // You can handle different actions here
-  }
-  
-  // Open the app or focus existing window
+
   event.waitUntil(
-    clients.matchAll({
-      type: 'window',
-      includeUncontrolled: true
-    }).then((clientList) => {
-      // Check if there's already a window open
-      for (let i = 0; i < clientList.length; i++) {
-        const client = clientList[i];
-        if (client.url === new URL(urlToOpen, self.location.origin).href && 'focus' in client) {
-          return client.focus();
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        for (let i = 0; i < clientList.length; i++) {
+          const client = clientList[i];
+          if (client.url === new URL(urlToOpen, self.location.origin).href && 'focus' in client) {
+            return client.focus();
+          }
         }
-      }
-      
-      // If no window is open, open a new one
-      if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
-      }
-    })
+        if (clients.openWindow) return clients.openWindow(urlToOpen);
+        return undefined;
+      })
   );
 });
 
 // Background sync event (optional - for offline actions)
 self.addEventListener('sync', (event) => {
   console.log('[SW] Background sync:', event.tag);
-  
+
   if (event.tag === 'sync-pulse-updates') {
-    event.waitUntil(
-      // Sync any pending updates when connection is restored
-      syncPendingUpdates()
-    );
+    event.waitUntil(syncPendingUpdates());
   }
 });
 
 async function syncPendingUpdates() {
-  // Implementation for syncing offline updates
   console.log('[SW] Syncing pending updates...');
-  // This would retrieve any pending updates from IndexedDB and send them to the server
+  // Retrieve pending updates from IndexedDB and send them to the server
 }
 
 // Message event - handle messages from the app
 self.addEventListener('message', (event) => {
   console.log('[SW] Message received:', event.data);
-  
+
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
-  
+
   if (event.data && event.data.type === 'GET_VERSION') {
-    event.ports[0].postMessage({
-      version: CACHE_NAME
-    });
+    event.ports[0].postMessage({ version: CACHE_NAME });
   }
 });
