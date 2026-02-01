@@ -73,17 +73,8 @@
     "vite-plugin-pwa": "1.2.0",
     "workbox-build": "^7.4.0"
   },
-  "peerDependencies": {
-    
-  },
-  "peerDependenciesMeta": {
-    "react": {
-      "optional": true
-    },
-    "react-dom": {
-      "optional": true
-    }
-  },
+
+
   "pnpm": {
     "overrides": {
       "vite": "6.3.5"
