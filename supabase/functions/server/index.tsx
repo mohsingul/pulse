@@ -547,8 +547,16 @@ app.get("/make-server-494d91eb/today/:coupleId", async (c) => {
 
 app.post("/make-server-494d91eb/today/:coupleId", async (c) => {
   try {
+    let body;
+    try {
+      body = await c.req.json();
+    } catch (parseError) {
+      console.log(`[Today Card Update] Failed to parse JSON body: ${parseError}`);
+      return c.json({ error: "Invalid JSON in request body" }, 400);
+    }
+    
     const coupleId = c.req.param("coupleId");
-    const { userId, mood, message, doodle, intensity } = await c.req.json();
+    const { userId, mood, message, doodle, intensity } = body;
     
     const today = new Date().toISOString().split('T')[0];
     const existingCard = await kv.get(`today:${coupleId}:${today}`) || {};
@@ -632,8 +640,16 @@ app.post("/make-server-494d91eb/today/:coupleId", async (c) => {
 
 app.post("/make-server-494d91eb/today/:coupleId/react", async (c) => {
   try {
+    let body;
+    try {
+      body = await c.req.json();
+    } catch (parseError) {
+      console.log(`[Today Card React] Failed to parse JSON body: ${parseError}`);
+      return c.json({ error: "Invalid JSON in request body" }, 400);
+    }
+    
     const coupleId = c.req.param("coupleId");
-    const { userId, emoji } = await c.req.json();
+    const { userId, emoji } = body;
     
     const today = new Date().toISOString().split('T')[0];
     const todayCard = await kv.get(`today:${coupleId}:${today}`);
@@ -687,7 +703,15 @@ app.get("/make-server-494d91eb/history/:coupleId", async (c) => {
 // NOTIFICATION ROUTES
 app.post("/make-server-494d91eb/notifications/nudge", async (c) => {
   try {
-    const { coupleId, senderId } = await c.req.json();
+    let body;
+    try {
+      body = await c.req.json();
+    } catch (parseError) {
+      console.log(`[Nudge Notification] Failed to parse JSON body: ${parseError}`);
+      return c.json({ error: "Invalid JSON in request body" }, 400);
+    }
+    
+    const { coupleId, senderId } = body;
     
     if (!coupleId || !senderId) {
       return c.json({ error: "Couple ID and sender ID are required" }, 400);
@@ -825,7 +849,15 @@ app.post("/make-server-494d91eb/notifications/message-update", async (c) => {
 
 app.post("/make-server-494d91eb/notifications/doodle-update", async (c) => {
   try {
-    const { coupleId, senderId, doodle } = await c.req.json();
+    let body;
+    try {
+      body = await c.req.json();
+    } catch (parseError) {
+      console.log(`[Doodle Update Notification] Failed to parse JSON body: ${parseError}`);
+      return c.json({ error: "Invalid JSON in request body" }, 400);
+    }
+    
+    const { coupleId, senderId, doodle } = body;
     
     if (!coupleId || !senderId) {
       return c.json({ error: "Couple ID and sender ID are required" }, 400);

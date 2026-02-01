@@ -132,59 +132,57 @@ export function HistoryScreen({ coupleId, userId, user1Id, user2Id, userName, pa
 
   return (
     <div className="h-full w-full flex flex-col bg-background">
-      {/* Header - Background extends into notch */}
-      <div className="bg-background border-b border-border flex-shrink-0">
-        <div className="px-6 py-6 safe-top">
-          <div className="flex items-center justify-between mb-4">
-            <button
-              type="button"
-              onClick={selectedDay ? () => setSelectedDay(null) : onBack}
-              className="p-2 hover:bg-accent rounded-full transition-colors -ml-2"
-            >
-              <ArrowLeft className="w-6 h-6" />
-            </button>
-            <h2 className="text-xl font-semibold flex-1 text-center -ml-10">
-              {selectedDay ? formatDate(selectedDay.date) : 'History'}
-            </h2>
-            <div className="w-10" /> {/* Spacer for balance */}
-          </div>
-
-          {/* Filter Tabs */}
-          {!selectedDay && (
-            <div className="flex space-x-2">
-              <button
-                onClick={() => setFilter('all')}
-                className={`flex-1 px-4 py-2 rounded-full font-medium transition-all ${
-                  filter === 'all'
-                    ? 'bg-[image:var(--pulse-gradient)] text-white'
-                    : 'bg-accent text-foreground hover:bg-accent/80'
-                }`}
-              >
-                All
-              </button>
-              <button
-                onClick={() => setFilter('mine')}
-                className={`flex-1 px-4 py-2 rounded-full font-medium transition-all ${
-                  filter === 'mine'
-                    ? 'bg-[image:var(--pulse-gradient)] text-white'
-                    : 'bg-accent text-foreground hover:bg-accent/80'
-                }`}
-              >
-                Mine
-              </button>
-              <button
-                onClick={() => setFilter('partner')}
-                className={`flex-1 px-4 py-2 rounded-full font-medium transition-all ${
-                  filter === 'partner'
-                    ? 'bg-[image:var(--pulse-gradient)] text-white'
-                    : 'bg-accent text-foreground hover:bg-accent/80'
-                }`}
-              >
-                {partnerName}
-              </button>
-            </div>
-          )}
+      {/* Header */}
+      <div className="px-6 py-6 border-b border-border safe-top flex-shrink-0">
+        <div className="flex items-center justify-between mb-4">
+          <button
+            type="button"
+            onClick={selectedDay ? () => setSelectedDay(null) : onBack}
+            className="p-2 hover:bg-accent rounded-full transition-colors -ml-2"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <h2 className="text-xl font-semibold flex-1 text-center -ml-10">
+            {selectedDay ? formatDate(selectedDay.date) : 'History'}
+          </h2>
+          <div className="w-10" /> {/* Spacer for balance */}
         </div>
+
+        {/* Filter Tabs */}
+        {!selectedDay && (
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setFilter('all')}
+              className={`flex-1 px-4 py-2 rounded-full font-medium transition-all ${
+                filter === 'all'
+                  ? 'bg-[image:var(--pulse-gradient)] text-white'
+                  : 'bg-accent text-foreground hover:bg-accent/80'
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setFilter('mine')}
+              className={`flex-1 px-4 py-2 rounded-full font-medium transition-all ${
+                filter === 'mine'
+                  ? 'bg-[image:var(--pulse-gradient)] text-white'
+                  : 'bg-accent text-foreground hover:bg-accent/80'
+              }`}
+            >
+              Mine
+            </button>
+            <button
+              onClick={() => setFilter('partner')}
+              className={`flex-1 px-4 py-2 rounded-full font-medium transition-all ${
+                filter === 'partner'
+                  ? 'bg-[image:var(--pulse-gradient)] text-white'
+                  : 'bg-accent text-foreground hover:bg-accent/80'
+              }`}
+            >
+              {partnerName}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Content */}

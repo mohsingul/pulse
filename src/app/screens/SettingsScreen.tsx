@@ -56,16 +56,14 @@ export function SettingsScreen({ onBack, userId, userName }: SettingsScreenProps
   return (
     <div className="h-full w-full flex flex-col bg-background">
       {/* Header */}
-      <div className="bg-background border-b border-border flex-shrink-0">
-        <div className="px-6 py-6 flex items-center justify-between safe-top">
-          <button
-            onClick={onBack}
-            className="p-2 hover:bg-accent rounded-full transition-colors -ml-2"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <h2 className="text-xl font-semibold ml-4">Settings</h2>
-        </div>
+      <div className="px-6 py-6 flex items-center justify-between border-b border-border safe-top flex-shrink-0">
+        <button
+          onClick={onBack}
+          className="p-2 hover:bg-accent rounded-full transition-colors -ml-2"
+        >
+          <ArrowLeft className="w-6 h-6" />
+        </button>
+        <h2 className="text-xl font-semibold ml-4">Settings</h2>
       </div>
 
       {/* Content */}
