@@ -2,6 +2,36 @@ import { projectId, publicAnonKey } from '/utils/supabase/info';
 
 const BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-494d91eb`;
 
+// Health check to verify server is accessible
+let serverHealthy = true;
+let lastHealthCheck = 0;
+const HEALTH_CHECK_INTERVAL = 60000; // 1 minute
+
+async function checkServerHealth(): Promise<boolean> {
+  const now = Date.now();
+  if (now - lastHealthCheck < HEALTH_CHECK_INTERVAL) {
+    return serverHealthy;
+  }
+  
+  try {
+    const response = await fetch(`${BASE_URL}/health`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${publicAnonKey}`,
+      },
+      signal: AbortSignal.timeout(5000), // 5 second timeout
+    });
+    serverHealthy = response.ok;
+    lastHealthCheck = now;
+    return serverHealthy;
+  } catch (error) {
+    console.warn('[API] Health check failed:', error);
+    serverHealthy = false;
+    lastHealthCheck = now;
+    return false;
+  }
+}
+
 async function apiRequest(endpoint: string, options: RequestInit = {}) {
   try {
     console.log(`[API] Making request to: ${BASE_URL}${endpoint}`);
@@ -18,6 +48,13 @@ async function apiRequest(endpoint: string, options: RequestInit = {}) {
 
     console.log(`[API] Response status: ${response.status}`);
 
+    // Handle non-JSON responses
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      console.error(`[API] Non-JSON response received for ${endpoint}`);
+      throw new Error(`Server returned non-JSON response. Status: ${response.status}`);
+    }
+
     const data = await response.json();
 
     if (!response.ok) {
@@ -30,8 +67,24 @@ async function apiRequest(endpoint: string, options: RequestInit = {}) {
     console.error(`[API] Request failed for ${endpoint}:`, error);
     
     // Provide more helpful error messages
-    if (error instanceof TypeError && error.message === 'Failed to fetch') {
-      throw new Error('Unable to connect to server. The Supabase Edge Function may not be deployed or network connection is unavailable.');
+    if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+      console.error('[API] Network error - Check if Supabase Edge Function is deployed');
+      console.error('[API] Base URL:', BASE_URL);
+      console.error('[API] Full URL:', `${BASE_URL}${endpoint}`);
+      
+      // For non-critical operations like marking notifications as read, fail silently
+      if (endpoint.includes('/notifications/') && endpoint.includes('/read')) {
+        console.log('[API] Notification mark-as-read failed (non-critical), continuing...');
+        return { success: false, error: 'Network error' };
+      }
+      
+      // For fetching notifications, return empty array instead of throwing
+      if (endpoint.includes('/notifications/') && !endpoint.includes('/read')) {
+        console.log('[API] Notification fetch failed, returning empty array');
+        return { notifications: [] };
+      }
+      
+      throw new Error('Unable to connect to server. Please check your network connection and try again.');
     }
     
     throw error;
@@ -213,3 +266,6 @@ export const challengesAPI = {
   getHistory: (coupleId: string) =>
     apiRequest(`/challenges/history/${coupleId}`),
 };
+
+// Export health check function
+export { checkServerHealth };
