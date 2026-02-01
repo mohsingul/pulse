@@ -225,10 +225,10 @@ export function HomeScreen({
   const partnerUpdatedAt = todayCard?.[`${partnerPrefix}UpdatedAt`];
   
   return (
-    <div className="h-full w-full flex flex-col bg-background safe-top safe-bottom">
+    <div className="h-full w-full flex flex-col bg-background">
       {/* Server Error Banner */}
       {loadingError && (
-        <div className="px-6 pt-4">
+        <div className="px-6 pt-4 safe-top">
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
             <div className="flex items-start space-x-3">
               <div className="flex-shrink-0">
@@ -253,7 +253,7 @@ export function HomeScreen({
       )}
 
       {/* Header */}
-      <div className="px-6 py-6 flex items-center justify-between border-b border-border">
+      <div className="px-6 py-6 flex items-center justify-between border-b border-border safe-top flex-shrink-0">
         <h1 className="text-2xl font-bold">Today</h1>
         <div className="flex items-center space-x-2">
           <button

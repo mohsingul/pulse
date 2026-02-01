@@ -103,47 +103,48 @@ export function DoodleGalleryScreen({
   };
 
   return (
-    <div className="h-full w-full flex flex-col bg-background safe-top safe-bottom">
+    <div className="h-full w-full flex flex-col bg-background">
       {/* Header */}
-      <div className="px-6 py-6 border-b border-border">
-        <div className="flex items-center mb-6">
+      <div className="px-6 py-6 border-b border-border safe-top flex-shrink-0">
+        <div className="flex items-center justify-between">
           <button
             onClick={onBack}
             className="p-2 hover:bg-accent rounded-full transition-colors -ml-2"
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
-          <h2 className="text-xl font-semibold ml-4">Doodle Gallery</h2>
+          <h2 className="text-xl font-semibold">Doodle Gallery</h2>
+          <div className="w-10" /> {/* Spacer */}
         </div>
 
         {/* Filter Tabs */}
-        <div className="flex space-x-2">
+        <div className="flex space-x-2 mt-4">
           <button
             onClick={() => setFilter('all')}
-            className={`flex-1 px-4 py-2 rounded-full font-medium transition-all ${
+            className={`flex-1 py-3 px-4 rounded-2xl font-medium transition-all ${
               filter === 'all'
-                ? 'bg-[image:var(--pulse-gradient)] text-white'
-                : 'bg-accent text-foreground hover:bg-accent/80'
+                ? 'bg-[image:var(--pulse-gradient)] text-white shadow-lg'
+                : 'bg-accent text-muted-foreground hover:bg-accent/80'
             }`}
           >
             All
           </button>
           <button
             onClick={() => setFilter('mine')}
-            className={`flex-1 px-4 py-2 rounded-full font-medium transition-all ${
+            className={`flex-1 py-3 px-4 rounded-2xl font-medium transition-all ${
               filter === 'mine'
-                ? 'bg-[image:var(--pulse-gradient)] text-white'
-                : 'bg-accent text-foreground hover:bg-accent/80'
+                ? 'bg-[image:var(--pulse-gradient)] text-white shadow-lg'
+                : 'bg-accent text-muted-foreground hover:bg-accent/80'
             }`}
           >
             Mine
           </button>
           <button
             onClick={() => setFilter('partner')}
-            className={`flex-1 px-4 py-2 rounded-full font-medium transition-all ${
+            className={`flex-1 py-3 px-4 rounded-2xl font-medium transition-all ${
               filter === 'partner'
-                ? 'bg-[image:var(--pulse-gradient)] text-white'
-                : 'bg-accent text-foreground hover:bg-accent/80'
+                ? 'bg-[image:var(--pulse-gradient)] text-white shadow-lg'
+                : 'bg-accent text-muted-foreground hover:bg-accent/80'
             }`}
           >
             {partnerName}
@@ -152,7 +153,7 @@ export function DoodleGalleryScreen({
       </div>
 
       {/* Content */}
-      <div className="flex-1 px-6 py-6 overflow-y-auto">
+      <div className="flex-1 px-6 py-6 overflow-y-auto safe-bottom">
         {loading ? (
           <div className="text-center py-12">
             <div className="w-16 h-16 border-4 border-[#A83FFF] border-t-transparent rounded-full animate-spin mx-auto mb-4" />

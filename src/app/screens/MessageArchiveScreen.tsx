@@ -112,20 +112,21 @@ export function MessageArchiveScreen({
   }, {});
 
   return (
-    <div className="h-full w-full flex flex-col bg-background safe-top safe-bottom">
+    <div className="h-full w-full flex flex-col bg-background">
       {/* Header */}
-      <div className="px-6 py-6 flex items-center border-b border-border">
+      <div className="px-6 py-6 flex items-center justify-between border-b border-border safe-top flex-shrink-0">
         <button
           onClick={onBack}
           className="p-2 hover:bg-accent rounded-full transition-colors -ml-2"
         >
           <ArrowLeft className="w-6 h-6" />
         </button>
-        <h2 className="text-xl font-semibold ml-4">Message Archive</h2>
+        <h2 className="text-xl font-semibold">Message Archive</h2>
+        <div className="w-10" /> {/* Spacer */}
       </div>
 
       {/* Content */}
-      <div className="flex-1 px-6 py-6 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto safe-bottom">
         {loading ? (
           <div className="text-center py-12">
             <div className="w-16 h-16 border-4 border-[#A83FFF] border-t-transparent rounded-full animate-spin mx-auto mb-4" />

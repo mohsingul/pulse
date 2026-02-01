@@ -19,6 +19,21 @@ app.use(
   }),
 );
 
+// Global middleware to ensure all errors are caught and logged
+app.use('*', async (c, next) => {
+  try {
+    await next();
+  } catch (error: any) {
+    console.error(`[Middleware Error] ${c.req.method} ${c.req.url}:`, error);
+    console.error(`[Middleware Error Stack]:`, error?.stack);
+    return c.json({ 
+      error: 'Request processing failed', 
+      message: error?.message || 'Unknown error',
+      path: new URL(c.req.url).pathname
+    }, 500);
+  }
+});
+
 // Utility: Hash password
 async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -137,7 +152,15 @@ app.get("/make-server-494d91eb/debug/users", async (c) => {
 // USER ROUTES
 app.post("/make-server-494d91eb/users/create", async (c) => {
   try {
-    const { username, password, displayName } = await c.req.json();
+    let body;
+    try {
+      body = await c.req.json();
+    } catch (parseError) {
+      console.log(`[Create User] Failed to parse JSON body: ${parseError}`);
+      return c.json({ error: "Invalid JSON in request body" }, 400);
+    }
+    
+    const { username, password, displayName } = body;
     
     if (!username || !password || !displayName) {
       return c.json({ error: "Username, password, and display name are required" }, 400);
@@ -1399,12 +1422,6 @@ function getWeekEnd(date: Date): Date {
 }
 
 // ===== END COUPLE CHALLENGES ENDPOINTS =====
-
-// Global error handler
-app.onError((err, c) => {
-  console.error(`[Server Error] ${err.message}`, err);
-  return c.json({ error: err.message || "Internal server error" }, 500);
-});
 
 // 404 handler
 app.notFound((c) => {

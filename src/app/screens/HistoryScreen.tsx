@@ -131,19 +131,21 @@ export function HistoryScreen({ coupleId, userId, user1Id, user2Id, userName, pa
   };
 
   return (
-    <div className="h-full w-full flex flex-col bg-background safe-top safe-bottom">
+    <div className="h-full w-full flex flex-col bg-background">
       {/* Header */}
-      <div className="px-6 py-6 border-b border-border">
-        <div className="flex items-center mb-4">
+      <div className="px-6 py-6 border-b border-border safe-top flex-shrink-0">
+        <div className="flex items-center justify-between mb-4">
           <button
+            type="button"
             onClick={selectedDay ? () => setSelectedDay(null) : onBack}
             className="p-2 hover:bg-accent rounded-full transition-colors -ml-2"
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
-          <h2 className="text-xl font-semibold ml-4">
+          <h2 className="text-xl font-semibold flex-1 text-center -ml-10">
             {selectedDay ? formatDate(selectedDay.date) : 'History'}
           </h2>
+          <div className="w-10" /> {/* Spacer for balance */}
         </div>
 
         {/* Filter Tabs */}

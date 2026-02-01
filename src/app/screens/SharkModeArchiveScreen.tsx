@@ -83,9 +83,9 @@ export function SharkModeArchiveScreen({
   };
 
   return (
-    <div className="h-full w-full flex flex-col bg-background safe-top safe-bottom">
+    <div className="h-full w-full flex flex-col bg-background">
       {/* Header */}
-      <div className="px-6 py-6 flex items-center justify-between border-b border-border">
+      <div className="px-6 py-6 flex items-center justify-between border-b border-border safe-top flex-shrink-0">
         <button
           onClick={onBack}
           className="p-2 hover:bg-accent rounded-full transition-colors -ml-2"
@@ -97,7 +97,7 @@ export function SharkModeArchiveScreen({
       </div>
 
       {/* Content */}
-      <div className="flex-1 px-6 py-8 space-y-4 overflow-y-auto">
+      <div className="flex-1 px-6 py-8 space-y-4 overflow-y-auto safe-bottom">
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <LoadingSpinner />
