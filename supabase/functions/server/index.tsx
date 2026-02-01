@@ -872,88 +872,519 @@ app.post("/make-server-494d91eb/notifications/:notificationId/read", async (c) =
   }
 });
 
-// PUSH SUBSCRIPTION ROUTES
-app.post("/make-server-494d91eb/push/subscribe", async (c) => {
+// ===== SHARK MODE ENDPOINTS =====
+
+// Activate Shark Mode
+app.post("/make-server-494d91eb/shark-mode/activate", async (c) => {
   try {
-    const { userId, endpoint, keys, userAgent, deviceType } = await c.req.json();
+    const { coupleId, userId, durationDays, note } = await c.req.json();
     
-    if (!userId || !endpoint || !keys) {
-      return c.json({ error: "Missing required fields" }, 400);
+    if (!coupleId || !userId || !durationDays) {
+      return c.json({ error: "Couple ID, user ID, and duration are required" }, 400);
     }
 
-    const subscriptionId = generateId();
-    const subscription = {
-      subscriptionId,
-      userId,
-      endpoint,
-      keys,
-      userAgent: userAgent || 'unknown',
-      deviceType: deviceType || 'unknown',
-      createdAt: new Date().toISOString(),
-      revokedAt: null,
+    if (durationDays < 1 || durationDays > 7) {
+      return c.json({ error: "Duration must be between 1 and 7 days" }, 400);
+    }
+
+    const couple = await kv.get(`couple:${coupleId}`);
+    if (!couple) {
+      return c.json({ error: "Couple not found" }, 404);
+    }
+
+    // Verify user is part of the couple
+    if (couple.user1Id !== userId && couple.user2Id !== userId) {
+      return c.json({ error: "User is not part of this couple" }, 403);
+    }
+
+    // Get user info for display name
+    const user = await kv.get(`user:${userId}`);
+
+    const now = new Date();
+    const endsAt = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+
+    const sharkModeId = generateId();
+    const sharkMode = {
+      id: sharkModeId,
+      coupleId,
+      activatedBy: userId,
+      activatedByName: user.displayName,
+      activatedAt: now.toISOString(),
+      endsAt: endsAt.toISOString(),
+      durationDays,
+      note: note || '',
+      reassurance: null,
+      reassuranceBy: null,
+      reassuranceAt: null,
+      status: "active",
     };
 
-    // Save subscription to KV store
-    await kv.set(`push_subscription:${subscriptionId}`, subscription);
-    await kv.set(`user_push:${userId}`, subscriptionId);
+    await kv.set(`shark_mode:${coupleId}`, sharkMode);
+    await kv.set(`shark_mode_history:${coupleId}:${sharkModeId}`, sharkMode);
 
-    console.log(`[Push] Subscription created for user ${userId}`);
-    return c.json({ success: true, subscriptionId });
+    console.log(`[Shark Mode] Activated by user ${userId} for ${durationDays} days`);
+    return c.json({ success: true, sharkMode });
   } catch (error: any) {
-    console.error("[Push] Error creating subscription:", error);
-    return c.json({ error: error.message || "Failed to create subscription" }, 500);
+    console.error(`[Shark Mode] Error activating:`, error);
+    return c.json({ error: error.message || "Failed to activate Shark Mode" }, 500);
   }
 });
 
-app.delete("/make-server-494d91eb/push/unsubscribe/:userId", async (c) => {
+// Extend Shark Mode
+app.post("/make-server-494d91eb/shark-mode/extend", async (c) => {
   try {
-    const userId = c.req.param("userId");
-
-    // Get subscription ID for user
-    const subscriptionId = await kv.get(`user_push:${userId}`);
+    const { coupleId, userId, additionalDays } = await c.req.json();
     
-    if (subscriptionId) {
-      // Get subscription and mark as revoked
-      const subscription = await kv.get(`push_subscription:${subscriptionId}`);
-      if (subscription) {
-        subscription.revokedAt = new Date().toISOString();
-        await kv.set(`push_subscription:${subscriptionId}`, subscription);
-      }
-      
-      // Remove user mapping
-      await kv.del(`user_push:${userId}`);
+    if (!coupleId || !userId || !additionalDays) {
+      return c.json({ error: "Couple ID, user ID, and additional days are required" }, 400);
     }
 
-    console.log(`[Push] Subscription revoked for user ${userId}`);
+    const sharkMode = await kv.get(`shark_mode:${coupleId}`);
+    
+    if (!sharkMode || sharkMode.status !== "active") {
+      return c.json({ error: "Shark Mode is not active" }, 404);
+    }
+
+    // Verify the user is the one who activated it
+    if (sharkMode.activatedBy !== userId) {
+      return c.json({ error: "Only the user who activated Shark Mode can extend it" }, 403);
+    }
+
+    const currentEndsAt = new Date(sharkMode.endsAt);
+    const newEndsAt = new Date(currentEndsAt.getTime() + additionalDays * 24 * 60 * 60 * 1000);
+    const maxEndsAt = new Date(new Date(sharkMode.activatedAt).getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    // Don't allow extension beyond 7 days from activation
+    if (newEndsAt > maxEndsAt) {
+      return c.json({ error: "Cannot extend beyond 7 days total" }, 400);
+    }
+
+    sharkMode.endsAt = newEndsAt.toISOString();
+    sharkMode.durationDays = Math.ceil((newEndsAt.getTime() - new Date(sharkMode.activatedAt).getTime()) / (24 * 60 * 60 * 1000));
+    
+    await kv.set(`shark_mode:${coupleId}`, sharkMode);
+    // Update history as well
+    await kv.set(`shark_mode_history:${coupleId}:${sharkMode.id}`, sharkMode);
+
+    console.log(`[Shark Mode] Extended by user ${userId} to ${newEndsAt.toISOString()}`);
+    return c.json({ success: true, sharkMode });
+  } catch (error: any) {
+    console.error(`[Shark Mode] Error extending:`, error);
+    return c.json({ error: error.message || "Failed to extend Shark Mode" }, 500);
+  }
+});
+
+// Deactivate Shark Mode
+app.post("/make-server-494d91eb/shark-mode/deactivate", async (c) => {
+  try {
+    const { coupleId, userId } = await c.req.json();
+    
+    if (!coupleId || !userId) {
+      return c.json({ error: "Couple ID and user ID are required" }, 400);
+    }
+
+    const sharkMode = await kv.get(`shark_mode:${coupleId}`);
+    
+    if (!sharkMode || sharkMode.status !== "active") {
+      return c.json({ error: "Shark Mode is not active" }, 404);
+    }
+
+    // Verify the user is the one who activated it
+    if (sharkMode.activatedBy !== userId) {
+      return c.json({ error: "Only the user who activated Shark Mode can deactivate it" }, 403);
+    }
+
+    sharkMode.status = "deactivated";
+    sharkMode.deactivatedAt = new Date().toISOString();
+    
+    await kv.set(`shark_mode:${coupleId}`, sharkMode);
+    // Update history as well
+    await kv.set(`shark_mode_history:${coupleId}:${sharkMode.id}`, sharkMode);
+
+    console.log(`[Shark Mode] Deactivated by user ${userId}`);
     return c.json({ success: true });
   } catch (error: any) {
-    console.error("[Push] Error revoking subscription:", error);
-    return c.json({ error: error.message || "Failed to revoke subscription" }, 500);
+    console.error(`[Shark Mode] Error deactivating:`, error);
+    return c.json({ error: error.message || "Failed to deactivate Shark Mode" }, 500);
   }
 });
 
-app.get("/make-server-494d91eb/push/subscription/:userId", async (c) => {
+// Update note
+app.post("/make-server-494d91eb/shark-mode/update-note", async (c) => {
   try {
-    const userId = c.req.param("userId");
+    const { coupleId, userId, note } = await c.req.json();
     
-    const subscriptionId = await kv.get(`user_push:${userId}`);
-    
-    if (!subscriptionId) {
-      return c.json({ subscription: null });
+    if (!coupleId || !userId) {
+      return c.json({ error: "Couple ID and user ID are required" }, 400);
     }
 
-    const subscription = await kv.get(`push_subscription:${subscriptionId}`);
+    const sharkMode = await kv.get(`shark_mode:${coupleId}`);
     
-    if (!subscription || subscription.revokedAt) {
-      return c.json({ subscription: null });
+    if (!sharkMode || sharkMode.status !== "active") {
+      return c.json({ error: "Shark Mode is not active" }, 404);
     }
 
-    return c.json({ subscription });
+    // Verify the user is the one who activated it
+    if (sharkMode.activatedBy !== userId) {
+      return c.json({ error: "Only the user who activated Shark Mode can update the note" }, 403);
+    }
+
+    sharkMode.note = note || '';
+    await kv.set(`shark_mode:${coupleId}`, sharkMode);
+    // Update history as well
+    await kv.set(`shark_mode_history:${coupleId}:${sharkMode.id}`, sharkMode);
+
+    console.log(`[Shark Mode] Note updated by user ${userId}`);
+    return c.json({ success: true, sharkMode });
   } catch (error: any) {
-    console.error("[Push] Error getting subscription:", error);
-    return c.json({ error: error.message || "Failed to get subscription" }, 500);
+    console.error(`[Shark Mode] Error updating note:`, error);
+    return c.json({ error: error.message || "Failed to update note" }, 500);
   }
 });
+
+// Get Shark Mode status
+app.get("/make-server-494d91eb/shark-mode/status/:coupleId", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    
+    if (!coupleId) {
+      return c.json({ error: "Couple ID is required" }, 400);
+    }
+
+    const sharkMode = await kv.get(`shark_mode:${coupleId}`);
+    
+    if (!sharkMode) {
+      return c.json({ sharkMode: null });
+    }
+
+    // Check if it has expired
+    if (sharkMode.status === "active" && new Date(sharkMode.endsAt) < new Date()) {
+      sharkMode.status = "expired";
+      await kv.set(`shark_mode:${coupleId}`, sharkMode);
+      // Update in history as well
+      await kv.set(`shark_mode_history:${coupleId}:${sharkMode.id}`, sharkMode);
+    }
+
+    // Only return active shark modes
+    if (sharkMode.status === "active") {
+      return c.json({ sharkMode });
+    }
+
+    return c.json({ sharkMode: null });
+  } catch (error: any) {
+    console.error(`[Shark Mode] Error getting status:`, error);
+    return c.json({ error: error.message || "Failed to get Shark Mode status" }, 500);
+  }
+});
+
+// Send reassurance
+app.post("/make-server-494d91eb/shark-mode/reassurance", async (c) => {
+  try {
+    const { coupleId, userId, reassurance } = await c.req.json();
+    
+    if (!coupleId || !userId || !reassurance) {
+      return c.json({ error: "Couple ID, user ID, and reassurance are required" }, 400);
+    }
+
+    const sharkMode = await kv.get(`shark_mode:${coupleId}`);
+    
+    if (!sharkMode || sharkMode.status !== "active") {
+      return c.json({ error: "Shark Mode is not active" }, 404);
+    }
+
+    // Verify the user is NOT the one who activated it (partner only)
+    if (sharkMode.activatedBy === userId) {
+      return c.json({ error: "Only the partner can send reassurance" }, 403);
+    }
+
+    // Get user info for display name
+    const user = await kv.get(`user:${userId}`);
+
+    sharkMode.reassurance = reassurance;
+    sharkMode.reassuranceBy = userId;
+    sharkMode.reassuranceByName = user.displayName;
+    sharkMode.reassuranceAt = new Date().toISOString();
+    
+    await kv.set(`shark_mode:${coupleId}`, sharkMode);
+    // Update history as well
+    await kv.set(`shark_mode_history:${coupleId}:${sharkMode.id}`, sharkMode);
+
+    console.log(`[Shark Mode] Reassurance sent by user ${userId}`);
+    return c.json({ success: true, sharkMode });
+  } catch (error: any) {
+    console.error(`[Shark Mode] Error sending reassurance:`, error);
+    return c.json({ error: error.message || "Failed to send reassurance" }, 500);
+  }
+});
+
+// Get Shark Mode history
+app.get("/make-server-494d91eb/shark-mode/history/:coupleId", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    
+    if (!coupleId) {
+      return c.json({ error: "Couple ID is required" }, 400);
+    }
+
+    const history = await kv.getByPrefix(`shark_mode_history:${coupleId}:`);
+    
+    // Sort by activatedAt descending (newest first)
+    const sortedHistory = history.sort((a: any, b: any) => {
+      return new Date(b.activatedAt).getTime() - new Date(a.activatedAt).getTime();
+    });
+
+    return c.json({ history: sortedHistory });
+  } catch (error: any) {
+    console.error(`[Shark Mode] Error getting history:`, error);
+    return c.json({ error: error.message || "Failed to get Shark Mode history" }, 500);
+  }
+});
+
+// ===== END SHARK MODE ENDPOINTS =====
+
+// ===== COUPLE CHALLENGES ENDPOINTS =====
+
+// Challenge Library - Fun weekly challenges for couples
+const CHALLENGE_LIBRARY = [
+  // Communication 💬
+  { id: 'c1', category: '💬 Communication', title: 'Share 3 Compliments', description: 'Throughout the day, send your partner 3 genuine compliments', points: 10 },
+  { id: 'c2', category: '💬 Communication', title: 'Childhood Memory', description: 'Share a favorite childhood memory with each other', points: 10 },
+  { id: 'c3', category: '💬 Communication', title: 'Dream Talk', description: 'Discuss your dreams and goals for the future together', points: 15 },
+  { id: 'c4', category: '💬 Communication', title: 'Gratitude Exchange', description: 'Each write down 5 things you love about the other person', points: 15 },
+  { id: 'c5', category: '💬 Communication', title: 'Question Deep Dive', description: 'Ask each other: "What made you fall in love with me?"', points: 20 },
+  
+  // Adventure 🎯
+  { id: 'c6', category: '🎯 Adventure', title: 'New Recipe Together', description: 'Cook or bake something you\'ve never tried before together', points: 20 },
+  { id: 'c7', category: '🎯 Adventure', title: 'Explore New Place', description: 'Visit a restaurant, cafe, or spot you\'ve never been to', points: 20 },
+  { id: 'c8', category: '🎯 Adventure', title: 'Phone-Free Walk', description: 'Take a 20-minute walk together without phones', points: 15 },
+  { id: 'c9', category: '🎯 Adventure', title: 'Sunrise/Sunset', description: 'Watch the sunrise or sunset together', points: 25 },
+  { id: 'c10', category: '🎯 Adventure', title: 'Try Something New', description: 'Do an activity neither of you has done before', points: 30 },
+  
+  // Romance 💕
+  { id: 'c11', category: '💕 Romance', title: 'Love Letter', description: 'Write each other a handwritten love note', points: 20 },
+  { id: 'c12', category: '💕 Romance', title: 'Plan Surprise Date', description: 'One person plans a surprise date for the other', points: 25 },
+  { id: 'c13', category: '💕 Romance', title: 'Dance Together', description: 'Dance together for at least 5 minutes (any style!)', points: 15 },
+  { id: 'c14', category: '💕 Romance', title: 'Massage Exchange', description: 'Give each other a 10-minute massage', points: 20 },
+  { id: 'c15', category: '💕 Romance', title: 'Candlelit Dinner', description: 'Have dinner together by candlelight at home', points: 20 },
+  
+  // Fun & Games 🎮
+  { id: 'c16', category: '🎮 Fun & Games', title: 'Game Night', description: 'Play a board game, card game, or video game together', points: 15 },
+  { id: 'c17', category: '🎮 Fun & Games', title: 'Movie Marathon', description: 'Pick a theme and watch 2-3 movies together', points: 15 },
+  { id: 'c18', category: '🎮 Fun & Games', title: 'Create Together', description: 'Make art, craft, or build something together', points: 20 },
+  { id: 'c19', category: '🎮 Fun & Games', title: 'Karaoke Night', description: 'Sing at least 3 songs together (at home or out!)', points: 20 },
+  { id: 'c20', category: '🎮 Fun & Games', title: 'Photo Challenge', description: 'Take 10 fun selfies together in different poses', points: 10 },
+  
+  // Growth 🌱
+  { id: 'c21', category: '🌱 Growth', title: 'Learn Together', description: 'Watch an educational video or read an article and discuss', points: 15 },
+  { id: 'c22', category: '🌱 Growth', title: 'Meditation/Yoga', description: 'Do a 15-minute meditation or yoga session together', points: 20 },
+  { id: 'c23', category: '🌱 Growth', title: 'Goal Setting', description: 'Set one personal and one couple goal for the month', points: 20 },
+  { id: 'c24', category: '🌱 Growth', title: 'Digital Detox', description: 'Spend an entire evening without screens together', points: 25 },
+  { id: 'c25', category: '🌱 Growth', title: 'Gratitude Journal', description: 'Write down 3 things you\'re grateful for about your relationship', points: 15 },
+  
+  // Support 💪
+  { id: 'c26', category: '💪 Support', title: 'Acts of Service', description: 'Do 3 helpful tasks for your partner without being asked', points: 15 },
+  { id: 'c27', category: '💪 Support', title: 'Listen Deeply', description: 'Each person talks for 10 mins while the other just listens', points: 20 },
+  { id: 'c28', category: '💪 Support', title: 'Encouragement Notes', description: 'Leave 5 encouraging notes for your partner to find', points: 15 },
+  { id: 'c29', category: '💪 Support', title: 'Check-In Time', description: 'Have a 30-minute check-in about how you\'re both really doing', points: 20 },
+  { id: 'c30', category: '💪 Support', title: 'Appreciate Effort', description: 'Acknowledge and thank each other for the little things', points: 10 },
+];
+
+// Get the current week's challenge
+app.get("/make-server-494d91eb/challenges/current/:coupleId", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    
+    if (!coupleId) {
+      return c.json({ error: "Couple ID is required" }, 400);
+    }
+
+    // Get current challenge for this couple
+    let currentChallenge = await kv.get(`challenge_current:${coupleId}`);
+    
+    // If no challenge exists or it's from a previous week, generate a new one
+    const now = new Date();
+    const weekNumber = getWeekNumber(now);
+    const year = now.getFullYear();
+    const currentWeekKey = `${year}-W${weekNumber}`;
+    
+    if (!currentChallenge || currentChallenge.weekKey !== currentWeekKey) {
+      // Get challenge history to avoid repeats
+      const history = await kv.getByPrefix(`challenge_history:${coupleId}:`);
+      const usedChallengeIds = history.map((h: any) => h.challengeId);
+      
+      // Filter out used challenges, or reset if all have been used
+      let availableChallenges = CHALLENGE_LIBRARY.filter(ch => !usedChallengeIds.includes(ch.id));
+      if (availableChallenges.length === 0) {
+        availableChallenges = CHALLENGE_LIBRARY; // Reset if all completed
+      }
+      
+      // Pick a random challenge
+      const randomChallenge = availableChallenges[Math.floor(Math.random() * availableChallenges.length)];
+      
+      currentChallenge = {
+        ...randomChallenge,
+        weekKey: currentWeekKey,
+        startDate: getWeekStart(now).toISOString(),
+        endDate: getWeekEnd(now).toISOString(),
+        user1Completed: false,
+        user2Completed: false,
+        user1CompletedAt: null,
+        user2CompletedAt: null,
+        user1Response: null,
+        user2Response: null,
+        bothCompleted: false,
+        bothCompletedAt: null,
+      };
+      
+      await kv.set(`challenge_current:${coupleId}`, currentChallenge);
+      console.log(`[Challenges] New challenge for ${coupleId}: ${currentChallenge.title}`);
+    }
+
+    return c.json({ challenge: currentChallenge });
+  } catch (error: any) {
+    console.error(`[Challenges] Error getting current challenge:`, error);
+    return c.json({ error: error.message || "Failed to get current challenge" }, 500);
+  }
+});
+
+// Mark challenge as complete
+app.post("/make-server-494d91eb/challenges/complete", async (c) => {
+  try {
+    const { coupleId, userId, response } = await c.req.json();
+    
+    if (!coupleId || !userId) {
+      return c.json({ error: "Couple ID and User ID are required" }, 400);
+    }
+
+    // Get couple to determine if user1 or user2
+    const couple = await kv.get(`couple:${coupleId}`);
+    if (!couple) {
+      return c.json({ error: "Couple not found" }, 404);
+    }
+    
+    const isUser1 = couple.user1Id === userId;
+    const userKey = isUser1 ? 'user1Completed' : 'user2Completed';
+    const userCompletedAtKey = isUser1 ? 'user1CompletedAt' : 'user2CompletedAt';
+    const userResponseKey = isUser1 ? 'user1Response' : 'user2Response';
+    
+    // Get current challenge
+    const currentChallenge = await kv.get(`challenge_current:${coupleId}`);
+    if (!currentChallenge) {
+      return c.json({ error: "No active challenge found" }, 404);
+    }
+    
+    // Mark as completed
+    currentChallenge[userKey] = true;
+    currentChallenge[userCompletedAtKey] = new Date().toISOString();
+    currentChallenge[userResponseKey] = response || null;
+    
+    // Check if both completed
+    if (currentChallenge.user1Completed && currentChallenge.user2Completed && !currentChallenge.bothCompleted) {
+      currentChallenge.bothCompleted = true;
+      currentChallenge.bothCompletedAt = new Date().toISOString();
+      
+      // Save to history
+      const historyEntry = {
+        ...currentChallenge,
+        completedAt: currentChallenge.bothCompletedAt,
+      };
+      await kv.set(`challenge_history:${coupleId}:${currentChallenge.weekKey}`, historyEntry);
+      
+      console.log(`[Challenges] Both completed challenge: ${currentChallenge.title}`);
+    }
+    
+    await kv.set(`challenge_current:${coupleId}`, currentChallenge);
+
+    return c.json({ 
+      success: true, 
+      challenge: currentChallenge,
+      celebration: currentChallenge.bothCompleted && currentChallenge.bothCompletedAt === currentChallenge[userCompletedAtKey]
+    });
+  } catch (error: any) {
+    console.error(`[Challenges] Error completing challenge:`, error);
+    return c.json({ error: error.message || "Failed to complete challenge" }, 500);
+  }
+});
+
+// Get challenge history
+app.get("/make-server-494d91eb/challenges/history/:coupleId", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    
+    if (!coupleId) {
+      return c.json({ error: "Couple ID is required" }, 400);
+    }
+
+    const history = await kv.getByPrefix(`challenge_history:${coupleId}:`);
+    
+    // Sort by completion date descending (newest first)
+    const sortedHistory = history.sort((a: any, b: any) => {
+      return new Date(b.bothCompletedAt || b.endDate).getTime() - new Date(a.bothCompletedAt || a.endDate).getTime();
+    });
+
+    // Calculate stats
+    const totalCompleted = sortedHistory.length;
+    const totalPoints = sortedHistory.reduce((sum: number, ch: any) => sum + (ch.points || 0), 0);
+    
+    // Calculate streak (consecutive weeks)
+    let currentStreak = 0;
+    const sortedByWeek = [...sortedHistory].sort((a: any, b: any) => {
+      return b.weekKey.localeCompare(a.weekKey);
+    });
+    
+    for (let i = 0; i < sortedByWeek.length; i++) {
+      const challenge = sortedByWeek[i];
+      if (challenge.bothCompleted) {
+        currentStreak++;
+        // Check if next challenge is from the previous week
+        if (i < sortedByWeek.length - 1) {
+          const currentWeek = parseInt(challenge.weekKey.split('-W')[1]);
+          const nextWeek = parseInt(sortedByWeek[i + 1].weekKey.split('-W')[1]);
+          if (currentWeek - nextWeek !== 1) {
+            break; // Streak broken
+          }
+        }
+      } else {
+        break;
+      }
+    }
+
+    return c.json({ 
+      history: sortedHistory,
+      stats: {
+        totalCompleted,
+        totalPoints,
+        currentStreak,
+      }
+    });
+  } catch (error: any) {
+    console.error(`[Challenges] Error getting challenge history:`, error);
+    return c.json({ error: error.message || "Failed to get challenge history" }, 500);
+  }
+});
+
+// Utility functions for week calculations
+function getWeekNumber(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+}
+
+function getWeekStart(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday as start
+  return new Date(d.setDate(diff));
+}
+
+function getWeekEnd(date: Date): Date {
+  const start = getWeekStart(date);
+  return new Date(start.getTime() + 6 * 24 * 60 * 60 * 1000); // Add 6 days
+}
+
+// ===== END COUPLE CHALLENGES ENDPOINTS =====
 
 // Global error handler
 app.onError((err, c) => {
@@ -970,33 +1401,23 @@ app.notFound((c) => {
 // Start the server with error handling
 Deno.serve({
   handler: async (req: Request) => {
-    // Set a timeout to prevent hanging connections
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
-    
     try {
-      const response = await app.fetch(req, { signal: controller.signal });
-      clearTimeout(timeoutId);
-      return response;
-    } catch (error) {
-      clearTimeout(timeoutId);
+      // Always return a response, no timeout to avoid connection closures
+      const response = await app.fetch(req);
       
-      if (error.name === 'AbortError') {
-        console.error('[Server] Request timeout');
-        return new Response(
-          JSON.stringify({ error: 'Request timeout' }),
-          {
-            status: 504,
-            headers: { 
-              'Content-Type': 'application/json',
-              'Access-Control-Allow-Origin': '*',
-              'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, PATCH',
-              'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With'
-            }
-          }
-        );
+      // Ensure we always have proper headers
+      if (!response.headers.get('Content-Type')) {
+        const newHeaders = new Headers(response.headers);
+        newHeaders.set('Content-Type', 'application/json');
+        return new Response(response.body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: newHeaders
+        });
       }
       
+      return response;
+    } catch (error: any) {
       console.error('[Server] Unhandled error:', error);
       return new Response(
         JSON.stringify({ error: 'Internal server error', message: error?.message || 'Unknown error' }),
@@ -1027,7 +1448,6 @@ Deno.serve({
       }
     );
   },
-  port: 8000,
   onListen: ({ port, hostname }) => {
     console.log(`[Server] Listening on http://${hostname}:${port}`);
   }

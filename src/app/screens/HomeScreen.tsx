@@ -4,8 +4,10 @@ import { Card } from '@/app/components/Card';
 import { LoadingSpinner } from '@/app/components/LoadingSpinner';
 import { NotificationPanel } from '@/app/components/NotificationPanel';
 import { InstallPrompt } from '@/app/components/InstallPrompt';
+import { SharkModeHomeCard } from '@/app/components/SharkModeHomeCard';
+import { ChallengeCard } from '@/app/components/ChallengeCard';
 import { Heart, SmilePlus, Sparkles, Clock, History, User, Bell, X } from 'lucide-react';
-import { todayAPI, notificationAPI } from '@/utils/api';
+import { todayAPI, notificationAPI, sharkModeAPI, challengesAPI } from '@/utils/api';
 import { formatDistanceToNow } from 'date-fns';
 
 interface HomeScreenProps {
@@ -42,6 +44,8 @@ export function HomeScreen({
   const [showNotificationPanel, setShowNotificationPanel] = useState(false);
   const [allNotifications, setAllNotifications] = useState<any[]>([]);
   const previousNotificationIdsRef = React.useRef<Set<string>>(new Set());
+  const [sharkMode, setSharkMode] = useState<any>(null);
+  const [challenge, setChallenge] = useState<any>(null);
 
   // Create notification sound
   const notificationSound = React.useMemo(() => {
@@ -91,9 +95,13 @@ export function HomeScreen({
   useEffect(() => {
     fetchTodayCard();
     fetchNotifications();
+    fetchSharkMode();
+    fetchChallenges();
     const interval = setInterval(() => {
       fetchTodayCard();
       fetchNotifications();
+      fetchSharkMode();
+      fetchChallenges();
     }, 1000); // Refresh every 1s for near-instant updates
     return () => clearInterval(interval);
   }, [coupleId]);
@@ -111,6 +119,51 @@ export function HomeScreen({
     }
   };
 
+  const fetchSharkMode = async () => {
+    try {
+      const response = await sharkModeAPI.getStatus(coupleId);
+      setSharkMode(response.sharkMode);
+    } catch (error) {
+      console.error('Error fetching shark mode:', error);
+    }
+  };
+
+  const handleSendReassurance = async (reassurance: string) => {
+    try {
+      await sharkModeAPI.sendReassurance(coupleId, userId, reassurance);
+      await fetchSharkMode();
+    } catch (error: any) {
+      console.error('Failed to send reassurance:', error);
+      alert(error.message || 'Failed to send reassurance');
+      throw error;
+    }
+  };
+
+  const fetchChallenges = async () => {
+    try {
+      const response = await challengesAPI.getCurrent(coupleId);
+      setChallenge(response.challenge);
+    } catch (error) {
+      console.error('Error fetching challenges:', error);
+    }
+  };
+
+  const handleCompleteChallenge = async (response?: string) => {
+    try {
+      const resp = await challengesAPI.complete(coupleId, userId, response);
+      setChallenge(resp.challenge);
+      
+      // Show celebration if both just completed
+      if (resp.celebration) {
+        alert('🎉 Both of you completed the challenge! Great teamwork!');
+      }
+    } catch (error: any) {
+      console.error('Failed to complete challenge:', error);
+      alert(error.message || 'Failed to complete challenge');
+      throw error;
+    }
+  };
+
   const fetchNotifications = async () => {
     try {
       const response = await notificationAPI.getNotifications(userId);
@@ -122,25 +175,17 @@ export function HomeScreen({
       const newNotificationIds = new Set(unreadNotifications.map((n: any) => n.id));
       const previousNotificationIds = previousNotificationIdsRef.current;
       
-      // Find truly new notifications (IDs that exist now but didn't exist before)
-      let hasNewNotifications = false;
-      newNotificationIds.forEach((id) => {
-        if (!previousNotificationIds.has(id)) {
-          hasNewNotifications = true;
-        }
-      });
+      const hasNewNotification = Array.from(newNotificationIds).some(id => !previousNotificationIds.has(id));
       
-      // Only play sound if there are actually new notifications
-      if (hasNewNotifications && previousNotificationIds.size > 0) {
+      if (hasNewNotification && previousNotificationIds.size > 0) {
         notificationSound();
       }
       
-      // Update the set for the next check
+      // Update the ref with the current notification IDs
       previousNotificationIdsRef.current = newNotificationIds;
     } catch (error) {
-      // Silently handle notification errors - they're not critical to app functionality
-      // Only log to console for debugging purposes
-      console.log('Unable to fetch notifications (non-critical):', error);
+      console.error('Error fetching notifications:', error);
+      // Silently fail - don't break the app
     }
   };
 
@@ -250,6 +295,32 @@ export function HomeScreen({
 
       {/* Content */}
       <div className="flex-1 px-6 py-8 space-y-6 overflow-y-auto">
+        {/* Shark Mode - Show for BOTH users */}
+        {sharkMode && (
+          <SharkModeHomeCard
+            sharkMode={sharkMode}
+            userId={userId}
+            partnerName={partnerName}
+            onSendReassurance={handleSendReassurance}
+          />
+        )}
+
+        {/* Weekly Challenge */}
+        {challenge && (
+          <ChallengeCard
+            challenge={challenge}
+            userId={userId}
+            user1Id={user1Id}
+            user2Id={user2Id}
+            partnerName={partnerName}
+            onComplete={handleCompleteChallenge}
+            onViewHistory={() => {
+              const event = new CustomEvent('navigate-to-challenge-archive');
+              window.dispatchEvent(event);
+            }}
+          />
+        )}
+
         {/* Your Mood Summary - Show ONLY the current user's mood */}
         {myMood && myUpdatedAt && (
           <Card className="p-4 bg-gradient-to-r from-[#FB3094]/10 via-[#A83FFF]/10 to-[#2571FF]/10 border-2 border-[#A83FFF]/30">

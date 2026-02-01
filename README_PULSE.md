@@ -93,7 +93,6 @@ A lightweight, intimate couples app for sharing daily moods, messages, and doodl
 
 ## Future Enhancements (Not Implemented)
 - Widget designs for iOS/Android
-- Push notifications
-- Actual notification scheduling
+- Actual notification scheduling (reminder settings are UI-only)
 - Image optimization for doodles
-- PWA manifest for installability
+- Advanced analytics and insights

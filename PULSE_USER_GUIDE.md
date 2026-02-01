@@ -154,9 +154,9 @@ Open browser console to see:
 ## Known Limitations (By Design)
 
 1. **No Email/OAuth**: Simple username + password only
-2. **No Push Notifications**: Reminder settings are UI-only (no actual scheduling)
+2. **No Push Notifications**: All notifications are in-app only (app must be open)
 3. **No Widgets**: Widget designs were specified but not implemented (requires native wrapper)
-4. **Manual Refresh**: 30-second auto-polling (not true real-time WebSocket)
+4. **Manual Refresh**: 1-second auto-polling for real-time updates (not WebSocket)
 5. **Local Authentication**: Passwords stored as SHA-256 hashes (suitable for prototyping only)
 6. **In-Memory Database**: Uses Supabase KV store (data persists per session)
 

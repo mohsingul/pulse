@@ -159,3 +159,57 @@ export const historyAPI = {
   get: (coupleId: string) =>
     apiRequest(`/history/${coupleId}`),
 };
+
+// Shark Mode API
+export const sharkModeAPI = {
+  activate: (coupleId: string, userId: string, durationDays: number, note?: string) =>
+    apiRequest('/shark-mode/activate', {
+      method: 'POST',
+      body: JSON.stringify({ coupleId, userId, durationDays, note }),
+    }),
+
+  extend: (coupleId: string, userId: string, additionalDays: number) =>
+    apiRequest('/shark-mode/extend', {
+      method: 'POST',
+      body: JSON.stringify({ coupleId, userId, additionalDays }),
+    }),
+
+  deactivate: (coupleId: string, userId: string) =>
+    apiRequest('/shark-mode/deactivate', {
+      method: 'POST',
+      body: JSON.stringify({ coupleId, userId }),
+    }),
+
+  updateNote: (coupleId: string, userId: string, note: string) =>
+    apiRequest('/shark-mode/update-note', {
+      method: 'POST',
+      body: JSON.stringify({ coupleId, userId, note }),
+    }),
+
+  sendReassurance: (coupleId: string, userId: string, reassurance: string) =>
+    apiRequest('/shark-mode/reassurance', {
+      method: 'POST',
+      body: JSON.stringify({ coupleId, userId, reassurance }),
+    }),
+
+  getStatus: (coupleId: string) =>
+    apiRequest(`/shark-mode/status/${coupleId}`),
+
+  getHistory: (coupleId: string) =>
+    apiRequest(`/shark-mode/history/${coupleId}`),
+};
+
+// Challenges API
+export const challengesAPI = {
+  getCurrent: (coupleId: string) =>
+    apiRequest(`/challenges/current/${coupleId}`),
+
+  complete: (coupleId: string, userId: string, response?: string) =>
+    apiRequest('/challenges/complete', {
+      method: 'POST',
+      body: JSON.stringify({ coupleId, userId, response }),
+    }),
+
+  getHistory: (coupleId: string) =>
+    apiRequest(`/challenges/history/${coupleId}`),
+};

@@ -7,9 +7,10 @@ import { storage } from '@/utils/storage';
 interface SettingsScreenProps {
   onBack: () => void;
   userId: string;
+  userName: string;
 }
 
-export function SettingsScreen({ onBack, userId }: SettingsScreenProps) {
+export function SettingsScreen({ onBack, userId, userName }: SettingsScreenProps) {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [notifications, setNotifications] = useState({
     morning: { enabled: true, time: '09:00' },
@@ -103,7 +104,9 @@ export function SettingsScreen({ onBack, userId }: SettingsScreenProps) {
 
         {/* Notifications */}
         <div className="space-y-3">
-          <h3 className="text-lg font-semibold">Reminder Notifications</h3>
+          <h3 className="text-lg font-semibold">Notifications</h3>
+          
+          <h4 className="text-base font-semibold">Reminder Notifications</h4>
           <p className="text-sm text-muted-foreground">
             We'll gently remind you to update your Pulse
           </p>

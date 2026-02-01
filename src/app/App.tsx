@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { storage } from '@/utils/storage';
-import { coupleAPI, todayAPI, notificationAPI, userAPI } from '@/utils/api';
+import { coupleAPI, todayAPI, notificationAPI, userAPI, sharkModeAPI } from '@/utils/api';
 import { projectId, publicAnonKey } from '/utils/supabase/info';
 
 // Screens
@@ -19,6 +19,8 @@ import { DoodleCanvasScreen } from '@/app/screens/DoodleCanvasScreen';
 import { DoodleGalleryScreen } from '@/app/screens/DoodleGalleryScreen';
 import { MessageArchiveScreen } from '@/app/screens/MessageArchiveScreen';
 import { MoodArchiveScreen } from '@/app/screens/MoodArchiveScreen';
+import { SharkModeArchiveScreen } from '@/app/screens/SharkModeArchiveScreen';
+import { ChallengeArchiveScreen } from '@/app/screens/ChallengeArchiveScreen';
 
 // Components
 import { UpdatePulseSheet } from '@/app/components/UpdatePulseSheet';
@@ -39,7 +41,9 @@ type Screen =
   | 'doodle'
   | 'doodle-gallery'
   | 'message-archive'
-  | 'mood-archive';
+  | 'mood-archive'
+  | 'shark-mode-archive'
+  | 'challenge-archive';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
@@ -313,6 +317,8 @@ export default function App() {
             onDoodleGallery={() => setCurrentScreen('doodle-gallery')}
             onMessageArchive={() => setCurrentScreen('message-archive')}
             onMoodArchive={() => setCurrentScreen('mood-archive')}
+            onSharkModeArchive={() => setCurrentScreen('shark-mode-archive')}
+            onChallengeArchive={() => setCurrentScreen('challenge-archive')}
           />
         );
 
@@ -320,6 +326,7 @@ export default function App() {
         return (
           <SettingsScreen
             userId={user!.userId}
+            userName={user!.displayName}
             onBack={() => setCurrentScreen('profile')}
           />
         );
@@ -396,6 +403,28 @@ export default function App() {
             userId={user.userId}
             user1Id={couple.user1Id}
             user2Id={couple.user2Id}
+            userName={user.displayName}
+            partnerName={couple.partner.displayName}
+            onBack={() => setCurrentScreen('profile')}
+          />
+        );
+
+      case 'shark-mode-archive':
+        return (
+          <SharkModeArchiveScreen
+            coupleId={couple.coupleId}
+            userId={user.userId}
+            userName={user.displayName}
+            partnerName={couple.partner.displayName}
+            onBack={() => setCurrentScreen('profile')}
+          />
+        );
+
+      case 'challenge-archive':
+        return (
+          <ChallengeArchiveScreen
+            coupleId={couple.coupleId}
+            userId={user.userId}
             userName={user.displayName}
             partnerName={couple.partner.displayName}
             onBack={() => setCurrentScreen('profile')}

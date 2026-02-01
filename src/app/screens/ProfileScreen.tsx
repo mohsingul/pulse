@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/app/components/Button';
 import { Card } from '@/app/components/Card';
-import { ArrowLeft, Copy, Share2, Settings, AlertTriangle, UserX, Image, MessageSquare, Smile } from 'lucide-react';
-import { pairingAPI, coupleAPI } from '@/utils/api';
+import { SharkModeSheet } from '@/app/components/SharkModeSheet';
+import { ArrowLeft, Copy, Share2, Settings, AlertTriangle, UserX, Image, MessageSquare, Smile, Waves, Target } from 'lucide-react';
+import { pairingAPI, coupleAPI, sharkModeAPI } from '@/utils/api';
 import { storage } from '@/utils/storage';
 import { copyToClipboard } from '@/utils/clipboard';
 
@@ -18,6 +19,8 @@ interface ProfileScreenProps {
   onDoodleGallery?: () => void;
   onMessageArchive?: () => void;
   onMoodArchive?: () => void;
+  onSharkModeArchive?: () => void;
+  onChallengeArchive?: () => void;
 }
 
 export function ProfileScreen({
@@ -32,16 +35,23 @@ export function ProfileScreen({
   onDoodleGallery,
   onMessageArchive,
   onMoodArchive,
+  onSharkModeArchive,
+  onChallengeArchive,
 }: ProfileScreenProps) {
   const [codeData, setCodeData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [showUnpairConfirm, setShowUnpairConfirm] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showSharkModeSheet, setShowSharkModeSheet] = useState(false);
+  const [sharkMode, setSharkMode] = useState<any>(null);
 
   useEffect(() => {
     fetchCode();
-  }, []);
+    if (coupleId) {
+      fetchSharkMode();
+    }
+  }, [coupleId]);
 
   const fetchCode = async () => {
     try {
@@ -51,6 +61,60 @@ export function ProfileScreen({
       console.error('Error fetching code:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSharkMode = async () => {
+    if (!coupleId) return;
+    try {
+      const response = await sharkModeAPI.getStatus(coupleId);
+      setSharkMode(response.sharkMode);
+    } catch (error) {
+      console.log('Error fetching Shark Mode:', error);
+    }
+  };
+
+  const handleActivateSharkMode = async (durationDays: number, note: string) => {
+    if (!coupleId) return;
+    try {
+      await sharkModeAPI.activate(coupleId, userId, durationDays, note);
+      await fetchSharkMode();
+    } catch (error: any) {
+      alert(error.message || 'Failed to activate Shark Mode');
+      throw error;
+    }
+  };
+
+  const handleExtendSharkMode = async (additionalDays: number) => {
+    if (!coupleId) return;
+    try {
+      await sharkModeAPI.extend(coupleId, userId, additionalDays);
+      await fetchSharkMode();
+    } catch (error: any) {
+      alert(error.message || 'Failed to extend Shark Mode');
+      throw error;
+    }
+  };
+
+  const handleDeactivateSharkMode = async () => {
+    if (!coupleId) return;
+    try {
+      await sharkModeAPI.deactivate(coupleId, userId);
+      await fetchSharkMode();
+    } catch (error: any) {
+      alert(error.message || 'Failed to deactivate Shark Mode');
+      throw error;
+    }
+  };
+
+  const handleUpdateNote = async (note: string) => {
+    if (!coupleId) return;
+    try {
+      await sharkModeAPI.updateNote(coupleId, userId, note);
+      await fetchSharkMode();
+    } catch (error: any) {
+      alert(error.message || 'Failed to update note');
+      throw error;
     }
   };
 
@@ -272,6 +336,37 @@ export function ProfileScreen({
               <span>Mood Archive</span>
             </button>
           )}
+
+          {onSharkModeArchive && (
+            <button
+              onClick={onSharkModeArchive}
+              className="w-full px-4 py-3 bg-accent hover:bg-accent/80 rounded-2xl transition-colors flex items-center justify-center space-x-2"
+            >
+              <Waves className="w-5 h-5" />
+              <span>Shark Mode Archive</span>
+            </button>
+          )}
+
+          {onChallengeArchive && (
+            <button
+              onClick={onChallengeArchive}
+              className="w-full px-4 py-3 bg-accent hover:bg-accent/80 rounded-2xl transition-colors flex items-center justify-center space-x-2"
+            >
+              <Target className="w-5 h-5" />
+              <span>Challenge Archive</span>
+            </button>
+          )}
+        </div>
+
+        {/* Shark Mode */}
+        <div className="space-y-3 pt-4">
+          <button
+            onClick={() => setShowSharkModeSheet(true)}
+            className="w-full px-4 py-3 bg-accent hover:bg-accent/80 rounded-2xl transition-colors flex items-center justify-center space-x-2"
+          >
+            <Waves className="w-5 h-5" />
+            <span>{sharkMode?.active ? 'Manage Shark Mode' : 'Enable Shark Mode'}</span>
+          </button>
         </div>
       </div>
 
@@ -349,6 +444,21 @@ export function ProfileScreen({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Shark Mode Sheet */}
+      {showSharkModeSheet && (
+        <SharkModeSheet
+          isOpen={showSharkModeSheet}
+          onClose={() => setShowSharkModeSheet(false)}
+          onActivate={handleActivateSharkMode}
+          isActive={!!sharkMode && sharkMode.status === 'active' && sharkMode.activatedBy === userId}
+          currentDuration={sharkMode?.durationDays}
+          currentNote={sharkMode?.note || ''}
+          onExtend={sharkMode?.activatedBy === userId ? handleExtendSharkMode : undefined}
+          onDeactivate={sharkMode?.activatedBy === userId ? handleDeactivateSharkMode : undefined}
+          onUpdateNote={sharkMode?.activatedBy === userId ? handleUpdateNote : undefined}
+        />
       )}
     </div>
   );
