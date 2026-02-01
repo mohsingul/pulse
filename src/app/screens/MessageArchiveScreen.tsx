@@ -37,32 +37,37 @@ export function MessageArchiveScreen({
       const response = await historyAPI.get(coupleId);
       const allHistory = response.history || [];
 
-      // Extract all messages from both users
+      // Extract all messages from both users using galleries
       const allMessages: any[] = [];
 
       allHistory.forEach((day: any) => {
-        // User1's message
-        if (day.user1Message) {
-          allMessages.push({
-            message: day.user1Message,
-            mood: day.user1Mood,
-            createdBy: user1Id,
-            senderName: isUser1 ? 'You' : partnerName,
-            isMine: isUser1,
-            date: day.date,
-            timestamp: day.user1UpdatedAt || day.updatedAt,
+        // User1's messages from gallery
+        if (day.user1MessageGallery && Array.isArray(day.user1MessageGallery)) {
+          day.user1MessageGallery.forEach((messageEntry: any) => {
+            allMessages.push({
+              message: messageEntry.message,
+              mood: day.user1Mood, // Get mood from the day card
+              createdBy: user1Id,
+              senderName: isUser1 ? 'You' : partnerName,
+              isMine: isUser1,
+              date: day.date,
+              timestamp: messageEntry.timestamp,
+            });
           });
         }
-        // User2's message
-        if (day.user2Message) {
-          allMessages.push({
-            message: day.user2Message,
-            mood: day.user2Mood,
-            createdBy: user2Id,
-            senderName: isUser1 ? partnerName : 'You',
-            isMine: !isUser1,
-            date: day.date,
-            timestamp: day.user2UpdatedAt || day.updatedAt,
+        
+        // User2's messages from gallery
+        if (day.user2MessageGallery && Array.isArray(day.user2MessageGallery)) {
+          day.user2MessageGallery.forEach((messageEntry: any) => {
+            allMessages.push({
+              message: messageEntry.message,
+              mood: day.user2Mood, // Get mood from the day card
+              createdBy: user2Id,
+              senderName: isUser1 ? partnerName : 'You',
+              isMine: !isUser1,
+              date: day.date,
+              timestamp: messageEntry.timestamp,
+            });
           });
         }
       });

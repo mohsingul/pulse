@@ -37,32 +37,37 @@ export function MoodArchiveScreen({
       const response = await historyAPI.get(coupleId);
       const allHistory = response.history || [];
 
-      // Extract all moods from both users
+      // Extract all moods from both users using galleries
       const allMoods: any[] = [];
 
       allHistory.forEach((day: any) => {
-        // User1's mood
-        if (day.user1Mood) {
-          allMoods.push({
-            mood: day.user1Mood,
-            intensity: day.user1Intensity,
-            createdBy: user1Id,
-            senderName: isUser1 ? 'You' : partnerName,
-            isMine: isUser1,
-            date: day.date,
-            timestamp: day.user1UpdatedAt || day.updatedAt,
+        // User1's moods from gallery
+        if (day.user1MoodGallery && Array.isArray(day.user1MoodGallery)) {
+          day.user1MoodGallery.forEach((moodEntry: any) => {
+            allMoods.push({
+              mood: moodEntry.mood,
+              intensity: moodEntry.intensity,
+              createdBy: user1Id,
+              senderName: isUser1 ? 'You' : partnerName,
+              isMine: isUser1,
+              date: day.date,
+              timestamp: moodEntry.timestamp,
+            });
           });
         }
-        // User2's mood
-        if (day.user2Mood) {
-          allMoods.push({
-            mood: day.user2Mood,
-            intensity: day.user2Intensity,
-            createdBy: user2Id,
-            senderName: isUser1 ? partnerName : 'You',
-            isMine: !isUser1,
-            date: day.date,
-            timestamp: day.user2UpdatedAt || day.updatedAt,
+        
+        // User2's moods from gallery
+        if (day.user2MoodGallery && Array.isArray(day.user2MoodGallery)) {
+          day.user2MoodGallery.forEach((moodEntry: any) => {
+            allMoods.push({
+              mood: moodEntry.mood,
+              intensity: moodEntry.intensity,
+              createdBy: user2Id,
+              senderName: isUser1 ? partnerName : 'You',
+              isMine: !isUser1,
+              date: day.date,
+              timestamp: moodEntry.timestamp,
+            });
           });
         }
       });

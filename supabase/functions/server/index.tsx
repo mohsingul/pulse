@@ -507,10 +507,33 @@ app.post("/make-server-494d91eb/today/:coupleId", async (c) => {
     const updates: any = {};
     
     if (mood !== undefined) {
+      // Add mood to gallery array instead of overwriting
+      const moodGalleryKey = `${userPrefix}MoodGallery`;
+      const existingMoodGallery = existingCard[moodGalleryKey] || [];
+      const newMoodEntry = {
+        mood,
+        intensity,
+        timestamp: new Date().toISOString(),
+        userId,
+      };
+      updates[moodGalleryKey] = [...existingMoodGallery, newMoodEntry];
+      
+      // Also update the single mood field for backward compatibility
       updates[`${userPrefix}Mood`] = mood;
       updates[`${userPrefix}Intensity`] = intensity;
     }
     if (message !== undefined) {
+      // Add message to gallery array instead of overwriting
+      const messageGalleryKey = `${userPrefix}MessageGallery`;
+      const existingMessageGallery = existingCard[messageGalleryKey] || [];
+      const newMessageEntry = {
+        message,
+        timestamp: new Date().toISOString(),
+        userId,
+      };
+      updates[messageGalleryKey] = [...existingMessageGallery, newMessageEntry];
+      
+      // Also update the single message field for backward compatibility
       updates[`${userPrefix}Message`] = message;
     }
     if (doodle !== undefined) {
@@ -947,15 +970,44 @@ app.notFound((c) => {
 // Start the server with error handling
 Deno.serve({
   handler: async (req: Request) => {
+    // Set a timeout to prevent hanging connections
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
+    
     try {
-      return await app.fetch(req);
+      const response = await app.fetch(req, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      return response;
     } catch (error) {
+      clearTimeout(timeoutId);
+      
+      if (error.name === 'AbortError') {
+        console.error('[Server] Request timeout');
+        return new Response(
+          JSON.stringify({ error: 'Request timeout' }),
+          {
+            status: 504,
+            headers: { 
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, PATCH',
+              'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With'
+            }
+          }
+        );
+      }
+      
       console.error('[Server] Unhandled error:', error);
       return new Response(
-        JSON.stringify({ error: 'Internal server error' }),
+        JSON.stringify({ error: 'Internal server error', message: error?.message || 'Unknown error' }),
         {
           status: 500,
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, PATCH',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With'
+          }
         }
       );
     }
@@ -963,11 +1015,20 @@ Deno.serve({
   onError: (error) => {
     console.error('[Deno.serve] Error:', error);
     return new Response(
-      JSON.stringify({ error: 'Service error' }),
+      JSON.stringify({ error: 'Service error', message: error?.message || 'Unknown error' }),
       {
         status: 500,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, PATCH',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With'
+        }
       }
     );
+  },
+  port: 8000,
+  onListen: ({ port, hostname }) => {
+    console.log(`[Server] Listening on http://${hostname}:${port}`);
   }
 });

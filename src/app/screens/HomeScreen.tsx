@@ -3,6 +3,7 @@ import { Button } from '@/app/components/Button';
 import { Card } from '@/app/components/Card';
 import { LoadingSpinner } from '@/app/components/LoadingSpinner';
 import { NotificationPanel } from '@/app/components/NotificationPanel';
+import { InstallPrompt } from '@/app/components/InstallPrompt';
 import { Heart, SmilePlus, Sparkles, Clock, History, User, Bell, X } from 'lucide-react';
 import { todayAPI, notificationAPI } from '@/utils/api';
 import { formatDistanceToNow } from 'date-fns';
@@ -432,6 +433,9 @@ export function HomeScreen({
         onDismiss={handleDismissNotification}
         onClose={() => setShowNotificationPanel(false)}
       />
+
+      {/* Install Prompt */}
+      <InstallPrompt />
     </div>
   );
 }
