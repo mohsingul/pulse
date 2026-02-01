@@ -20,7 +20,6 @@ import { DoodleGalleryScreen } from '@/app/screens/DoodleGalleryScreen';
 import { MessageArchiveScreen } from '@/app/screens/MessageArchiveScreen';
 import { MoodArchiveScreen } from '@/app/screens/MoodArchiveScreen';
 import { SharkModeArchiveScreen } from '@/app/screens/SharkModeArchiveScreen';
-import { ChallengeArchiveScreen } from '@/app/screens/ChallengeArchiveScreen';
 
 // Components
 import { UpdatePulseSheet } from '@/app/components/UpdatePulseSheet';
@@ -42,8 +41,7 @@ type Screen =
   | 'doodle-gallery'
   | 'message-archive'
   | 'mood-archive'
-  | 'shark-mode-archive'
-  | 'challenge-archive';
+  | 'shark-mode-archive';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
@@ -318,7 +316,6 @@ export default function App() {
             onMessageArchive={() => setCurrentScreen('message-archive')}
             onMoodArchive={() => setCurrentScreen('mood-archive')}
             onSharkModeArchive={() => setCurrentScreen('shark-mode-archive')}
-            onChallengeArchive={() => setCurrentScreen('challenge-archive')}
           />
         );
 
@@ -412,17 +409,6 @@ export default function App() {
       case 'shark-mode-archive':
         return (
           <SharkModeArchiveScreen
-            coupleId={couple.coupleId}
-            userId={user.userId}
-            userName={user.displayName}
-            partnerName={couple.partner.displayName}
-            onBack={() => setCurrentScreen('profile')}
-          />
-        );
-
-      case 'challenge-archive':
-        return (
-          <ChallengeArchiveScreen
             coupleId={couple.coupleId}
             userId={user.userId}
             userName={user.displayName}

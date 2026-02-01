@@ -132,8 +132,8 @@
 
   body {
     @apply bg-background text-foreground;
-    /* iOS Safe Area - Prevent overlap with notch/status bar */
-    padding-top: env(safe-area-inset-top);
+    /* iOS Safe Area - Reduced padding to prevent too much space */
+    padding-top: max(12px, env(safe-area-inset-top));
     padding-bottom: env(safe-area-inset-bottom);
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
