@@ -2,6 +2,7 @@ import { Hono } from "npm:hono";
 import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
 import * as kv from "./kv_store.ts";
+
 const app = new Hono();
 
 // Enable logger
@@ -84,7 +85,7 @@ app.post("/make-server-494d91eb/init-demo", async (c) => {
       await kv.set(`user:${userId1}`, demoUser1);
       createdUsers.push("demo");
       console.log("[Init Demo] Created demo user: demo / password123");
-    } else{ 
+    } else {
       console.log("[Init Demo] User 'demo' already exists");
     }
     
@@ -146,6 +147,133 @@ app.get("/make-server-494d91eb/debug/users", async (c) => {
   } catch (error) {
     console.log(`Error fetching users: ${error}`);
     return c.json({ error: "Failed to fetch users" }, 500);
+  }
+});
+
+// Debug endpoint to export all couples
+app.get("/make-server-494d91eb/debug/couples", async (c) => {
+  try {
+    const allData = await kv.getByPrefix("couple:");
+    
+    // Filter to get only the main couple records (not the user mappings)
+    const couples = allData.filter((item: any) => item.coupleId && item.user1Id && item.user2Id);
+    
+    console.log(`[Debug] Found ${couples.length} couples`);
+    
+    return c.json({
+      success: true,
+      count: couples.length,
+      couples: couples,
+    });
+  } catch (error) {
+    console.log(`Error fetching couples: ${error}`);
+    return c.json({ error: "Failed to fetch couples" }, 500);
+  }
+});
+
+// Debug endpoint to export all pairing codes
+app.get("/make-server-494d91eb/debug/codes", async (c) => {
+  try {
+    const allData = await kv.getByPrefix("code:");
+    
+    // Filter to get only the main code records
+    const codes = allData.filter((item: any) => item.code && item.userId);
+    
+    console.log(`[Debug] Found ${codes.length} pairing codes`);
+    
+    return c.json({
+      success: true,
+      count: codes.length,
+      codes: codes,
+    });
+  } catch (error) {
+    console.log(`Error fetching pairing codes: ${error}`);
+    return c.json({ error: "Failed to fetch pairing codes" }, 500);
+  }
+});
+
+// Debug endpoint to export all today cards
+app.get("/make-server-494d91eb/debug/today-cards", async (c) => {
+  try {
+    const allCards = await kv.getByPrefix("today:");
+    
+    console.log(`[Debug] Found ${allCards.length} today cards`);
+    
+    return c.json({
+      success: true,
+      count: allCards.length,
+      todayCards: allCards,
+    });
+  } catch (error) {
+    console.log(`Error fetching today cards: ${error}`);
+    return c.json({ error: "Failed to fetch today cards" }, 500);
+  }
+});
+
+// Debug endpoint to export all notifications
+app.get("/make-server-494d91eb/debug/notifications", async (c) => {
+  try {
+    // Notifications are not stored in database (feature disabled to reduce usage)
+    console.log(`[Debug] Notification storage disabled - returning empty array`);
+
+    return c.json({
+      success: true,
+      count: 0,
+      notifications: [],
+      note: "Notification storage disabled to reduce database usage"
+    });
+  } catch (error) {
+    console.log(`Error fetching notifications: ${error}`);
+    return c.json({ error: "Failed to fetch notifications" }, 500);
+  }
+});
+
+// Debug endpoint to export ALL data at once
+app.get("/make-server-494d91eb/debug/export-all", async (c) => {
+  try {
+    console.log(`[Export All] Starting full data export...`);
+
+    // Fetch all data types
+    const usersData = await kv.getByPrefix("user:");
+    const couplesData = await kv.getByPrefix("couple:");
+    const codesData = await kv.getByPrefix("code:");
+    const todayCardsData = await kv.getByPrefix("today:");
+
+    // Filter to get clean data
+    const couples = couplesData.filter((item: any) => item.coupleId && item.user1Id && item.user2Id);
+    const codes = codesData.filter((item: any) => item.code && item.userId);
+
+    // Notifications are not stored in database (feature disabled to reduce usage)
+
+    const exportData = {
+      exportDate: new Date().toISOString(),
+      exportVersion: "1.0.0",
+      appName: "Aimo Pulse",
+      statistics: {
+        totalUsers: usersData.length,
+        totalCouples: couples.length,
+        totalPairingCodes: codes.length,
+        totalTodayCards: todayCardsData.length,
+        totalNotifications: 0, // Notification storage disabled
+      },
+      data: {
+        users: usersData,
+        couples: couples,
+        pairingCodes: codes,
+        todayCards: todayCardsData,
+        notifications: [], // Notification storage disabled to reduce database usage
+      },
+      notes: {
+        notifications: "Notification storage has been disabled to reduce database usage. Notifications are handled locally on the frontend only."
+      }
+    };
+
+    console.log(`[Export All] Export complete:`, exportData.statistics);
+
+    return c.json(exportData);
+  } catch (error) {
+    console.log(`Error exporting all data: ${error}`);
+    return c.json({ error: "Failed to export all data" }, 500);
   }
 });
 
@@ -701,6 +829,8 @@ app.get("/make-server-494d91eb/history/:coupleId", async (c) => {
 });
 
 // NOTIFICATION ROUTES
+// NOTE: Notifications are NOT stored in database to reduce usage
+// They are handled locally on the frontend only
 app.post("/make-server-494d91eb/notifications/nudge", async (c) => {
   try {
     let body;
@@ -710,11 +840,11 @@ app.post("/make-server-494d91eb/notifications/nudge", async (c) => {
       console.log(`[Nudge Notification] Failed to parse JSON body: ${parseError}`);
       return c.json({ error: "Invalid JSON in request body" }, 400);
     }
-    
+
     const { coupleId, senderId } = body;
-    
+
     console.log(`[Nudge Notification] Received request - coupleId: ${coupleId}, senderId: ${senderId}`);
-    
+
     if (!coupleId || !senderId) {
       return c.json({ error: "Couple ID and sender ID are required" }, 400);
     }
@@ -727,13 +857,13 @@ app.post("/make-server-494d91eb/notifications/nudge", async (c) => {
 
     // Get receiver ID (the partner)
     const receiverId = couple.user1Id === senderId ? couple.user2Id : couple.user1Id;
-    
+
     console.log(`[Nudge Notification] Receiver identified: ${receiverId}`);
-    
+
     // Get sender info
     const sender = await kv.get(`user:${senderId}`);
-    
-    // Store notification
+
+    // Create notification object but DO NOT store in database
     const notificationId = generateId();
     const notification = {
       id: notificationId,
@@ -746,10 +876,11 @@ app.post("/make-server-494d91eb/notifications/nudge", async (c) => {
       read: false,
     };
 
-    await kv.set(`notification:${notificationId}`, notification);
-    await kv.set(`notification:user:${receiverId}:${notificationId}`, notificationId);
+    // Database storage removed to reduce usage
+    // await kv.set(`notification:${notificationId}`, notification);
+    // await kv.set(`notification:user:${receiverId}:${notificationId}`, notificationId);
 
-    console.log(`[Nudge Notification] Successfully created notification ${notificationId} for receiver ${receiverId}`);
+    console.log(`[Nudge Notification] Notification created (not stored in DB): ${notificationId} for receiver ${receiverId}`);
 
     return c.json({
       success: true,
@@ -771,9 +902,9 @@ app.post("/make-server-494d91eb/notifications/mood-update", async (c) => {
       console.log(`[Mood Update Notification] Failed to parse JSON body: ${parseError}`);
       return c.json({ error: "Invalid JSON in request body" }, 400);
     }
-    
+
     const { coupleId, senderId, mood, intensity } = body;
-    
+
     if (!coupleId || !senderId || !mood) {
       return c.json({ error: "Couple ID, sender ID, and mood are required" }, 400);
     }
@@ -785,11 +916,11 @@ app.post("/make-server-494d91eb/notifications/mood-update", async (c) => {
 
     // Get receiver ID (the partner)
     const receiverId = couple.user1Id === senderId ? couple.user2Id : couple.user1Id;
-    
+
     // Get sender info
     const sender = await kv.get(`user:${senderId}`);
-    
-    // Store notification
+
+    // Create notification object but DO NOT store in database
     const notificationId = generateId();
     const notification = {
       id: notificationId,
@@ -804,8 +935,9 @@ app.post("/make-server-494d91eb/notifications/mood-update", async (c) => {
       read: false,
     };
 
-    await kv.set(`notification:${notificationId}`, notification);
-    await kv.set(`notification:user:${receiverId}:${notificationId}`, notificationId);
+    // Database storage removed to reduce usage
+    // await kv.set(`notification:${notificationId}`, notification);
+    // await kv.set(`notification:user:${receiverId}:${notificationId}`, notificationId);
 
     return c.json({
       success: true,
@@ -820,7 +952,7 @@ app.post("/make-server-494d91eb/notifications/mood-update", async (c) => {
 app.post("/make-server-494d91eb/notifications/message-update", async (c) => {
   try {
     const { coupleId, senderId, message } = await c.req.json();
-    
+
     if (!coupleId || !senderId || !message) {
       return c.json({ error: "Couple ID, sender ID, and message are required" }, 400);
     }
@@ -832,11 +964,11 @@ app.post("/make-server-494d91eb/notifications/message-update", async (c) => {
 
     // Get receiver ID (the partner)
     const receiverId = couple.user1Id === senderId ? couple.user2Id : couple.user1Id;
-    
+
     // Get sender info
     const sender = await kv.get(`user:${senderId}`);
-    
-    // Store notification
+
+    // Create notification object but DO NOT store in database
     const notificationId = generateId();
     const notification = {
       id: notificationId,
@@ -850,8 +982,9 @@ app.post("/make-server-494d91eb/notifications/message-update", async (c) => {
       read: false,
     };
 
-    await kv.set(`notification:${notificationId}`, notification);
-    await kv.set(`notification:user:${receiverId}:${notificationId}`, notificationId);
+    // Database storage removed to reduce usage
+    // await kv.set(`notification:${notificationId}`, notification);
+    // await kv.set(`notification:user:${receiverId}:${notificationId}`, notificationId);
 
     return c.json({
       success: true,
@@ -872,9 +1005,9 @@ app.post("/make-server-494d91eb/notifications/doodle-update", async (c) => {
       console.log(`[Doodle Update Notification] Failed to parse JSON body: ${parseError}`);
       return c.json({ error: "Invalid JSON in request body" }, 400);
     }
-    
+
     const { coupleId, senderId, doodle } = body;
-    
+
     if (!coupleId || !senderId) {
       return c.json({ error: "Couple ID and sender ID are required" }, 400);
     }
@@ -886,11 +1019,11 @@ app.post("/make-server-494d91eb/notifications/doodle-update", async (c) => {
 
     // Get receiver ID (the partner)
     const receiverId = couple.user1Id === senderId ? couple.user2Id : couple.user1Id;
-    
+
     // Get sender info
     const sender = await kv.get(`user:${senderId}`);
-    
-    // Store notification with doodle data
+
+    // Create notification object but DO NOT store in database
     const notificationId = generateId();
     const notification = {
       id: notificationId,
@@ -904,8 +1037,9 @@ app.post("/make-server-494d91eb/notifications/doodle-update", async (c) => {
       read: false,
     };
 
-    await kv.set(`notification:${notificationId}`, notification);
-    await kv.set(`notification:user:${receiverId}:${notificationId}`, notificationId);
+    // Database storage removed to reduce usage
+    // await kv.set(`notification:${notificationId}`, notification);
+    // await kv.set(`notification:user:${receiverId}:${notificationId}`, notificationId);
 
     return c.json({
       success: true,
@@ -920,44 +1054,12 @@ app.post("/make-server-494d91eb/notifications/doodle-update", async (c) => {
 app.get("/make-server-494d91eb/notifications/:userId", async (c) => {
   try {
     const userId = c.req.param("userId");
-    
-    console.log(`[Notifications] Fetching notifications for user: ${userId}`);
-    
-    if (!userId) {
-      console.log('[Notifications] No userId provided, returning empty array');
-      return c.json({ notifications: [] });
-    }
-    
-    const notificationIds = await kv.getByPrefix(`notification:user:${userId}:`);
-    
-    console.log(`[Notifications] Found ${notificationIds?.length || 0} notification pointers for user ${userId}`);
-    
-    if (!notificationIds || notificationIds.length === 0) {
-      return c.json({ notifications: [] });
-    }
-    
-    const notifications = await Promise.all(
-      notificationIds.map(async (id: string) => {
-        try {
-          const notification = await kv.get(`notification:${id}`);
-          console.log(`[Notifications] Retrieved notification ${id}:`, notification ? 'found' : 'not found');
-          return notification;
-        } catch (err) {
-          console.log(`[Notifications] Error fetching notification ${id}: ${err}`);
-          return null;
-        }
-      })
-    );
 
-    // Filter out nulls and sort by timestamp descending
-    const validNotifications = notifications
-      .filter((n) => n !== null && n !== undefined)
-      .sort((a: any, b: any) => {
-        return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
-      });
+    console.log(`[Notifications] Fetching notifications for user: ${userId} (DB storage disabled)`);
 
-    console.log(`[Notifications] Returning ${validNotifications.length} valid notifications`);
-    return c.json({ notifications: validNotifications });
+    // Notifications are not stored in database to reduce usage
+    // Always return empty array
+    return c.json({ notifications: [] });
   } catch (error) {
     console.log(`[Notifications] Error getting notifications: ${error}`);
     console.log(`[Notifications] Error stack:`, error?.stack);
@@ -968,21 +1070,11 @@ app.get("/make-server-494d91eb/notifications/:userId", async (c) => {
 app.post("/make-server-494d91eb/notifications/:notificationId/read", async (c) => {
   try {
     const notificationId = c.req.param("notificationId");
-    
-    console.log(`[Notifications] Marking notification as read: ${notificationId}`);
-    
-    const notification = await kv.get(`notification:${notificationId}`);
-    
-    if (!notification) {
-      console.log(`[Notifications] Notification not found: ${notificationId}`);
-      return c.json({ error: "Notification not found" }, 404);
-    }
 
-    notification.read = true;
-    await kv.set(`notification:${notificationId}`, notification);
+    console.log(`[Notifications] Mark as read request for: ${notificationId} (DB storage disabled)`);
 
-    console.log(`[Notifications] Successfully marked notification ${notificationId} as read`);
-
+    // Notifications are not stored in database to reduce usage
+    // Always return success
     return c.json({ success: true });
   } catch (error) {
     console.log(`[Notifications] Error marking notification as read: ${error}`);
