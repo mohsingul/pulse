@@ -1,7 +1,5 @@
 
-  # Design Pulse Mood Board App
-
-  This is a code bundle for Design Pulse Mood Board App. The original project is available at https://www.figma.com/design/76h2kBRXK4DEa2FSCQ5UbO/Design-Pulse-Mood-Board-App.
+  This Webapp is deployed on Vercel https://pulse-one-umber.vercel.app/
 
   ## Running the code
 
