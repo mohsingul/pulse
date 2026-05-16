@@ -220,16 +220,6 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
             >
               Reset local profile
             </button>
-            
-            {/* Debug: Create Demo Users Button */}
-            <div>
-              <button
-                onClick={createDemoUser}
-                className="text-[#A83FFF] hover:text-[#FB3094] transition-colors text-sm font-medium"
-              >
-                🔧 Create Demo Users (Testing)
-              </button>
-            </div>
           </div>
         </div>
       </div>

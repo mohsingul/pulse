@@ -87,7 +87,7 @@ export async function registerFirebaseServiceWorker(): Promise<ServiceWorkerRegi
 
   try {
     const registration = await navigator.serviceWorker.register(
-      '/firebase-messaging-sw.js',
+      '/sw.js',
       { scope: '/' }
     );
 
