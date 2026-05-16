@@ -5,6 +5,78 @@ import * as kv from "./kv_store.ts";
 
 const app = new Hono();
 
+const FCM_SERVER_KEY = Deno.env.get('FCM_SERVER_KEY');
+const FCM_SEND_ENDPOINT = 'https://fcm.googleapis.com/fcm/send';
+
+async function updateUserFcmToken(userId: string, fcmToken: string | null) {
+  const user = await kv.get(`user:${userId}`);
+  if (!user) {
+    throw new Error(`User not found: ${userId}`);
+  }
+
+  if (fcmToken) {
+    user.fcmToken = fcmToken;
+    user.fcmTokenUpdatedAt = new Date().toISOString();
+  } else {
+    delete user.fcmToken;
+    delete user.fcmTokenUpdatedAt;
+  }
+
+  await kv.set(`user:${userId}`, user);
+  return user;
+}
+
+async function sendFcmPush(
+  fcmToken: string,
+  notification: { title: string; body: string; icon?: string; badge?: string },
+  data: Record<string, unknown> = {},
+) {
+  if (!FCM_SERVER_KEY) {
+    throw new Error('FCM server key not configured. Set FCM_SERVER_KEY in your environment.');
+  }
+
+  const payload = {
+    to: fcmToken,
+    priority: 'high',
+    notification: {
+      title: notification.title,
+      body: notification.body,
+      icon: notification.icon || '/icon-192.png',
+      badge: notification.badge || '/icon-192.png',
+      click_action: '/',
+    },
+    data,
+    webpush: {
+      headers: {
+        Urgency: 'high',
+      },
+      notification: {
+        title: notification.title,
+        body: notification.body,
+        icon: notification.icon || '/icon-192.png',
+        badge: notification.badge || '/icon-192.png',
+      },
+    },
+  };
+
+  const response = await fetch(FCM_SEND_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `key=${FCM_SERVER_KEY}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const result = await response.json();
+  if (!response.ok) {
+    console.log('[FCM] Error response:', response.status, result);
+    throw new Error(`FCM send failed: ${JSON.stringify(result)}`);
+  }
+
+  return result;
+}
+
 // Enable logger
 app.use('*', logger(console.log));
 
@@ -390,6 +462,44 @@ app.get("/make-server-494d91eb/users/:userId", async (c) => {
   } catch (error) {
     console.log(`Error getting user: ${error}`);
     return c.json({ error: "Failed to get user" }, 500);
+  }
+});
+
+app.post("/make-server-494d91eb/users/:userId/fcm", async (c) => {
+  try {
+    const userId = c.req.param("userId");
+    let body;
+    try {
+      body = await c.req.json();
+    } catch (parseError) {
+      console.log(`[FCM Register] Failed to parse JSON body: ${parseError}`);
+      return c.json({ error: "Invalid JSON in request body" }, 400);
+    }
+
+    const { fcmToken } = body;
+    if (!fcmToken) {
+      return c.json({ error: "fcmToken is required" }, 400);
+    }
+
+    await updateUserFcmToken(userId, fcmToken);
+    console.log(`[FCM Register] Stored FCM token for user: ${userId}`);
+
+    return c.json({ success: true });
+  } catch (error) {
+    console.log(`[FCM Register] Error storing token: ${error}`);
+    return c.json({ error: "Failed to register FCM token" }, 500);
+  }
+});
+
+app.delete("/make-server-494d91eb/users/:userId/fcm", async (c) => {
+  try {
+    const userId = c.req.param("userId");
+    await updateUserFcmToken(userId, null);
+    console.log(`[FCM Unregister] Removed FCM token for user: ${userId}`);
+    return c.json({ success: true });
+  } catch (error) {
+    console.log(`[FCM Unregister] Error removing token: ${error}`);
+    return c.json({ error: "Failed to unregister FCM token" }, 500);
   }
 });
 
@@ -876,6 +986,33 @@ app.post("/make-server-494d91eb/notifications/nudge", async (c) => {
       read: false,
     };
 
+    // Attempt to send push notification to the partner
+    const receiver = await kv.get(`user:${receiverId}`);
+    let notificationSent = false;
+    if (receiver?.fcmToken) {
+      try {
+        await sendFcmPush(
+          receiver.fcmToken,
+          {
+            title: `${sender.displayName} sent you a nudge`,
+            body: "Open Aimo Pulse to view your partner's update.",
+          },
+          {
+            type: "nudge",
+            coupleId,
+            senderId,
+            receiverId,
+            notificationId,
+          },
+        );
+        notificationSent = true;
+      } catch (pushError) {
+        console.log(`[Nudge Notification] FCM push failed: ${pushError}`);
+      }
+    } else {
+      console.log(`[Nudge Notification] Receiver does not have an FCM token: ${receiverId}`);
+    }
+
     // Database storage removed to reduce usage
     // await kv.set(`notification:${notificationId}`, notification);
     // await kv.set(`notification:user:${receiverId}:${notificationId}`, notificationId);
@@ -885,6 +1022,7 @@ app.post("/make-server-494d91eb/notifications/nudge", async (c) => {
     return c.json({
       success: true,
       notification,
+      notificationSent,
     });
   } catch (error) {
     console.log(`[Nudge Notification] Error sending nudge notification: ${error}`);
@@ -935,6 +1073,34 @@ app.post("/make-server-494d91eb/notifications/mood-update", async (c) => {
       read: false,
     };
 
+    const receiver = await kv.get(`user:${receiverId}`);
+    let notificationSent = false;
+    if (receiver?.fcmToken) {
+      try {
+        await sendFcmPush(
+          receiver.fcmToken,
+          {
+            title: `${sender.displayName} updated their mood`,
+            body: `${sender.displayName} is feeling ${mood}${intensity ? ` (${intensity})` : ''}.`,
+          },
+          {
+            type: "mood-update",
+            coupleId,
+            senderId,
+            receiverId,
+            notificationId,
+            mood,
+            intensity,
+          },
+        );
+        notificationSent = true;
+      } catch (pushError) {
+        console.log(`[Mood Update Notification] FCM push failed: ${pushError}`);
+      }
+    } else {
+      console.log(`[Mood Update Notification] Receiver does not have an FCM token: ${receiverId}`);
+    }
+
     // Database storage removed to reduce usage
     // await kv.set(`notification:${notificationId}`, notification);
     // await kv.set(`notification:user:${receiverId}:${notificationId}`, notificationId);
@@ -942,6 +1108,7 @@ app.post("/make-server-494d91eb/notifications/mood-update", async (c) => {
     return c.json({
       success: true,
       notification,
+      notificationSent,
     });
   } catch (error) {
     console.log(`Error sending mood update notification: ${error}`);
@@ -982,6 +1149,33 @@ app.post("/make-server-494d91eb/notifications/message-update", async (c) => {
       read: false,
     };
 
+    const receiver = await kv.get(`user:${receiverId}`);
+    let notificationSent = false;
+    if (receiver?.fcmToken) {
+      try {
+        await sendFcmPush(
+          receiver.fcmToken,
+          {
+            title: `${sender.displayName} sent you a message`,
+            body: message,
+          },
+          {
+            type: "message-update",
+            coupleId,
+            senderId,
+            receiverId,
+            notificationId,
+            message,
+          },
+        );
+        notificationSent = true;
+      } catch (pushError) {
+        console.log(`[Message Update Notification] FCM push failed: ${pushError}`);
+      }
+    } else {
+      console.log(`[Message Update Notification] Receiver does not have an FCM token: ${receiverId}`);
+    }
+
     // Database storage removed to reduce usage
     // await kv.set(`notification:${notificationId}`, notification);
     // await kv.set(`notification:user:${receiverId}:${notificationId}`, notificationId);
@@ -989,6 +1183,7 @@ app.post("/make-server-494d91eb/notifications/message-update", async (c) => {
     return c.json({
       success: true,
       notification,
+      notificationSent,
     });
   } catch (error) {
     console.log(`Error sending message update notification: ${error}`);
@@ -1037,6 +1232,32 @@ app.post("/make-server-494d91eb/notifications/doodle-update", async (c) => {
       read: false,
     };
 
+    const receiver = await kv.get(`user:${receiverId}`);
+    let notificationSent = false;
+    if (receiver?.fcmToken) {
+      try {
+        await sendFcmPush(
+          receiver.fcmToken,
+          {
+            title: `${sender.displayName} sent a doodle`,
+            body: "Tap to open the new doodle in Aimo Pulse.",
+          },
+          {
+            type: "doodle-update",
+            coupleId,
+            senderId,
+            receiverId,
+            notificationId,
+          },
+        );
+        notificationSent = true;
+      } catch (pushError) {
+        console.log(`[Doodle Update Notification] FCM push failed: ${pushError}`);
+      }
+    } else {
+      console.log(`[Doodle Update Notification] Receiver does not have an FCM token: ${receiverId}`);
+    }
+
     // Database storage removed to reduce usage
     // await kv.set(`notification:${notificationId}`, notification);
     // await kv.set(`notification:user:${receiverId}:${notificationId}`, notificationId);
@@ -1044,6 +1265,7 @@ app.post("/make-server-494d91eb/notifications/doodle-update", async (c) => {
     return c.json({
       success: true,
       notification,
+      notificationSent,
     });
   } catch (error) {
     console.log(`Error sending doodle update notification: ${error}`);

@@ -148,6 +148,15 @@ export const userAPI = {
     apiRequest('/init-demo', {
       method: 'POST',
     }),
+  registerFcmToken: (userId: string, fcmToken: string) =>
+    apiRequest(`/users/${userId}/fcm`, {
+      method: 'POST',
+      body: JSON.stringify({ fcmToken }),
+    }),
+  unregisterFcmToken: (userId: string) =>
+    apiRequest(`/users/${userId}/fcm`, {
+      method: 'DELETE',
+    }),
 };
 
 // Pairing API

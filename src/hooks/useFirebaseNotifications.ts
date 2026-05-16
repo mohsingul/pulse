@@ -9,6 +9,7 @@ import {
   NotificationPreferences,
   deleteFCMToken,
 } from '@/utils/firebase-notifications';
+import { userAPI } from '@/utils/api';
 
 export interface NotificationState {
   supported: boolean;
@@ -38,7 +39,7 @@ export function useFirebaseNotifications(userId?: string) {
         unsubscribeRef.current();
       }
     };
-  }, []);
+  }, [userId]);
 
   const checkNotificationStatus = async () => {
     try {
@@ -57,6 +58,10 @@ export function useFirebaseNotifications(userId?: string) {
         const token = await getFCMToken();
         if (token) {
           setState(prev => ({ ...prev, fcmToken: token }));
+
+          if (userId) {
+            await sendTokenToBackend(userId, token);
+          }
 
           // Setup foreground message listener
           const unsubscribe = setupForegroundMessageListener((payload) => {
@@ -218,28 +223,7 @@ export function useNotificationPreferences() {
 async function sendTokenToBackend(userId: string, fcmToken: string): Promise<void> {
   try {
     console.log('[Notifications] Sending FCM token to backend:', { userId, fcmToken: fcmToken.substring(0, 20) + '...' });
-
-    // TODO: Replace with your actual Supabase endpoint
-    // Example:
-    // const response = await fetch(
-    //   `https://YOUR_PROJECT.supabase.co/functions/v1/make-server-494d91eb/fcm/subscribe`,
-    //   {
-    //     method: 'POST',
-    //     headers: {
-    //       'Content-Type': 'application/json',
-    //       'Authorization': `Bearer YOUR_ANON_KEY`,
-    //     },
-    //     body: JSON.stringify({ userId, fcmToken }),
-    //   }
-    // );
-
-    // if (!response.ok) {
-    //   throw new Error('Failed to save token');
-    // }
-
-    // For now, just store in localStorage as fallback
-    localStorage.setItem('fcm_token', fcmToken);
-    localStorage.setItem('fcm_user_id', userId);
+    await userAPI.registerFcmToken(userId, fcmToken);
   } catch (error) {
     console.error('[Notifications] Failed to send token to backend:', error);
     throw error;
@@ -250,24 +234,7 @@ async function sendTokenToBackend(userId: string, fcmToken: string): Promise<voi
 async function removeTokenFromBackend(userId: string, fcmToken: string): Promise<void> {
   try {
     console.log('[Notifications] Removing FCM token from backend:', { userId });
-
-    // TODO: Replace with your actual Supabase endpoint
-    // Example:
-    // await fetch(
-    //   `https://YOUR_PROJECT.supabase.co/functions/v1/make-server-494d91eb/fcm/unsubscribe`,
-    //   {
-    //     method: 'POST',
-    //     headers: {
-    //       'Content-Type': 'application/json',
-    //       'Authorization': `Bearer YOUR_ANON_KEY`,
-    //     },
-    //     body: JSON.stringify({ userId, fcmToken }),
-    //   }
-    // );
-
-    // For now, just remove from localStorage
-    localStorage.removeItem('fcm_token');
-    localStorage.removeItem('fcm_user_id');
+    await userAPI.unregisterFcmToken(userId);
   } catch (error) {
     console.error('[Notifications] Failed to remove token from backend:', error);
   }
