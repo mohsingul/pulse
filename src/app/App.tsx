@@ -1,3 +1,4 @@
+/// <reference types="react" />
 import React, { useState, useEffect } from 'react';
 import { storage } from '@/utils/storage';
 import { coupleAPI, todayAPI, notificationAPI, userAPI, sharkModeAPI } from '@/utils/api';
@@ -21,15 +22,18 @@ import { MessageArchiveScreen } from '@/app/screens/MessageArchiveScreen';
 import { MoodArchiveScreen } from '@/app/screens/MoodArchiveScreen';
 import { SharkModeArchiveScreen } from '@/app/screens/SharkModeArchiveScreen';
 import { DailyChallengeArchiveScreen } from '@/app/screens/DailyChallengeArchiveScreen';
+import { NotificationSettingsScreen } from '@/app/screens/NotificationSettingsScreen';
+import { NotificationCenterScreen } from '@/app/screens/NotificationCenterScreen';
 
 // Components
 import { UpdatePulseSheet } from '@/app/components/UpdatePulseSheet';
 import { DoodleExpandedView } from '@/app/components/DoodleExpandedView';
-import { NotificationSettingsScreen } from '@/app/screens/NotificationSettingsScreen';
-import { NotificationCenterScreen } from '@/app/screens/NotificationCenterScreen';
 import { NotificationOnboarding } from '@/app/components/NotificationOnboarding';
+
+// Hooks
 import { useFirebaseNotifications } from '@/hooks/useFirebaseNotifications';
-type Screen = 
+
+type Screen =
   | 'welcome'
   | 'create-profile'
   | 'login'
@@ -40,16 +44,15 @@ type Screen =
   | 'home'
   | 'profile'
   | 'settings'
+  | 'notification-settings'
+  | 'notification-center'
   | 'history'
   | 'doodle'
   | 'doodle-gallery'
   | 'message-archive'
   | 'mood-archive'
   | 'shark-mode-archive'
-  | 'daily-challenge-archive'
-  | 'notification-settings'
-  | 'notification-center';   
-
+  | 'daily-challenge-archive';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
@@ -58,6 +61,8 @@ export default function App() {
   const [showUpdateSheet, setShowUpdateSheet] = useState(false);
   const [expandedDoodle, setExpandedDoodle] = useState<any>(null);
   const [showNotificationOnboarding, setShowNotificationOnboarding] = useState(false);
+
+  // Initialize Firebase notifications
   const notifications = useFirebaseNotifications(user?.userId);
 
   useEffect(() => {
@@ -77,6 +82,17 @@ export default function App() {
     }
   }, []);
 
+  // Show notification onboarding after successful pairing
+  useEffect(() => {
+    if (couple && notifications.permission === 'default' && currentScreen === 'success') {
+      // Wait 2 seconds after pairing success, then show onboarding
+      const timer = setTimeout(() => {
+        setShowNotificationOnboarding(true);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [couple, notifications.permission, currentScreen]);
+
   const testBackendConnection = async () => {
     try {
       const response = await fetch(
@@ -89,28 +105,12 @@ export default function App() {
       );
       const data = await response.json();
       console.log('[Backend Health Check]', data);
-      
-      // Initialize demo users for testing
+
+      // Initialize demo users silently in background (no UI logs)
       try {
-        console.log('[Demo Data] Initializing demo users...');
-        const demoResponse = await userAPI.initDemo();
-        console.log('[Demo Data] Response:', demoResponse);
-        
-        if (demoResponse.created && demoResponse.created.length > 0) {
-          console.log('✅ Demo users created successfully!');
-          console.log(`📊 Total users in database: ${demoResponse.totalUsers}`);
-          console.log(`📝 Usernames available: ${demoResponse.usernames.join(', ')}`);
-          console.log('');
-          console.log('🔑 You can now test password reset with:');
-          console.log('   Username: demo');
-          console.log('   Password: password123');
-        } else {
-          console.log('ℹ️ Demo users already exist');
-          console.log(`📊 Total users in database: ${demoResponse.totalUsers}`);
-          console.log(`📝 Usernames available: ${demoResponse.usernames.join(', ')}`);
-        }
+        await userAPI.initDemo();
       } catch (demoError: any) {
-        console.log('[Demo Data] Error:', demoError.message || demoError);
+        // Silent - demo user initialization is optional
       }
     } catch (error) {
       console.error('[Backend Health Check Failed]', error);
@@ -135,6 +135,7 @@ export default function App() {
 
   const handleAuthSuccess = (userData: any) => {
     setUser(userData);
+    storage.saveUser(userData); // Persist user data to localStorage
     checkCouple(userData.userId);
   };
 
@@ -337,6 +338,26 @@ export default function App() {
             userId={user!.userId}
             userName={user!.displayName}
             onBack={() => setCurrentScreen('profile')}
+            onNotificationSettings={() => setCurrentScreen('notification-settings')}
+          />
+        );
+
+      case 'notification-settings':
+        return (
+          <NotificationSettingsScreen
+            userId={user!.userId}
+            userName={user!.displayName}
+            onBack={() => setCurrentScreen('settings')}
+            onNotificationCenter={() => setCurrentScreen('notification-center')}
+          />
+        );
+
+      case 'notification-center':
+        return (
+          <NotificationCenterScreen
+            userId={user!.userId}
+            coupleId={couple?.coupleId}
+            onBack={() => setCurrentScreen('notification-settings')}
           />
         );
 
@@ -450,6 +471,18 @@ export default function App() {
   return (
     <div className="h-full w-full bg-background text-foreground overflow-auto">
       {renderScreen()}
+
+      {/* Notification onboarding modal */}
+      {showNotificationOnboarding && (
+        <NotificationOnboarding
+          isOpen={showNotificationOnboarding}
+          onClose={() => setShowNotificationOnboarding(false)}
+          onEnableNotifications={async () => {
+            await notifications.enableNotifications();
+            setShowNotificationOnboarding(false);
+          }}
+        />
+      )}
     </div>
   );
 }

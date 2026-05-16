@@ -1,23 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/app/components/Button';
 import { Card } from '@/app/components/Card';
-import { ArrowLeft, Sun, Moon, Bell, BellOff, Smartphone, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Sun, Moon, Bell, BellOff, Smartphone, AlertCircle, ChevronRight } from 'lucide-react';
 import { storage } from '@/utils/storage';
+import { useFirebaseNotifications } from '@/hooks/useFirebaseNotifications';
 
 interface SettingsScreenProps {
   onBack: () => void;
   userId: string;
   userName: string;
+  onNotificationSettings?: () => void;
 }
 
-export function SettingsScreen({ onBack, userId, userName }: SettingsScreenProps) {
+export function SettingsScreen({ onBack, userId, userName, onNotificationSettings }: SettingsScreenProps) {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [notifications, setNotifications] = useState({
     morning: { enabled: true, time: '09:00' },
     midday: { enabled: true, time: '13:00' },
     evening: { enabled: true, time: '19:00' },
   });
-  
+
+  // Firebase push notifications
+  const pushNotifications = useFirebaseNotifications(userId);
+
   useEffect(() => {
     setTheme(storage.getTheme());
     setNotifications(storage.getNotifications());
@@ -102,11 +107,81 @@ export function SettingsScreen({ onBack, userId, userName }: SettingsScreenProps
           </Card>
         </div>
 
-        {/* Notifications */}
+        {/* Push Notifications */}
         <div className="space-y-3">
-          <h3 className="text-lg font-semibold">Notifications</h3>
-          
-          <h4 className="text-base font-semibold">Reminder Notifications</h4>
+          <h3 className="text-lg font-semibold">Push Notifications</h3>
+          <Card>
+            <div className="space-y-4">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Smartphone className="w-5 h-5 text-[#A83FFF]" />
+                    <h4 className="font-medium">Real-time Updates</h4>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Get notified when your partner updates their pulse
+                  </p>
+                </div>
+                {pushNotifications.permission === 'granted' ? (
+                  <Bell className="w-5 h-5 text-green-500" />
+                ) : (
+                  <BellOff className="w-5 h-5 text-muted-foreground" />
+                )}
+              </div>
+
+              {pushNotifications.permission === 'default' && (
+                <Button
+                  onClick={pushNotifications.enableNotifications}
+                  disabled={pushNotifications.loading}
+                  className="w-full bg-[image:var(--pulse-gradient)] text-white hover:opacity-90"
+                >
+                  {pushNotifications.loading ? 'Enabling...' : 'Enable Push Notifications'}
+                </Button>
+              )}
+
+              {pushNotifications.permission === 'denied' && (
+                <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
+                  <div className="flex gap-2">
+                    <AlertCircle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm">
+                      <p className="font-medium text-yellow-700 dark:text-yellow-400 mb-1">
+                        Notifications Blocked
+                      </p>
+                      <p className="text-yellow-600 dark:text-yellow-500">
+                        Please enable notifications in your browser settings to receive updates.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {pushNotifications.permission === 'granted' && (
+                <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/20">
+                  <div className="flex items-center gap-2">
+                    <Bell className="w-5 h-5 text-green-500" />
+                    <p className="text-sm text-green-700 dark:text-green-400 font-medium">
+                      Push notifications enabled
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {onNotificationSettings && (
+                <button
+                  onClick={onNotificationSettings}
+                  className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-accent transition-colors"
+                >
+                  <span className="text-sm font-medium">Advanced Notification Settings</span>
+                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                </button>
+              )}
+            </div>
+          </Card>
+        </div>
+
+        {/* Reminder Notifications */}
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold">Reminder Notifications</h3>
           <p className="text-sm text-muted-foreground">
             We'll gently remind you to update your Pulse
           </p>
