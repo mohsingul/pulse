@@ -241,10 +241,24 @@ async function sendSubscriptionToBackend(
 
 If you prefer Firebase:
 
-1. Set up Firebase project
-2. Get FCM server key
-3. Use FCM SDK instead of Web Push
-4. Follow Firebase docs for push notifications
+1. Set up a Firebase project
+2. Enable Cloud Messaging
+3. Get your FCM server key from Firebase Console
+4. Configure Supabase Edge Function environment
+5. Deploy the function and use the FCM push endpoint
+
+#### Supabase Environment Setup
+
+- In Supabase dashboard, open your Edge Function settings for `make-server-494d91eb`
+- Add `FCM_SERVER_KEY` and paste your Firebase server key
+
+You can also keep a local reference in `.env.example`:
+
+```env
+FCM_SERVER_KEY=your_firebase_server_key
+```
+
+Then deploy your function so the backend can send pushes to registered devices.
 
 ---
 

@@ -5,6 +5,8 @@ import * as kv from "./kv_store.ts";
 
 const app = new Hono();
 
+// Required environment variable for Firebase Cloud Messaging.
+// Set this in Supabase Edge Function configuration as FCM_SERVER_KEY.
 const FCM_SERVER_KEY = Deno.env.get('FCM_SERVER_KEY');
 const FCM_SEND_ENDPOINT = 'https://fcm.googleapis.com/fcm/send';
 
