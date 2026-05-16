@@ -3,25 +3,23 @@ import { Button } from '@/app/components/Button';
 import { Card } from '@/app/components/Card';
 import { ArrowLeft, Sun, Moon, Bell, BellOff, Smartphone, AlertCircle, ChevronRight } from 'lucide-react';
 import { storage } from '@/utils/storage';
-import { useFirebaseNotifications } from '@/hooks/useFirebaseNotifications';
+import { type FirebaseNotificationControls } from '@/hooks/useFirebaseNotifications';
 
 interface SettingsScreenProps {
   onBack: () => void;
   userId: string;
   userName: string;
+  pushNotifications: FirebaseNotificationControls;
   onNotificationSettings?: () => void;
 }
 
-export function SettingsScreen({ onBack, userId, userName, onNotificationSettings }: SettingsScreenProps) {
+export function SettingsScreen({ onBack, userId, userName, pushNotifications, onNotificationSettings }: SettingsScreenProps) {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [notifications, setNotifications] = useState({
     morning: { enabled: true, time: '09:00' },
     midday: { enabled: true, time: '13:00' },
     evening: { enabled: true, time: '19:00' },
   });
-
-  // Firebase push notifications
-  const pushNotifications = useFirebaseNotifications(userId);
 
   useEffect(() => {
     setTheme(storage.getTheme());

@@ -19,7 +19,14 @@ export interface NotificationState {
   error: string | null;
 }
 
-export function useFirebaseNotifications(userId?: string) {
+export interface FirebaseNotificationControls extends NotificationState {
+  requestPermission: () => Promise<NotificationPermission>;
+  enableNotifications: () => Promise<void>;
+  disableNotifications: () => Promise<void>;
+  checkNotificationStatus: () => Promise<void>;
+}
+
+export function useFirebaseNotifications(userId?: string): FirebaseNotificationControls {
   const [state, setState] = useState<NotificationState>({
     supported: false,
     permission: 'default',
@@ -63,7 +70,11 @@ export function useFirebaseNotifications(userId?: string) {
             await sendTokenToBackend(userId, token);
           }
 
-          // Setup foreground message listener
+          // Setup foreground message listener once
+          if (unsubscribeRef.current) {
+            unsubscribeRef.current();
+            unsubscribeRef.current = null;
+          }
           const unsubscribe = setupForegroundMessageListener((payload) => {
             console.log('[Notifications] Foreground message:', payload);
             // You can handle foreground notifications here
@@ -145,7 +156,11 @@ export function useFirebaseNotifications(userId?: string) {
             console.error('[useFirebaseNotifications] Failed to send token to backend:', error);
           }
 
-          // Setup foreground listener
+          // Setup foreground listener once
+          if (unsubscribeRef.current) {
+            unsubscribeRef.current();
+            unsubscribeRef.current = null;
+          }
           const unsubscribe = setupForegroundMessageListener((payload) => {
             console.log('[Notifications] Foreground message:', payload);
           });

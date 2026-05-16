@@ -337,6 +337,7 @@ export default function App() {
           <SettingsScreen
             userId={user!.userId}
             userName={user!.displayName}
+            pushNotifications={notifications}
             onBack={() => setCurrentScreen('profile')}
             onNotificationSettings={() => setCurrentScreen('notification-settings')}
           />

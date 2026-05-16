@@ -18,9 +18,14 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   console.log('[Firebase SW] Background message received:', payload);
 
-  const notificationTitle = payload.notification?.title || 'Aimo Pulse';
+  // If the payload already contains notification fields, let FCM handle display.
+  if (payload.notification?.title || payload.notification?.body) {
+    return;
+  }
+
+  const notificationTitle = payload.notification?.title || payload.data?.title || 'Aimo Pulse';
   const notificationOptions = {
-    body: payload.notification?.body || 'You have a new update',
+    body: payload.notification?.body || payload.data?.body || 'You have a new update',
     icon: payload.notification?.icon || '/icon-192.png',
     badge: '/icon-192.png',
     tag: 'aimo-pulse',
