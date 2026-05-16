@@ -5,10 +5,251 @@ import * as kv from "./kv_store.ts";
 
 const app = new Hono();
 
-// Required environment variable for Firebase Cloud Messaging.
-// Set this in Supabase Edge Function configuration as FCM_SERVER_KEY.
 const FCM_SERVER_KEY = Deno.env.get('FCM_SERVER_KEY');
-const FCM_SEND_ENDPOINT = 'https://fcm.googleapis.com/fcm/send';
+const FIREBASE_SERVICE_ACCOUNT_JSON = Deno.env.get('FIREBASE_SERVICE_ACCOUNT_JSON');
+const FIREBASE_PROJECT_ID = Deno.env.get('FIREBASE_PROJECT_ID');
+const FIREBASE_CLIENT_EMAIL = Deno.env.get('FIREBASE_CLIENT_EMAIL');
+const FIREBASE_PRIVATE_KEY = Deno.env.get('FIREBASE_PRIVATE_KEY');
+const FCM_LEGACY_SEND_ENDPOINT = 'https://fcm.googleapis.com/fcm/send';
+const FCM_OAUTH_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
+
+let cachedFcmAccessToken: { token: string; expiresAt: number } | null = null;
+
+type FirebaseServiceAccount = {
+  projectId: string;
+  clientEmail: string;
+  privateKey: string;
+};
+
+function base64UrlEncode(value: string | Uint8Array): string {
+  let base64 = '';
+  if (typeof value === 'string') {
+    base64 = btoa(value);
+  } else {
+    let binary = '';
+    for (const byte of value) {
+      binary += String.fromCharCode(byte);
+    }
+    base64 = btoa(binary);
+  }
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function parsePemPrivateKey(pem: string): Uint8Array {
+  const normalized = pem
+    .replace(/-----BEGIN PRIVATE KEY-----/g, '')
+    .replace(/-----END PRIVATE KEY-----/g, '')
+    .replace(/\s+/g, '');
+  const binary = atob(normalized);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function loadFirebaseServiceAccount(): FirebaseServiceAccount | null {
+  if (FIREBASE_SERVICE_ACCOUNT_JSON) {
+    try {
+      const parsed = JSON.parse(FIREBASE_SERVICE_ACCOUNT_JSON) as Record<string, unknown>;
+      const projectId = String(parsed.project_id || parsed.projectId || '').trim();
+      const clientEmail = String(parsed.client_email || parsed.clientEmail || '').trim();
+      const privateKey = String(parsed.private_key || parsed.privateKey || '').trim();
+      if (projectId && clientEmail && privateKey) {
+        return { projectId, clientEmail, privateKey };
+      }
+    } catch (error) {
+      console.error('[FCM] Invalid FIREBASE_SERVICE_ACCOUNT_JSON:', error);
+    }
+  }
+
+  if (FIREBASE_PROJECT_ID && FIREBASE_CLIENT_EMAIL && FIREBASE_PRIVATE_KEY) {
+    return {
+      projectId: FIREBASE_PROJECT_ID,
+      clientEmail: FIREBASE_CLIENT_EMAIL,
+      privateKey: FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    };
+  }
+
+  return null;
+}
+
+async function signJwt(payload: string, privateKey: string): Promise<string> {
+  const keyData = parsePemPrivateKey(privateKey);
+  const cryptoKey = await crypto.subtle.importKey(
+    'pkcs8',
+    keyData.buffer as ArrayBuffer,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, new TextEncoder().encode(payload));
+  return base64UrlEncode(new Uint8Array(signature));
+}
+
+async function getFcmAccessToken(): Promise<string | null> {
+  const serviceAccount = loadFirebaseServiceAccount();
+  if (!serviceAccount) {
+    return null;
+  }
+
+  if (cachedFcmAccessToken && Date.now() < cachedFcmAccessToken.expiresAt) {
+    return cachedFcmAccessToken.token;
+  }
+
+  const iat = Math.floor(Date.now() / 1000);
+  const exp = iat + 3600;
+  const header = base64UrlEncode(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const claimSet = base64UrlEncode(JSON.stringify({
+    iss: serviceAccount.clientEmail,
+    scope: 'https://www.googleapis.com/auth/firebase.messaging',
+    aud: FCM_OAUTH_TOKEN_ENDPOINT,
+    exp,
+    iat,
+  }));
+  const unsignedJwt = `${header}.${claimSet}`;
+  const signature = await signJwt(unsignedJwt, serviceAccount.privateKey);
+  const signedJwt = `${unsignedJwt}.${signature}`;
+
+  const response = await fetch(FCM_OAUTH_TOKEN_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: signedJwt,
+    }),
+  });
+
+  const result = await response.json();
+  if (!response.ok || !result.access_token) {
+    console.error('[FCM] Access token fetch failed:', response.status, result);
+    throw new Error('Failed to obtain Firebase access token');
+  }
+
+  cachedFcmAccessToken = {
+    token: result.access_token,
+    expiresAt: Date.now() + ((result.expires_in ?? 3600) - 60) * 1000,
+  };
+
+  return cachedFcmAccessToken.token;
+}
+
+function normalizeFcmData(data: Record<string, unknown>): Record<string, string> {
+  return Object.entries(data).reduce((acc, [key, value]) => {
+    if (value === undefined || value === null) return acc;
+    acc[key] = String(value);
+    return acc;
+  }, {} as Record<string, string>);
+}
+
+async function sendFcmPush(
+  fcmToken: string,
+  notification: { title: string; body: string; icon?: string; badge?: string },
+  data: Record<string, unknown> = {},
+) {
+  const normalizedData = normalizeFcmData(data);
+  const message = {
+    message: {
+      token: fcmToken,
+      notification: {
+        title: notification.title,
+        body: notification.body,
+      },
+      data: normalizedData,
+      webpush: {
+        headers: {
+          Urgency: 'high',
+        },
+        notification: {
+          title: notification.title,
+          body: notification.body,
+          icon: notification.icon || '/icon-192.png',
+          badge: notification.badge || '/icon-192.png',
+          tag: normalizedData.tag || undefined,
+          data: {
+            url: normalizedData.url || '/',
+          },
+        },
+        fcmOptions: {
+          link: normalizedData.url || '/',
+        },
+      },
+    },
+  };
+
+  const serviceAccount = loadFirebaseServiceAccount();
+  if (serviceAccount) {
+    const accessToken = await getFcmAccessToken();
+    if (!accessToken) {
+      throw new Error('Firebase access token not available');
+    }
+
+    const endpoint = `https://fcm.googleapis.com/v1/projects/${serviceAccount.projectId}/messages:send`;
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(message),
+    });
+
+    const result = await response.json();
+    if (!response.ok) {
+      console.log('[FCM] v1 send failed:', response.status, result);
+      throw new Error(`FCM v1 send failed: ${JSON.stringify(result)}`);
+    }
+
+    return result;
+  }
+
+  if (!FCM_SERVER_KEY) {
+    throw new Error('No Firebase credentials configured. Set FIREBASE_SERVICE_ACCOUNT_JSON or FCM_SERVER_KEY.');
+  }
+
+  const legacyPayload = {
+    to: fcmToken,
+    priority: 'high',
+    notification: {
+      title: notification.title,
+      body: notification.body,
+      icon: notification.icon || '/icon-192.png',
+      badge: notification.badge || '/icon-192.png',
+      click_action: '/',
+    },
+    data: normalizedData,
+    webpush: {
+      headers: {
+        Urgency: 'high',
+      },
+      notification: {
+        title: notification.title,
+        body: notification.body,
+        icon: notification.icon || '/icon-192.png',
+        badge: notification.badge || '/icon-192.png',
+      },
+    },
+  };
+
+  const response = await fetch(FCM_LEGACY_SEND_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `key=${FCM_SERVER_KEY}`,
+    },
+    body: JSON.stringify(legacyPayload),
+  });
+
+  const result = await response.json();
+  if (!response.ok) {
+    console.log('[FCM] Legacy send failed:', response.status, result);
+    throw new Error(`FCM send failed: ${JSON.stringify(result)}`);
+  }
+
+  return result;
+}
 
 async function updateUserFcmToken(userId: string, fcmToken: string | null) {
   const user = await kv.get(`user:${userId}`);
@@ -26,57 +267,6 @@ async function updateUserFcmToken(userId: string, fcmToken: string | null) {
 
   await kv.set(`user:${userId}`, user);
   return user;
-}
-
-async function sendFcmPush(
-  fcmToken: string,
-  notification: { title: string; body: string; icon?: string; badge?: string },
-  data: Record<string, unknown> = {},
-) {
-  if (!FCM_SERVER_KEY) {
-    throw new Error('FCM server key not configured. Set FCM_SERVER_KEY in your environment.');
-  }
-
-  const payload = {
-    to: fcmToken,
-    priority: 'high',
-    notification: {
-      title: notification.title,
-      body: notification.body,
-      icon: notification.icon || '/icon-192.png',
-      badge: notification.badge || '/icon-192.png',
-      click_action: '/',
-    },
-    data,
-    webpush: {
-      headers: {
-        Urgency: 'high',
-      },
-      notification: {
-        title: notification.title,
-        body: notification.body,
-        icon: notification.icon || '/icon-192.png',
-        badge: notification.badge || '/icon-192.png',
-      },
-    },
-  };
-
-  const response = await fetch(FCM_SEND_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `key=${FCM_SERVER_KEY}`,
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const result = await response.json();
-  if (!response.ok) {
-    console.log('[FCM] Error response:', response.status, result);
-    throw new Error(`FCM send failed: ${JSON.stringify(result)}`);
-  }
-
-  return result;
 }
 
 // Enable logger

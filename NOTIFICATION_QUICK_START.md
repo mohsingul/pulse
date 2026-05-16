@@ -243,19 +243,26 @@ If you prefer Firebase:
 
 1. Set up a Firebase project
 2. Enable Cloud Messaging
-3. Get your FCM server key from Firebase Console
+3. Create or download a Firebase Service Account JSON key
 4. Configure Supabase Edge Function environment
-5. Deploy the function and use the FCM push endpoint
+5. Deploy the function and send push messages via FCM HTTP v1
 
 #### Supabase Environment Setup
 
 - In Supabase dashboard, open your Edge Function settings for `make-server-494d91eb`
-- Add `FCM_SERVER_KEY` and paste your Firebase server key
+- Set one of these options:
+  - `FIREBASE_SERVICE_ACCOUNT_JSON` with the full service account JSON
+  - OR `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY`
+
+> The current Aimo Pulse backend now uses Firebase HTTP v1 by default. It will only fall back to `FCM_SERVER_KEY` if service account credentials are not available.
 
 You can also keep a local reference in `.env.example`:
 
 ```env
-FCM_SERVER_KEY=your_firebase_server_key
+FIREBASE_SERVICE_ACCOUNT_JSON={...}
+FIREBASE_PROJECT_ID=aimopulse
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk@aimopulse.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 ```
 
 Then deploy your function so the backend can send pushes to registered devices.
