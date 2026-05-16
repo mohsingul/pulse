@@ -104,7 +104,7 @@ export async function registerFirebaseServiceWorker(): Promise<ServiceWorkerRegi
 }
 
 /**
- * Get FCM token
+ * Get FCM token (assumes permission is already granted)
  */
 export async function getFCMToken(): Promise<string | null> {
   try {
@@ -119,10 +119,14 @@ export async function getFCMToken(): Promise<string | null> {
       throw new Error('Service worker not registered');
     }
 
-    // Request permission if needed
-    const permission = await requestNotificationPermission();
+    // Check permission (should already be granted by initializeNotifications)
+    const permission = Notification.permission;
     if (permission !== 'granted') {
-      throw new Error('Notification permission not granted');
+      throw new Error(
+        permission === 'denied'
+          ? 'Notifications are blocked. Enable them in browser settings.'
+          : 'Notification permission not granted. Enable notifications first.'
+      );
     }
 
     // Get FCM token
@@ -211,30 +215,42 @@ export async function initializeNotifications(
       throw new Error('Push notifications not supported on this device');
     }
 
-    // Step 2: Check permission
-    const permission = getNotificationPermission();
+    // Step 2: Check current permission
+    let permission = getNotificationPermission();
+    console.log('[Firebase] Current permission:', permission);
+
+    // Step 3: If already denied, ask user to enable in settings
     if (permission === 'denied') {
-      throw new Error('Notification permission denied. Please enable in settings.');
+      throw new Error(
+        'Notifications are blocked in your browser. Please enable them in browser settings and try again.'
+      );
     }
 
-    // Step 3: Initialize Firebase
+    // Step 4: Initialize Firebase
     initializeFirebase();
 
-    // Step 4: Register service worker
+    // Step 5: Register service worker
     const registration = await registerFirebaseServiceWorker();
     if (!registration) {
       throw new Error('Failed to register service worker');
     }
 
-    // Step 5: Request permission if needed
+    // Step 6: Request permission if needed (this will show the browser dialog)
     if (permission === 'default') {
-      const newPermission = await requestNotificationPermission();
-      if (newPermission !== 'granted') {
-        throw new Error('Notification permission not granted');
+      console.log('[Firebase] Requesting notification permission from user...');
+      permission = await requestNotificationPermission();
+      console.log('[Firebase] User response:', permission);
+
+      if (permission !== 'granted') {
+        throw new Error(
+          permission === 'denied'
+            ? 'Notifications are blocked in your browser. Please enable them in browser settings and try again.'
+            : 'Please click "Allow" when the browser asks for notification permission.'
+        );
       }
     }
 
-    // Step 6: Get FCM token
+    // Step 7: Get FCM token
     const token = await getFCMToken();
     if (!token) {
       throw new Error('Failed to get FCM token');
