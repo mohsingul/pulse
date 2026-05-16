@@ -25,7 +25,10 @@ import { DailyChallengeArchiveScreen } from '@/app/screens/DailyChallengeArchive
 // Components
 import { UpdatePulseSheet } from '@/app/components/UpdatePulseSheet';
 import { DoodleExpandedView } from '@/app/components/DoodleExpandedView';
-
+import { NotificationSettingsScreen } from '@/app/screens/NotificationSettingsScreen';
+import { NotificationCenterScreen } from '@/app/screens/NotificationCenterScreen';
+import { NotificationOnboarding } from '@/app/components/NotificationOnboarding';
+import { useFirebaseNotifications } from '@/hooks/useFirebaseNotifications';
 type Screen = 
   | 'welcome'
   | 'create-profile'
@@ -43,7 +46,9 @@ type Screen =
   | 'message-archive'
   | 'mood-archive'
   | 'shark-mode-archive'
-  | 'daily-challenge-archive';
+  | 'daily-challenge-archive'
+  | 'notification-settings'
+  | 'notification-center';   
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
@@ -51,6 +56,8 @@ export default function App() {
   const [couple, setCouple] = useState<any>(null);
   const [showUpdateSheet, setShowUpdateSheet] = useState(false);
   const [expandedDoodle, setExpandedDoodle] = useState<any>(null);
+  const [showNotificationOnboarding, setShowNotificationOnboarding] = useState(false);
+  const notifications = useFirebaseNotifications(user?.userId);
 
   useEffect(() => {
     // Initialize theme
