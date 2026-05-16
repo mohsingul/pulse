@@ -135,7 +135,7 @@ export default function App() {
 
   const handleAuthSuccess = (userData: any) => {
     setUser(userData);
-    storage.saveUser(userData); // Persist user data to localStorage
+    // storage.saveUser(userData); // Persist user data to localStorage
     checkCouple(userData.userId);
   };
 
