@@ -155,17 +155,7 @@ export function SettingsScreen({ onBack, userId, userName, onNotificationSetting
                 </div>
               )}
 
-              {pushNotifications.permission === 'granted' && !pushNotifications.fcmToken && (
-                <Button
-                  onClick={pushNotifications.enableNotifications}
-                  disabled={pushNotifications.loading}
-                  className="w-full bg-[image:var(--pulse-gradient)] text-white hover:opacity-90"
-                >
-                  {pushNotifications.loading ? 'Enabling...' : 'Enable Push Notifications'}
-                </Button>
-              )}
-
-              {pushNotifications.permission === 'granted' && pushNotifications.fcmToken && (
+              {pushNotifications.permission === 'granted' && (
                 <div className="space-y-3">
                   <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/20">
                     <div className="flex items-center gap-2">
@@ -174,6 +164,15 @@ export function SettingsScreen({ onBack, userId, userName, onNotificationSetting
                         Push notifications enabled
                       </p>
                     </div>
+                    {pushNotifications.fcmToken ? (
+                      <p className="text-sm text-green-600 dark:text-green-500 mt-2">
+                        Your device is subscribed to push notifications.
+                      </p>
+                    ) : (
+                      <p className="text-sm text-green-600 dark:text-green-500 mt-2">
+                        Notifications are granted but not yet subscribed. Click enable again if needed.
+                      </p>
+                    )}
                   </div>
                   <Button
                     onClick={pushNotifications.disableNotifications}
