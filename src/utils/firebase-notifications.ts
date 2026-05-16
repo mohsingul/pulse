@@ -2,7 +2,7 @@
 // iOS PWA-compatible push notifications
 
 import { initializeApp } from 'firebase/app';
-import { getMessaging, getToken, onMessage, type Messaging } from 'firebase/messaging';
+import { getMessaging, getToken, onMessage, deleteToken, type Messaging } from 'firebase/messaging';
 import { firebaseConfig, vapidKey } from './firebase-config';
 
 let firebaseApp: any = null;
@@ -274,10 +274,28 @@ export async function deleteFCMToken(): Promise<boolean> {
       return false;
     }
 
-    // Note: deleteToken is not available in modular SDK
-    // Instead, we just return true and let the server handle cleanup
-    console.log('[Firebase] Token deletion requested');
-    return true;
+    const registration = await registerFirebaseServiceWorker();
+    if (!registration) {
+      return false;
+    }
+
+    const existingToken = await getToken(messaging, {
+      vapidKey,
+      serviceWorkerRegistration: registration,
+    }).catch(() => null);
+
+    if (!existingToken) {
+      console.log('[Firebase] No FCM token to delete');
+      return true;
+    }
+
+    const deleted = await deleteToken(messaging).catch((error) => {
+      console.error('[Firebase] deleteToken failed:', error);
+      return false;
+    });
+
+    console.log('[Firebase] FCM token deleted:', deleted);
+    return deleted;
   } catch (error) {
     console.error('[Firebase] Error deleting token:', error);
     return false;

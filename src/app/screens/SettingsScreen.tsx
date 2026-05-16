@@ -155,14 +155,33 @@ export function SettingsScreen({ onBack, userId, userName, onNotificationSetting
                 </div>
               )}
 
-              {pushNotifications.permission === 'granted' && (
-                <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/20">
-                  <div className="flex items-center gap-2">
-                    <Bell className="w-5 h-5 text-green-500" />
-                    <p className="text-sm text-green-700 dark:text-green-400 font-medium">
-                      Push notifications enabled
-                    </p>
+              {pushNotifications.permission === 'granted' && !pushNotifications.fcmToken && (
+                <Button
+                  onClick={pushNotifications.enableNotifications}
+                  disabled={pushNotifications.loading}
+                  className="w-full bg-[image:var(--pulse-gradient)] text-white hover:opacity-90"
+                >
+                  {pushNotifications.loading ? 'Enabling...' : 'Enable Push Notifications'}
+                </Button>
+              )}
+
+              {pushNotifications.permission === 'granted' && pushNotifications.fcmToken && (
+                <div className="space-y-3">
+                  <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/20">
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-5 h-5 text-green-500" />
+                      <p className="text-sm text-green-700 dark:text-green-400 font-medium">
+                        Push notifications enabled
+                      </p>
+                    </div>
                   </div>
+                  <Button
+                    onClick={pushNotifications.disableNotifications}
+                    disabled={pushNotifications.loading}
+                    className="w-full bg-muted text-foreground hover:bg-border"
+                  >
+                    {pushNotifications.loading ? 'Disabling...' : 'Disable Push Notifications'}
+                  </Button>
                 </div>
               )}
 
