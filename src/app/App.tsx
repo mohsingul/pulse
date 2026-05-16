@@ -50,6 +50,7 @@ type Screen =
   | 'notification-settings'
   | 'notification-center';   
 
+
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
   const [user, setUser] = useState<any>(null);
