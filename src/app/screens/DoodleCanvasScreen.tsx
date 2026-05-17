@@ -211,15 +211,21 @@ export function DoodleCanvasScreen({ onClose, onSave }: DoodleCanvasScreenProps)
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-background flex flex-col" style={{ 
-      width: '100vw',
-      height: '100vh',
-      maxWidth: '100vw',
-      maxHeight: '100vh',
-      overflow: 'hidden'
-    }}>
+    <div
+      className="fixed inset-0 z-50 bg-background flex flex-col safe-top safe-bottom"
+      style={{
+        width: '100vw',
+        minHeight: '100dvh',
+        maxWidth: '100vw',
+        maxHeight: '100dvh',
+        overflow: 'hidden',
+        boxSizing: 'border-box',
+        paddingTop: 'env(safe-area-inset-top, 16px)',
+        paddingBottom: 'env(safe-area-inset-bottom, 16px)',
+      }}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card safe-top" style={{ flexShrink: 0 }}>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card" style={{ flexShrink: 0 }}>
         <h2 className="text-lg font-bold">Draw a Doodle</h2>
         <button
           onClick={onClose}
@@ -260,7 +266,7 @@ export function DoodleCanvasScreen({ onClose, onSave }: DoodleCanvasScreenProps)
       </div>
 
       {/* Tools - Compact */}
-      <div className="px-4 py-3 border-t border-border space-y-3">
+      <div className="px-4 py-3 border-t border-border space-y-3 safe-bottom">
         {/* Tool Selection - Single Row */}
         <div className="flex items-center justify-between gap-2">
           {/* Drawing Tools */}
