@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { storage } from '@/utils/storage';
 import { coupleAPI, todayAPI, notificationAPI, userAPI, sharkModeAPI } from '@/utils/api';
-import { projectId, publicAnonKey } from '/utils/supabase/info';import { useReminderNotifications } from '@/hooks/useReminderNotifications';
+import { projectId, publicAnonKey } from '/utils/supabase/info';
+import { useReminderNotifications } from '@/hooks/useReminderNotifications';
 // Screens
 import { WelcomeScreen } from '@/app/screens/WelcomeScreen';
 import { CreateProfileScreen } from '@/app/screens/CreateProfileScreen';
@@ -102,6 +103,7 @@ export default function App() {
         {
           headers: {
             'Authorization': `Bearer ${publicAnonKey}`,
+            'apikey': publicAnonKey,
           },
         }
       );
@@ -144,6 +146,11 @@ export default function App() {
   const handlePairingSuccess = (coupleData: any) => {
     setCouple(coupleData);
     setCurrentScreen('success');
+  };
+
+  const handleReconnect = (coupleData: any) => {
+    setCouple(coupleData);
+    setCurrentScreen('home');
   };
 
   const handleUpdatePulse = async (data: {
@@ -253,8 +260,10 @@ export default function App() {
       case 'connect':
         return (
           <ConnectScreen
+            userId={user?.userId ?? ''}
             onCreateCouple={() => setCurrentScreen('create-couple')}
             onJoinCouple={() => setCurrentScreen('join-couple')}
+            onReconnect={handleReconnect}
           />
         );
 

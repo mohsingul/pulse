@@ -13,6 +13,7 @@ export function JoinCoupleScreen({ userId, onBack, onSuccess }: JoinCoupleScreen
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
 
   const handleCodeChange = (index: number, value: string) => {
     if (!/^\d*$/.test(value)) return;
@@ -50,8 +51,16 @@ export function JoinCoupleScreen({ userId, onBack, onSuccess }: JoinCoupleScreen
 
     setLoading(true);
     setError('');
+    setInfo('');
     try {
       const response = await pairingAPI.join(userId, codeString);
+      if (response.pending) {
+        setInfo('A reconnect request has been sent to your partner. They must accept it to restore your connection.');
+        setCode(['', '', '', '', '', '']);
+        const firstInput = document.getElementById('code-0');
+        firstInput?.focus();
+        return;
+      }
       onSuccess(response);
     } catch (error: any) {
       setError(error.message);
@@ -115,6 +124,11 @@ export function JoinCoupleScreen({ userId, onBack, onSuccess }: JoinCoupleScreen
           {error && (
             <div className="p-4 bg-destructive/10 border border-destructive rounded-2xl text-center">
               <p className="text-sm text-destructive font-medium">{error}</p>
+            </div>
+          )}
+          {info && (
+            <div className="p-4 bg-slate-100 border border-slate-300 rounded-2xl text-center">
+              <p className="text-sm text-slate-700 font-medium">{info}</p>
             </div>
           )}
 

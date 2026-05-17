@@ -385,7 +385,7 @@ export function ProfileScreen({
               <div>
                 <h3 className="text-lg font-semibold mb-2">Unpair from {partnerName}?</h3>
                 <p className="text-sm text-muted-foreground">
-                  This will disconnect you from your partner. You'll need to pair again to reconnect.
+                  This will disconnect you from your partner. You can reconnect from the Connect screen without losing your previous shared data.
                 </p>
               </div>
             </div>

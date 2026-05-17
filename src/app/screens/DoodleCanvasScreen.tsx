@@ -225,12 +225,18 @@ export function DoodleCanvasScreen({ onClose, onSave }: DoodleCanvasScreenProps)
       }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card" style={{ flexShrink: 0 }}>
-        <h2 className="text-lg font-bold">Draw a Doodle</h2>
+      <div
+        className="flex justify-end px-4 pb-3"
+        style={{
+          flexShrink: 0,
+          paddingTop: 'env(safe-area-inset-top, 16px)',
+        }}
+      >
         <button
           onClick={onClose}
-          className="p-2 hover:bg-accent rounded-full transition-colors"
+          className="p-3 hover:bg-accent rounded-full transition-colors"
           style={{ touchAction: 'manipulation' }}
+          aria-label="Close doodle editor"
         >
           <X className="w-5 h-5" />
         </button>

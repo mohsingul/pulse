@@ -36,6 +36,7 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
         {
           headers: {
             'Authorization': `Bearer ${publicAnonKey}`,
+            'apikey': publicAnonKey,
           },
         }
       );
@@ -59,6 +60,19 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
     }
   };
 
+  const getLoginErrorMessage = (message: string) => {
+    if (message.includes('Unable to connect to server')) {
+      return 'Unable to reach the backend. Check your internet connection or verify the Supabase function deployment.';
+    }
+    if (message.includes('Invalid credentials')) {
+      return 'Invalid username or password. Please try again.';
+    }
+    if (message.includes('Failed to log in')) {
+      return 'Login failed due to a server error. Please try again shortly.';
+    }
+    return message;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
@@ -74,7 +88,7 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
       storage.setUser(response.user);
       onSuccess(response.user);
     } catch (error: any) {
-      setErrors({ general: error.message });
+      setErrors({ general: getLoginErrorMessage(error.message || 'An unknown error occurred') });
     } finally {
       setLoading(false);
     }

@@ -277,12 +277,16 @@ app.use(
   "/*",
   cors({
     origin: "*",
-    allowHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    allowHeaders: ["Content-Type", "Authorization", "apikey", "x-client-info", "X-Requested-With"],
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     exposeHeaders: ["Content-Length", "Content-Type"],
     maxAge: 600,
   }),
 );
+
+app.options("/*", (c) => {
+  return c.text('OK');
+});
 
 // Global middleware to ensure all errors are caught and logged
 app.use('*', async (c, next) => {
@@ -854,6 +858,39 @@ app.post("/make-server-494d91eb/pairing/join", async (c) => {
       return c.json({ error: "Cannot join your own code" }, 400);
     }
 
+    // If the code owner is already paired, block the join request.
+    const codeOwnerCoupleId = await kv.get(`couple:user:${codeData.userId}`);
+    if (codeOwnerCoupleId) {
+      return c.json({ error: "The code owner is already paired" }, 400);
+    }
+
+    // If this is a reconnect attempt to a previous partner, create a reconnect request instead
+    const previousHistory = (await kv.get(`couple:history:${codeData.userId}`)) || [];
+    const reconnectEntry = (previousHistory as any[]).find(
+      (entry) => entry.partnerId === userId && entry.coupleId
+    );
+
+    if (reconnectEntry) {
+      const requestId = generateId();
+      const request = {
+        requestId,
+        coupleId: reconnectEntry.coupleId,
+        requesterId: userId,
+        requesterUsername: user.username,
+        requesterDisplayName: user.displayName,
+        targetId: codeData.userId,
+        requestedAt: new Date().toISOString(),
+        status: "pending",
+      };
+
+      const requestKey = `reconnect:requests:${codeData.userId}`;
+      const existingRequests = (await kv.get(requestKey)) || [];
+      const updatedRequests = [request, ...(existingRequests as any[]).filter((item) => item.requestId !== requestId)];
+      await kv.set(requestKey, updatedRequests);
+
+      return c.json({ success: true, pending: true, request });
+    }
+
     // Create couple
     const coupleId = generateId();
     const couple = {
@@ -943,16 +980,206 @@ app.delete("/make-server-494d91eb/couples/:userId", async (c) => {
     }
 
     const couple = await kv.get(`couple:${coupleId}`);
-    
-    // Delete couple mappings
+    if (!couple) {
+      return c.json({ error: "Couple data not found" }, 404);
+    }
+
+    const partnerId = couple.user1Id === userId ? couple.user2Id : couple.user1Id;
+    const user = await kv.get(`user:${userId}`);
+    const partner = await kv.get(`user:${partnerId}`);
+
+    const historyEntryForUser = {
+      coupleId,
+      partnerId: partner.userId,
+      partnerUsername: partner.username,
+      partnerDisplayName: partner.displayName,
+      disconnectedAt: new Date().toISOString(),
+      createdAt: couple.createdAt,
+    };
+
+    const historyEntryForPartner = {
+      coupleId,
+      partnerId: user.userId,
+      partnerUsername: user.username,
+      partnerDisplayName: user.displayName,
+      disconnectedAt: new Date().toISOString(),
+      createdAt: couple.createdAt,
+    };
+
+    const appendHistory = async (targetUserId: string, entry: any) => {
+      const historyKey = `couple:history:${targetUserId}`;
+      const existingHistory = (await kv.get(historyKey)) || [];
+      const filteredHistory = (existingHistory as any[]).filter((item) => item.coupleId !== entry.coupleId);
+      const nextHistory = [entry, ...filteredHistory].slice(0, 10);
+      await kv.set(historyKey, nextHistory);
+    };
+
+    await appendHistory(userId, historyEntryForUser);
+    await appendHistory(partnerId, historyEntryForPartner);
+
+    // Remove both user connection mappings but keep couple data intact so reconnection is possible
     await kv.del(`couple:user:${couple.user1Id}`);
     await kv.del(`couple:user:${couple.user2Id}`);
-    await kv.del(`couple:${coupleId}`);
 
     return c.json({ success: true });
   } catch (error) {
     console.log(`Error unpairing: ${error}`);
     return c.json({ error: "Failed to unpair" }, 500);
+  }
+});
+
+app.get("/make-server-494d91eb/couples/history/:userId", async (c) => {
+  try {
+    const userId = c.req.param("userId");
+    const history = (await kv.get(`couple:history:${userId}`)) || [];
+    return c.json({ history });
+  } catch (error) {
+    console.log(`Error getting couple history: ${error}`);
+    return c.json({ error: "Failed to get couple history" }, 500);
+  }
+});
+
+app.get("/make-server-494d91eb/reconnect-requests/:userId", async (c) => {
+  try {
+    const userId = c.req.param("userId");
+    const requests = (await kv.get(`reconnect:requests:${userId}`)) || [];
+    return c.json({ requests });
+  } catch (error) {
+    console.log(`Error getting reconnect requests: ${error}`);
+    return c.json({ error: "Failed to get reconnect requests" }, 500);
+  }
+});
+
+app.post("/make-server-494d91eb/reconnect-requests/:userId/:requestId/accept", async (c) => {
+  try {
+    const userId = c.req.param("userId");
+    const requestId = c.req.param("requestId");
+    const requestsKey = `reconnect:requests:${userId}`;
+    const requests = (await kv.get(requestsKey)) || [];
+    const request = (requests as any[]).find((item) => item.requestId === requestId);
+
+    if (!request) {
+      return c.json({ error: "Reconnect request not found" }, 404);
+    }
+
+    if (request.status !== "pending") {
+      return c.json({ error: "Reconnect request is no longer pending" }, 400);
+    }
+
+    const requesterId = request.requesterId;
+    const targetId = request.targetId;
+    const coupleId = request.coupleId;
+
+    const existingRequesterCoupleId = await kv.get(`couple:user:${requesterId}`);
+    const existingTargetCoupleId = await kv.get(`couple:user:${targetId}`);
+
+    if (existingRequesterCoupleId) {
+      return c.json({ error: "Requester is already paired" }, 400);
+    }
+
+    if (existingTargetCoupleId) {
+      return c.json({ error: "Target user is already paired" }, 400);
+    }
+
+    const couple = await kv.get(`couple:${coupleId}`);
+    if (!couple) {
+      return c.json({ error: "Couple record no longer exists" }, 404);
+    }
+
+    await kv.set(`couple:user:${requesterId}`, coupleId);
+    await kv.set(`couple:user:${targetId}`, coupleId);
+
+    const updatedRequests = (requests as any[]).filter((item) => item.requestId !== requestId);
+    await kv.set(requestsKey, updatedRequests);
+
+    const partnerId = requesterId === userId ? targetId : requesterId;
+    const partner = await kv.get(`user:${partnerId}`);
+
+    return c.json({
+      success: true,
+      couple: {
+        coupleId: couple.coupleId,
+        createdAt: couple.createdAt,
+        user1Id: couple.user1Id,
+        user2Id: couple.user2Id,
+        partner: {
+          userId: partner.userId,
+          username: partner.username,
+          displayName: partner.displayName,
+        },
+      },
+    });
+  } catch (error) {
+    console.log(`Error accepting reconnect request: ${error}`);
+    return c.json({ error: "Failed to accept reconnect request" }, 500);
+  }
+});
+
+app.delete("/make-server-494d91eb/reconnect-requests/:userId/:requestId/decline", async (c) => {
+  try {
+    const userId = c.req.param("userId");
+    const requestId = c.req.param("requestId");
+    const requestsKey = `reconnect:requests:${userId}`;
+    const requests = (await kv.get(requestsKey)) || [];
+    const updatedRequests = (requests as any[]).filter((item) => item.requestId !== requestId);
+    await kv.set(requestsKey, updatedRequests);
+    return c.json({ success: true });
+  } catch (error) {
+    console.log(`Error declining reconnect request: ${error}`);
+    return c.json({ error: "Failed to decline reconnect request" }, 500);
+  }
+});
+
+app.post("/make-server-494d91eb/couples/reconnect/:userId", async (c) => {
+  try {
+    const userId = c.req.param("userId");
+    const { coupleId } = await c.req.json();
+
+    if (!coupleId) {
+      return c.json({ error: "Couple ID is required" }, 400);
+    }
+
+    const couple = await kv.get(`couple:${coupleId}`);
+    if (!couple) {
+      return c.json({ error: "Couple not found" }, 404);
+    }
+
+    if (couple.user1Id !== userId && couple.user2Id !== userId) {
+      return c.json({ error: "You are not part of this couple" }, 403);
+    }
+
+    const partnerId = couple.user1Id === userId ? couple.user2Id : couple.user1Id;
+    const partner = await kv.get(`user:${partnerId}`);
+    if (!partner) {
+      return c.json({ error: "Partner user not found" }, 404);
+    }
+
+    const partnerCurrentCoupleId = await kv.get(`couple:user:${partnerId}`);
+    if (partnerCurrentCoupleId && partnerCurrentCoupleId !== coupleId) {
+      return c.json({ error: "Your previous partner is already paired with someone else" }, 409);
+    }
+
+    // Restore both user mappings to the existing couple
+    await kv.set(`couple:user:${userId}`, coupleId);
+    await kv.set(`couple:user:${partnerId}`, coupleId);
+
+    return c.json({
+      success: true,
+      couple: {
+        coupleId: couple.coupleId,
+        createdAt: couple.createdAt,
+        user1Id: couple.user1Id,
+        user2Id: couple.user2Id,
+        partner: {
+          userId: partner.userId,
+          username: partner.username,
+          displayName: partner.displayName,
+        },
+      },
+    });
+  } catch (error) {
+    console.log(`Error reconnecting couple: ${error}`);
+    return c.json({ error: "Failed to reconnect" }, 500);
   }
 });
 

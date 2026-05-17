@@ -22,6 +22,7 @@ async function checkServerHealth(): Promise<boolean> {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${publicAnonKey}`,
+        'apikey': publicAnonKey,
       },
       signal: AbortSignal.timeout(5000), // 5 second timeout
     });
@@ -59,6 +60,7 @@ async function apiRequest(endpoint: string, options: RequestInit = {}) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${publicAnonKey}`,
+        'apikey': publicAnonKey,
         ...options.headers,
       },
       mode: 'cors',
@@ -184,6 +186,30 @@ export const coupleAPI = {
 
   unpair: (userId: string) =>
     apiRequest(`/couples/${userId}`, {
+      method: 'DELETE',
+    }),
+
+  getHistory: (userId: string) =>
+    apiRequest(`/couples/history/${userId}`),
+
+  reconnect: (userId: string, coupleId: string) =>
+    apiRequest(`/couples/reconnect/${userId}`, {
+      method: 'POST',
+      body: JSON.stringify({ coupleId }),
+    }),
+};
+
+export const reconnectRequestsAPI = {
+  get: (userId: string) =>
+    apiRequest(`/reconnect-requests/${userId}`),
+
+  accept: (userId: string, requestId: string) =>
+    apiRequest(`/reconnect-requests/${userId}/${requestId}/accept`, {
+      method: 'POST',
+    }),
+
+  decline: (userId: string, requestId: string) =>
+    apiRequest(`/reconnect-requests/${userId}/${requestId}/decline`, {
       method: 'DELETE',
     }),
 };
