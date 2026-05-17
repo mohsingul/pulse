@@ -2,8 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { storage } from '@/utils/storage';
 import { coupleAPI, todayAPI, notificationAPI, userAPI, sharkModeAPI } from '@/utils/api';
-import { projectId, publicAnonKey } from '/utils/supabase/info';
-
+import { projectId, publicAnonKey } from '/utils/supabase/info';import { useReminderNotifications } from '@/hooks/useReminderNotifications';
 // Screens
 import { WelcomeScreen } from '@/app/screens/WelcomeScreen';
 import { CreateProfileScreen } from '@/app/screens/CreateProfileScreen';
@@ -64,6 +63,9 @@ export default function App() {
 
   // Initialize Firebase notifications
   const notifications = useFirebaseNotifications(user?.userId);
+
+  // Schedule local reminder notifications when notification permission is available.
+  useReminderNotifications();
 
   useEffect(() => {
     // Initialize theme

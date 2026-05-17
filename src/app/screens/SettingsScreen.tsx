@@ -4,6 +4,7 @@ import { Card } from '@/app/components/Card';
 import { ArrowLeft, Sun, Moon, Bell, BellOff, Smartphone, AlertCircle, ChevronRight } from 'lucide-react';
 import { storage } from '@/utils/storage';
 import { type FirebaseNotificationControls } from '@/hooks/useFirebaseNotifications';
+import { dispatchReminderPreferenceUpdate } from '@/hooks/useReminderNotifications';
 
 interface SettingsScreenProps {
   onBack: () => void;
@@ -42,6 +43,7 @@ export function SettingsScreen({ onBack, userId, userName, pushNotifications, on
     };
     setNotifications(updated);
     storage.setNotifications(updated);
+    dispatchReminderPreferenceUpdate();
   };
 
   const handleTimeChange = (period: 'morning' | 'midday' | 'evening', time: string) => {
@@ -54,6 +56,7 @@ export function SettingsScreen({ onBack, userId, userName, pushNotifications, on
     };
     setNotifications(updated);
     storage.setNotifications(updated);
+    dispatchReminderPreferenceUpdate();
   };
 
   return (
@@ -201,6 +204,11 @@ export function SettingsScreen({ onBack, userId, userName, pushNotifications, on
           <p className="text-sm text-muted-foreground">
             We'll gently remind you to update your Pulse
           </p>
+          {pushNotifications.permission !== 'granted' && (
+            <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-700">
+              Reminder notifications require browser notification permission. Enable push notifications above to receive them.
+            </div>
+          )}
 
           {/* Morning */}
           <Card>
