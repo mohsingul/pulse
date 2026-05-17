@@ -212,7 +212,7 @@ export function DoodleCanvasScreen({ onClose, onSave }: DoodleCanvasScreenProps)
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-background flex flex-col safe-top safe-bottom"
+      className="fixed inset-0 z-50 bg-background flex flex-col safe-bottom"
       style={{
         width: '100vw',
         minHeight: '100dvh',
@@ -220,7 +220,6 @@ export function DoodleCanvasScreen({ onClose, onSave }: DoodleCanvasScreenProps)
         maxHeight: '100dvh',
         overflow: 'hidden',
         boxSizing: 'border-box',
-        paddingTop: 'env(safe-area-inset-top, 16px)',
         paddingBottom: 'env(safe-area-inset-bottom, 16px)',
       }}
     >
@@ -229,7 +228,7 @@ export function DoodleCanvasScreen({ onClose, onSave }: DoodleCanvasScreenProps)
         className="flex justify-end px-4 pb-3"
         style={{
           flexShrink: 0,
-          paddingTop: 'env(safe-area-inset-top, 16px)',
+          paddingTop: 'calc(env(safe-area-inset-top, 0px) + 5px)',
         }}
       >
         <button
