@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { storage } from '@/utils/storage';
 import { coupleAPI, todayAPI, notificationAPI, userAPI, sharkModeAPI } from '@/utils/api';
 import { projectId, publicAnonKey } from '/utils/supabase/info';
-import { useReminderNotifications } from '@/hooks/useReminderNotifications';
 // Screens
 import { WelcomeScreen } from '@/app/screens/WelcomeScreen';
 import { CreateProfileScreen } from '@/app/screens/CreateProfileScreen';
@@ -29,6 +28,7 @@ import { NotificationCenterScreen } from '@/app/screens/NotificationCenterScreen
 import { UpdatePulseSheet } from '@/app/components/UpdatePulseSheet';
 import { DoodleExpandedView } from '@/app/components/DoodleExpandedView';
 import { NotificationOnboarding } from '@/app/components/NotificationOnboarding';
+import { NotificationPermissionPrompt } from '@/app/components/NotificationPermissionPrompt';
 
 // Hooks
 import { useFirebaseNotifications } from '@/hooks/useFirebaseNotifications';
@@ -61,12 +61,10 @@ export default function App() {
   const [showUpdateSheet, setShowUpdateSheet] = useState(false);
   const [expandedDoodle, setExpandedDoodle] = useState<any>(null);
   const [showNotificationOnboarding, setShowNotificationOnboarding] = useState(false);
+  const [showNotificationPermissionPrompt, setShowNotificationPermissionPrompt] = useState(false);
 
   // Initialize Firebase notifications
   const notifications = useFirebaseNotifications(user?.userId);
-
-  // Schedule local reminder notifications when notification permission is available.
-  useReminderNotifications();
 
   useEffect(() => {
     // Initialize theme
@@ -141,6 +139,14 @@ export default function App() {
     setUser(userData);
     // storage.saveUser(userData); // Persist user data to localStorage
     checkCouple(userData.userId);
+
+    // Show notification permission prompt on every login if not granted
+    if (
+      notifications.permission !== 'granted' &&
+      notifications.permission !== 'denied'
+    ) {
+      setShowNotificationPermissionPrompt(true);
+    }
   };
 
   const handlePairingSuccess = (coupleData: any) => {
@@ -228,6 +234,21 @@ export default function App() {
     setUser(null);
     setCouple(null);
     setCurrentScreen('welcome');
+  };
+
+  const handleEnableNotifications = async () => {
+    setShowNotificationPermissionPrompt(false);
+    // Trigger the notification permission prompt
+    try {
+      const permission = await Notification.requestPermission();
+      console.log('[Notifications] Permission requested:', permission);
+    } catch (error) {
+      console.error('[Notifications] Permission request failed:', error);
+    }
+  };
+
+  const handleDismissNotificationPrompt = () => {
+    setShowNotificationPermissionPrompt(false);
   };
 
   // Render current screen
@@ -483,6 +504,14 @@ export default function App() {
   return (
     <div className="h-full w-full bg-background text-foreground overflow-auto">
       {renderScreen()}
+
+      {/* Notification permission prompt */}
+      {showNotificationPermissionPrompt && (
+        <NotificationPermissionPrompt
+          onEnable={handleEnableNotifications}
+          onDismiss={handleDismissNotificationPrompt}
+        />
+      )}
 
       {/* Notification onboarding modal */}
       {showNotificationOnboarding && (

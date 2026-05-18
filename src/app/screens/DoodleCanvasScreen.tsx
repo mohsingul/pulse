@@ -225,15 +225,16 @@ export function DoodleCanvasScreen({ onClose, onSave }: DoodleCanvasScreenProps)
     >
       {/* Header */}
       <div
-        className="flex justify-end px-4 pb-3"
+        className="flex justify-end px-4"
         style={{
           flexShrink: 0,
-          paddingTop: 'calc(env(safe-area-inset-top, 0px) + 5px)',
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+          paddingBottom: '4px',
         }}
       >
         <button
           onClick={onClose}
-          className="p-3 hover:bg-accent rounded-full transition-colors"
+          className="p-2 hover:bg-accent rounded-full transition-colors"
           style={{ touchAction: 'manipulation' }}
           aria-label="Close doodle editor"
         >

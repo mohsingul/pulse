@@ -46,4 +46,14 @@ export const storage = {
   setNotifications: (notifications: any) => {
     localStorage.setItem('pulse_notifications', JSON.stringify(notifications));
   },
+
+  // Notification Permission Prompt Tracking
+  getNotificationPromptState: () => {
+    const stored = localStorage.getItem('pulse_notification_prompt_state');
+    return stored ? JSON.parse(stored) : { lastPromptTime: 0, promptCount: 0 };
+  },
+
+  setNotificationPromptState: (state: any) => {
+    localStorage.setItem('pulse_notification_prompt_state', JSON.stringify(state));
+  },
 };
