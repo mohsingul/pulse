@@ -29,6 +29,29 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
   const [debugInfo, setDebugInfo] = useState<any>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
+  const savePasswordCredential = async (username: string, password: string) => {
+    if (!('credentials' in navigator)) {
+      return;
+    }
+
+    const PasswordCredential = (window as any).PasswordCredential || (window as any).webkitPasswordCredential;
+    if (!PasswordCredential) {
+      return;
+    }
+
+    try {
+      const credential = new PasswordCredential({
+        id: username,
+        password,
+        name: username,
+      });
+      await (navigator as any).credentials.store(credential);
+      console.log('[Login] Saved credential to password manager');
+    } catch (error) {
+      console.warn('[Login] Password manager save failed:', error);
+    }
+  };
+
   const loadDebugInfo = async () => {
     try {
       const response = await fetch(
@@ -86,6 +109,9 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
     try {
       const response = await userAPI.login(username.trim(), password);
       storage.setUser(response.user);
+      if (rememberMe) {
+        await savePasswordCredential(username.trim(), password);
+      }
       onSuccess(response.user);
     } catch (error: any) {
       setErrors({ general: getLoginErrorMessage(error.message || 'An unknown error occurred') });
@@ -170,6 +196,7 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
           <form onSubmit={handleSubmit} className="space-y-5">
             <Input
               label="Username"
+              name="username"
               placeholder="Enter your username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
@@ -178,6 +205,7 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
 
             <Input
               label="Password"
+              name="password"
               type="password"
               placeholder="Enter your password"
               value={password}

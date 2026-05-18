@@ -1,26 +1,18 @@
 import React from 'react';
-import { Bell, X } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { Button } from './Button';
 
 interface NotificationPermissionPromptProps {
   onEnable: () => void;
-  onDismiss: () => void;
+  permissionStatus: NotificationPermission;
 }
 
-export function NotificationPermissionPrompt({ onEnable, onDismiss }: NotificationPermissionPromptProps) {
-  return (
-    <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 safe-top safe-bottom">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-md w-full space-y-6 p-6">
-        {/* Close Button */}
-        <div className="flex justify-end">
-          <button
-            onClick={onDismiss}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full transition-colors"
-          >
-            <X className="w-5 h-5 text-muted-foreground" />
-          </button>
-        </div>
+export function NotificationPermissionPrompt({ onEnable, permissionStatus }: NotificationPermissionPromptProps) {
+  const isDenied = permissionStatus === 'denied';
 
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 safe-top safe-bottom">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-md w-full space-y-6 p-6">
         {/* Icon */}
         <div className="flex justify-center">
           <div className="p-4 bg-gradient-to-br from-[#FB3094]/20 via-[#A83FFF]/20 to-[#2571FF]/20 rounded-full">
@@ -30,9 +22,11 @@ export function NotificationPermissionPrompt({ onEnable, onDismiss }: Notificati
 
         {/* Content */}
         <div className="space-y-3 text-center">
-          <h3 className="text-2xl font-bold">Stay Connected</h3>
+          <h3 className="text-2xl font-bold">Enable Notifications</h3>
           <p className="text-muted-foreground leading-relaxed">
-            Enable notifications to receive instant updates from your partner, reminders for daily challenges, and important milestones.
+            {isDenied
+              ? 'Notifications are currently blocked. Please allow notifications in your browser or device settings to continue using Aimo Pulse as intended.'
+              : 'Enable notifications now to receive instant updates from your partner, daily challenge reminders, and mood alerts.'}
           </p>
         </div>
 
@@ -52,26 +46,20 @@ export function NotificationPermissionPrompt({ onEnable, onDismiss }: Notificati
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex gap-3 pt-2">
-          <button
-            onClick={onDismiss}
-            className="flex-1 px-4 py-3 rounded-full border-2 border-border text-foreground font-medium hover:bg-accent transition-colors"
-          >
-            Maybe Later
-          </button>
+        {/* Action Button */}
+        <div className="pt-2">
           <Button
             variant="gradient"
-            className="flex-1"
+            className="w-full"
             onClick={onEnable}
           >
-            Enable Now
+            {isDenied ? 'Retry / Open Settings' : 'Enable Now'}
           </Button>
         </div>
 
         {/* Footer */}
         <p className="text-xs text-center text-muted-foreground">
-          You can change this anytime in Settings
+          This step is required to continue.
         </p>
       </div>
     </div>

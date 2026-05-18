@@ -62,6 +62,9 @@ export default function App() {
   const [expandedDoodle, setExpandedDoodle] = useState<any>(null);
   const [showNotificationOnboarding, setShowNotificationOnboarding] = useState(false);
   const [showNotificationPermissionPrompt, setShowNotificationPermissionPrompt] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
+    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default'
+  );
 
   // Initialize Firebase notifications
   const notifications = useFirebaseNotifications(user?.userId);
@@ -81,7 +84,17 @@ export default function App() {
       // Check for existing couple
       checkCouple(savedUser.userId);
     }
+
+    if ('Notification' in window) {
+      setNotificationPermission(Notification.permission);
+    }
   }, []);
+
+  useEffect(() => {
+    if (user && notificationPermission !== 'granted') {
+      setShowNotificationPermissionPrompt(true);
+    }
+  }, [user, notificationPermission]);
 
   // Show notification onboarding after successful pairing
   useEffect(() => {
@@ -140,11 +153,7 @@ export default function App() {
     // storage.saveUser(userData); // Persist user data to localStorage
     checkCouple(userData.userId);
 
-    // Show notification permission prompt on every login if not granted
-    if (
-      notifications.permission !== 'granted' &&
-      notifications.permission !== 'denied'
-    ) {
+    if (notificationPermission !== 'granted') {
       setShowNotificationPermissionPrompt(true);
     }
   };
@@ -237,18 +246,16 @@ export default function App() {
   };
 
   const handleEnableNotifications = async () => {
-    setShowNotificationPermissionPrompt(false);
-    // Trigger the notification permission prompt
     try {
       const permission = await Notification.requestPermission();
       console.log('[Notifications] Permission requested:', permission);
+      setNotificationPermission(permission);
+      if (permission === 'granted') {
+        setShowNotificationPermissionPrompt(false);
+      }
     } catch (error) {
       console.error('[Notifications] Permission request failed:', error);
     }
-  };
-
-  const handleDismissNotificationPrompt = () => {
-    setShowNotificationPermissionPrompt(false);
   };
 
   // Render current screen
@@ -509,7 +516,7 @@ export default function App() {
       {showNotificationPermissionPrompt && (
         <NotificationPermissionPrompt
           onEnable={handleEnableNotifications}
-          onDismiss={handleDismissNotificationPrompt}
+          permissionStatus={notificationPermission}
         />
       )}
 
