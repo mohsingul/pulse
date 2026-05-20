@@ -14,6 +14,8 @@ import {
   shuffle,
   GAME_MODES,
   OFFICIAL_RULES,
+  PDF_CARD_COUNT,
+  cardHasInstruction,
   getKindMeta,
   type GameMode,
   type TeasePleaseCard,
@@ -252,6 +254,10 @@ export function TeaseOrPleaseScreen({
                   <li key={line}>• {line}</li>
                 ))}
               </ul>
+              <p className="text-xs text-purple-300/80 pt-1">
+                {PDF_CARD_COUNT.unique} unique cards · {PDF_CARD_COUNT.withDuplicates} cards when
+                playing with pairs (per PDF)
+              </p>
             </div>
 
             <div className="space-y-3">
@@ -401,9 +407,11 @@ export function TeaseOrPleaseScreen({
           <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-6 max-w-md mx-auto text-center px-4">
             <div className="text-6xl">💋</div>
             <h2 className="text-2xl font-bold bg-gradient-to-r from-rose-400 via-fuchsia-400 to-purple-400 bg-clip-text text-transparent">
-              Home run
+              HOME RUN
             </h2>
-            <p className="text-muted-foreground font-medium">Just do it already.</p>
+            <p className="text-muted-foreground font-medium uppercase tracking-wide">
+              JUST DO IT ALREADY
+            </p>
             <p className="text-sm text-muted-foreground">
               You drew the HOME RUN card. Game over — the rest of the night is yours.
             </p>
@@ -432,29 +440,36 @@ function CardReveal({
   onSkip: () => void;
 }) {
   const meta = getKindMeta(card.kind);
+  const twoLine = cardHasInstruction(card);
 
   return (
     <div className="max-w-md mx-auto space-y-6">
       <div
-        className={`relative rounded-3xl border-2 ${meta.border} p-6 shadow-2xl ${meta.glow} bg-gradient-to-br ${meta.gradient} overflow-hidden`}
+        className={`relative rounded-3xl border-4 ${meta.border} p-8 shadow-2xl ${meta.glow} overflow-hidden`}
+        style={{
+          background:
+            'repeating-linear-gradient(0deg, rgba(91,45,130,0.15) 0px, rgba(91,45,130,0.15) 6px, rgba(232,224,239,0.08) 6px, rgba(232,224,239,0.08) 12px)',
+        }}
       >
-        <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full blur-3xl" />
-        <div className="relative space-y-4">
-          <span className="text-xs uppercase tracking-[0.15em] text-white/70 font-semibold">
+        <div className="relative rounded-full border-4 border-purple-400/60 bg-purple-950/80 px-6 py-8 text-center min-h-[220px] flex flex-col justify-center">
+          <span className="text-[10px] uppercase tracking-[0.2em] text-purple-300/80 mb-3">
             {meta.label}
           </span>
-          <div className="text-4xl">{meta.emoji}</div>
-          <h3 className="text-2xl font-bold text-white uppercase tracking-tight">{card.title}</h3>
-          {card.subtitle && (
-            <p className="text-sm text-purple-200/90 border-t border-dashed border-white/20 pt-3 uppercase">
-              {card.subtitle}
-            </p>
+          <h3 className="text-lg sm:text-xl font-bold text-white uppercase tracking-tight leading-snug">
+            {card.title}
+          </h3>
+          {twoLine && (
+            <>
+              <div className="my-4 border-t border-dashed border-purple-300/50 w-3/4 mx-auto" />
+              <p className="text-sm sm:text-base text-purple-100 uppercase leading-snug font-medium">
+                {card.task}
+              </p>
+            </>
           )}
-          <p className="text-purple-50/95 leading-relaxed text-base">{card.task}</p>
           {card.kind === 'homerun' && (
-            <p className="text-xs text-rose-200/70 flex items-center gap-1">
+            <p className="text-xs text-rose-200/70 flex items-center justify-center gap-1 mt-4">
               <Heart className="w-3 h-3 fill-current" />
-              Finishing move with {partnerName}
+              With {partnerName}
             </p>
           )}
         </div>
