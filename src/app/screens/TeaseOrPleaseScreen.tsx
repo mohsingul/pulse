@@ -51,6 +51,7 @@ export function TeaseOrPleaseScreen({
   const [pileCount, setPileCount] = useState(0);
   const [matches, setMatches] = useState(0);
   const [showRulesMode, setShowRulesMode] = useState<GameMode | null>(null);
+  const [showFullRules, setShowFullRules] = useState(false);
 
   const playerNames = useMemo(() => [userName, partnerName], [userName, partnerName]);
   const currentPlayerName = playerNames[activePlayer];
@@ -191,8 +192,8 @@ export function TeaseOrPleaseScreen({
     setHand([]);
   };
 
-  const rulesForMode = (id: GameMode) =>
-    OFFICIAL_RULES.modes.find((m) => m.id === id)?.steps ?? [];
+  const modeRules = (id: GameMode) =>
+    OFFICIAL_RULES.modes.find((m) => m.id === id)?.paragraphs ?? [];
 
   return (
     <div className="h-full w-full flex flex-col bg-background">
@@ -231,15 +232,56 @@ export function TeaseOrPleaseScreen({
       <div className="flex-1 overflow-y-auto px-4 py-6 pb-10">
         {phase === 'menu' && (
           <div className="space-y-6 max-w-lg mx-auto">
-            <div className="relative rounded-3xl overflow-hidden border border-rose-500/25 p-6 text-center">
+            <div className="relative rounded-3xl overflow-hidden border border-rose-500/25 p-6">
               <div className="absolute inset-0 bg-gradient-to-br from-rose-950 via-fuchsia-950 to-purple-950" />
-              <div className="relative space-y-3">
-                <div className="text-5xl">🔥</div>
-                <h2 className="text-2xl font-bold text-white">Tonight is yours</h2>
-                <p className="text-sm text-rose-100/80 leading-relaxed">
-                  {OFFICIAL_RULES.object}
-                </p>
-                <p className="text-[10px] text-rose-200/60 uppercase tracking-widest">
+              <div className="relative space-y-4 text-sm text-rose-100/90 leading-relaxed">
+                <h2 className="text-xl font-bold text-white text-center">Tease or Please</h2>
+                <div>
+                  <p className="font-semibold text-purple-200 text-xs uppercase tracking-wider mb-1">
+                    {OFFICIAL_RULES.objectTitle}
+                  </p>
+                  <p>{OFFICIAL_RULES.object}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowFullRules(!showFullRules)}
+                  className="w-full py-2 rounded-xl border border-purple-400/30 text-xs font-semibold text-purple-100 hover:bg-purple-900/40"
+                >
+                  {showFullRules ? 'Hide full rules' : 'Read full rules'}
+                </button>
+                {showFullRules && (
+                  <div className="space-y-4 text-xs max-h-[40vh] overflow-y-auto pr-1">
+                    <div>
+                      <p className="font-semibold text-purple-200 mb-1">
+                        {OFFICIAL_RULES.contentsTitle}
+                      </p>
+                      <p>• {OFFICIAL_RULES.contentsLead}</p>
+                      <ul className="ml-4 list-disc text-muted-foreground">
+                        {OFFICIAL_RULES.contentsItems.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                      <p className="mt-2 italic text-purple-200/80">{OFFICIAL_RULES.note}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-purple-200 mb-1">
+                        {OFFICIAL_RULES.howToPlayTitle}
+                      </p>
+                      <p>{OFFICIAL_RULES.howToPlayIntro}</p>
+                    </div>
+                    {OFFICIAL_RULES.modes.map((mode) => (
+                      <div key={mode.id}>
+                        <p className="font-semibold text-foreground mb-1">{mode.name}</p>
+                        {mode.paragraphs.map((p) => (
+                          <p key={p.slice(0, 40)} className="text-muted-foreground mb-2">
+                            {p}
+                          </p>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className="text-[10px] text-rose-200/60 text-center uppercase tracking-widest">
                   {OFFICIAL_RULES.attribution}
                 </p>
               </div>
@@ -247,22 +289,24 @@ export function TeaseOrPleaseScreen({
 
             <div className="rounded-2xl border border-purple-500/20 bg-purple-950/20 p-4 space-y-2">
               <p className="text-xs font-semibold text-purple-200 uppercase tracking-wider">
-                Deck
+                {OFFICIAL_RULES.contentsTitle}
               </p>
-              <ul className="text-xs text-muted-foreground space-y-1">
-                {OFFICIAL_RULES.contents.map((line) => (
-                  <li key={line}>• {line}</li>
+              <p className="text-xs text-muted-foreground">• {OFFICIAL_RULES.contentsLead}</p>
+              <ul className="text-xs text-muted-foreground ml-4 list-disc space-y-0.5">
+                {OFFICIAL_RULES.contentsItems.map((item) => (
+                  <li key={item}>{item}</li>
                 ))}
               </ul>
+              <p className="text-xs italic text-purple-300/90">{OFFICIAL_RULES.note}</p>
               <p className="text-xs text-purple-300/80 pt-1">
-                {PDF_CARD_COUNT.unique} unique cards · {PDF_CARD_COUNT.withDuplicates} cards when
-                playing with pairs (per PDF)
+                App deck: {PDF_CARD_COUNT.unique} unique · {PDF_CARD_COUNT.withDuplicates} with
+                pairs
               </p>
             </div>
 
             <div className="space-y-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
-                Choose how to play
+                {OFFICIAL_RULES.howToPlayIntro}
               </p>
               {GAME_MODES.map((m) => (
                 <div
@@ -295,11 +339,11 @@ export function TeaseOrPleaseScreen({
                   <p className="text-sm font-semibold text-foreground">
                     {OFFICIAL_RULES.modes.find((m) => m.id === showRulesMode)?.name}
                   </p>
-                  <ol className="text-sm text-muted-foreground space-y-1.5 list-decimal list-inside">
-                    {rulesForMode(showRulesMode).map((line) => (
-                      <li key={line}>{line}</li>
-                    ))}
-                  </ol>
+                  {modeRules(showRulesMode).map((paragraph) => (
+                    <p key={paragraph.slice(0, 48)} className="text-sm text-muted-foreground leading-relaxed">
+                      {paragraph}
+                    </p>
+                  ))}
                 </div>
               )}
             </div>
@@ -325,8 +369,8 @@ export function TeaseOrPleaseScreen({
               </p>
             </div>
             <p className="text-center text-muted-foreground text-sm px-4">
-              <span className="font-semibold text-foreground">{currentPlayerName}</span>,
-              draw a card when you&apos;re ready
+              <span className="font-semibold text-foreground">{currentPlayerName}</span>, draw a
+              card — both perform the task. Repeat until satisfied or you draw HOME RUN.
             </p>
             <Button variant="gradient" size="lg" onClick={drawFromDeck} className="min-w-[200px]">
               <Shuffle className="w-5 h-5 mr-2 inline" />
@@ -337,8 +381,12 @@ export function TeaseOrPleaseScreen({
 
         {phase === 'playing' && mode === 'memory' && !drawnCard && (
           <div className="max-w-md mx-auto">
-            <p className="text-center text-sm text-muted-foreground mb-4">
-              {currentPlayerName} — flip two cards
+            <p className="text-center text-sm text-muted-foreground mb-2">
+              {currentPlayerName} — flip two cards face down in the grid
+            </p>
+            <p className="text-center text-xs text-muted-foreground/80 mb-4 px-2">
+              Match → do the task → pass to partner. No match → flip back → partner&apos;s turn.
+              Ends on HOME RUN.
             </p>
             <div className="grid grid-cols-4 gap-2">
               {memoryGrid.map((cell, i) => (
@@ -387,6 +435,11 @@ export function TeaseOrPleaseScreen({
                 );
               })}
             </div>
+            <p className="text-center text-xs text-muted-foreground px-2">
+              Find pairs in your hand, or draw from the pile. No card? Say{' '}
+              <span className="font-semibold text-foreground">&quot;Quit teasing me&quot;</span>.
+              First to 5 matches wins.
+            </p>
             <p className="text-center text-xs text-muted-foreground">{pileCount} in pile</p>
             <Button variant="gradient" className="w-full" onClick={teasingDraw}>
               Draw from pile

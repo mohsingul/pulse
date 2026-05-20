@@ -24,50 +24,43 @@ export function cardHasInstruction(card: TeasePleaseCardDef): boolean {
   return card.task.trim().toUpperCase() !== card.title.trim().toUpperCase();
 }
 
-/** Rules transcribed from PDF page 1 */
+/** Rules — verbatim from the printable PDF */
 export const OFFICIAL_RULES = {
   attribution: 'Tease or Please · Bee-ingMommy.blogspot.com · 18+ · Play responsibly',
-  contents: [
-    '72 Game Cards (2 of each card): 62 Task Cards, 4 Wild Cards, 6 Blank Cards',
-    'Timer and supplies needed to tease/please are NOT INCLUDED',
+  contentsTitle: 'Contents:',
+  contentsLead: '72 Game Cards (2 of each card):',
+  contentsItems: [
+    '62 Task Cards',
+    '4 Wild Cards',
+    '6 Blank Cards to Create your own task',
   ],
+  note: 'NOTE: Timer and Supplies needed to tease/please NOT INCLUDED',
+  objectTitle: 'Object of the Game:',
   object:
-    'The object of the game is to spend quality time with your significant other, teasing or pleasing them as the cards suggest. If you are uncomfortable completing the task on the card you may remove the cards before the game begins.',
+    'The object of the game is spend some quality time with your significant other, teasing or pleasing them as the cards suggest. If you are uncomfortable completing the task on the card you may remove the cards before the game begins.',
+  howToPlayTitle: 'How to Play:',
+  howToPlayIntro: 'There are three ways to play the game Tease or Please.',
   modes: [
     {
       id: 'memory' as GameMode,
       name: 'Game 1: Tease or Please (Matching)',
-      steps: [
-        'Mix the game cards up and lay them face down in a square.',
-        'Player 1 goes first. Flip over a card, followed by another card.',
-        'If the two cards match, you must perform the task on the card. Once completed, it is Player 2\'s turn.',
-        'If the cards do not match, flip the cards back over and Player 2 may take their turn.',
-        'The game is over once you complete the HOME RUN card.',
+      paragraphs: [
+        'Mix the game cards up and lay them face down in a square. Player 1 goes first. Flip over a card, followed by another card. If the two cards match, you must perform the task on the card. Once the task has been completed it is Player 2\'s turn. If the cards do not match then flip the cards back over and Player 2 may take their turn. The game is over once you complete the HOME RUN card.',
       ],
     },
     {
       id: 'teasing' as GameMode,
       name: 'Game 2: Teasing (Go Fish)',
-      steps: [
-        'Shuffle and place all the game cards in a pile. Deal five cards to each player.',
-        'If you are dealt a match, lay it down and complete the task.',
-        'Player 1 asks Player 2 if they have a card of their choosing.',
-        'If Player 2 has the card they must give the card to Player 1 and complete the task. Player 1 gets to go again.',
-        'If Player 2 does not have the card they must say, "Quit teasing me."',
-        'Player 1 must then draw a card from the pile.',
-        'If Player 1 draws the match to the card they asked for, they may lay them down and complete the task.',
-        'The game is over when a player gets five matches.',
+      paragraphs: [
+        'Shuffle and place all the game cards in a pile. Deal five cards to each player. If you are dealt a match, lay it down and complete the task. Player 1 asks Player 2 if they have a card of their choosing. If Player 2 has the card they must give the card to Player 1 and complete the task. Player 1 gets to go again. Once the task has been completed it is Player 2\'s turn.',
+        'If Player 2 does not have the card then they must say, "Quit teasing me". Player 1 must then draw a card from the pile. If Player 1 draws the match to the card they asked for then they may lay them down and complete the task. If the card does not match what they asked for but another card in their hand, they must hold onto it until their next turn. Once a player draws a card that doesn\'t play from the pile, it is the next players turn. The game is over when a player gets five matches.',
       ],
     },
     {
       id: 'pleasing' as GameMode,
       name: 'Game 3: Pleasing (Drawing)',
-      steps: [
-        'Place all the game cards in a pile or mix them up in a bowl.',
-        'Player 1 goes first by drawing a card. The players must perform the task on the card.',
-        'Player 2 then draws a card and the players must perform the task on the card.',
-        'Repeat until you are satisfied or draw the HOME RUN card.',
-        'You may take out the duplicate cards if you don\'t want to repeat some tasks.',
+      paragraphs: [
+        'Place all the game cards in pile or mix them up in a bowl. Player 1 goes first by drawing a card. The players must perform the task on the card. Player 2 then draws a card and the players must perform the task on the card. Repeat until you are satisfied or draw the HOME RUN card. You may take out the duplicate cards if you don\'t want to repeat some tasks or leave them in for a chance at your significant other having to complete the same tasks as you.',
       ],
     },
   ],
@@ -81,20 +74,20 @@ export const GAME_MODES: {
 }[] = [
   {
     id: 'memory',
-    label: 'Tease or Please',
-    subtitle: 'Matching',
+    label: 'Game 1',
+    subtitle: 'Tease or Please (Matching)',
     emoji: '🃏',
   },
   {
     id: 'teasing',
-    label: 'Teasing',
-    subtitle: 'Go Fish',
+    label: 'Game 2',
+    subtitle: 'Teasing (Go Fish)',
     emoji: '😈',
   },
   {
     id: 'pleasing',
-    label: 'Pleasing',
-    subtitle: 'Drawing',
+    label: 'Game 3',
+    subtitle: 'Pleasing (Drawing)',
     emoji: '💋',
   },
 ];
