@@ -332,6 +332,44 @@ export const challengesAPI = {
     apiRequest(`/challenges/history/${coupleId}`),
 };
 
+// Partner Needs You API
+export const partnerNeedsAPI = {
+  get: (coupleId: string) =>
+    apiRequest(`/partner-needs/${coupleId}`),
+
+  update: (coupleId: string, userId: string, status: 'great' | 'low' | 'attention' | 'support') =>
+    apiRequest(`/partner-needs/${coupleId}`, {
+      method: 'POST',
+      body: JSON.stringify({ userId, status }),
+    }),
+};
+
+// Couple Calendar API
+export const calendarAPI = {
+  get: (coupleId: string) =>
+    apiRequest(`/calendar/${coupleId}`),
+
+  create: (
+    coupleId: string,
+    userId: string,
+    data: {
+      type: 'anniversary' | 'birthday' | 'trip' | 'important';
+      title: string;
+      date: string;
+      notes?: string;
+    },
+  ) =>
+    apiRequest(`/calendar/${coupleId}`, {
+      method: 'POST',
+      body: JSON.stringify({ userId, ...data }),
+    }),
+
+  delete: (coupleId: string, eventId: string, userId: string) =>
+    apiRequest(`/calendar/${coupleId}/${eventId}?userId=${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
+    }),
+};
+
 // Daily Challenge API
 export const dailyChallengeAPI = {
   getCurrent: (coupleId: string) =>

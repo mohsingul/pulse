@@ -6,9 +6,16 @@ import { NotificationPanel } from '@/app/components/NotificationPanel';
 import { InstallPrompt } from '@/app/components/InstallPrompt';
 import { SharkModeHomeCard } from '@/app/components/SharkModeHomeCard';
 import { DailyChallenge } from '@/app/components/DailyChallenge';
-import { Heart, SmilePlus, Sparkles, Clock, History, User, Bell, X } from 'lucide-react';
-import { todayAPI, notificationAPI, sharkModeAPI } from '@/utils/api';
+import { Heart, Sparkles, Clock, History, User, Bell, Calendar, HandHeart } from 'lucide-react';
+import { todayAPI, notificationAPI, sharkModeAPI, partnerNeedsAPI } from '@/utils/api';
 import { formatDistanceToNow } from 'date-fns';
+import { PartnerNeedsBanner } from '@/app/components/PartnerNeedsBanner';
+import { PartnerNeedsSheet } from '@/app/components/PartnerNeedsSheet';
+import {
+  getPartnerStatusFromRecord,
+  getPartnerNeedLevel,
+  type PartnerNeedStatus,
+} from '@/app/constants/partnerNeeds';
 
 interface HomeScreenProps {
   userId: string;
@@ -20,6 +27,7 @@ interface HomeScreenProps {
   onUpdatePulse: () => void;
   onViewHistory: () => void;
   onViewProfile: () => void;
+  onViewCalendar: () => void;
   onViewDailyChallengeArchive?: () => void;
 }
 
@@ -35,6 +43,7 @@ export function HomeScreen({
   onUpdatePulse,
   onViewHistory,
   onViewProfile,
+  onViewCalendar,
   onViewDailyChallengeArchive,
 }: HomeScreenProps) {
   const [todayCard, setTodayCard] = useState<any>(null);
@@ -47,6 +56,8 @@ export function HomeScreen({
   const [allNotifications, setAllNotifications] = useState<any[]>([]);
   const previousNotificationIdsRef = React.useRef<Set<string>>(new Set());
   const [sharkMode, setSharkMode] = useState<any>(null);
+  const [partnerNeeds, setPartnerNeeds] = useState<any>(null);
+  const [showPartnerNeedsSheet, setShowPartnerNeedsSheet] = useState(false);
 
   // Create notification sound
   const notificationSound = React.useMemo(() => {
@@ -97,10 +108,12 @@ export function HomeScreen({
     fetchTodayCard();
     fetchNotifications();
     fetchSharkMode();
+    fetchPartnerNeeds();
     const interval = setInterval(() => {
       fetchTodayCard();
       fetchNotifications();
       fetchSharkMode();
+      fetchPartnerNeeds();
     }, 1000); // Refresh every 1s for near-instant updates
     return () => clearInterval(interval);
   }, [coupleId]);
@@ -125,6 +138,20 @@ export function HomeScreen({
     } catch (error) {
       console.error('Error fetching shark mode:', error);
     }
+  };
+
+  const fetchPartnerNeeds = async () => {
+    try {
+      const response = await partnerNeedsAPI.get(coupleId);
+      setPartnerNeeds(response.partnerNeeds);
+    } catch (error) {
+      console.error('Error fetching partner needs:', error);
+    }
+  };
+
+  const handleUpdatePartnerNeeds = async (status: PartnerNeedStatus) => {
+    await partnerNeedsAPI.update(coupleId, userId, status);
+    await fetchPartnerNeeds();
   };
 
   const handleSendReassurance = async (reassurance: string) => {
@@ -226,6 +253,11 @@ export function HomeScreen({
   const partnerMessage = todayCard?.[`${partnerPrefix}Message`];
   const partnerDoodle = todayCard?.[`${partnerPrefix}Doodle`];
   const partnerUpdatedAt = todayCard?.[`${partnerPrefix}UpdatedAt`];
+
+  const myPartnerNeedStatus = getPartnerStatusFromRecord(partnerNeeds, userId, user1Id);
+  const partnerUserId = isUser1 ? user2Id : user1Id;
+  const partnerNeedStatus = getPartnerStatusFromRecord(partnerNeeds, partnerUserId, user1Id);
+  const myNeedLevel = getPartnerNeedLevel(myPartnerNeedStatus);
   
   return (
     <div className="h-full w-full flex flex-col bg-background">
@@ -260,6 +292,27 @@ export function HomeScreen({
         <h1 className="text-2xl font-bold">Today</h1>
         <div className="flex items-center space-x-2">
           <button
+            onClick={() => setShowPartnerNeedsSheet(true)}
+            className="p-2 hover:bg-accent rounded-full transition-colors relative"
+            aria-label="Update how you're feeling"
+            title="How are you feeling?"
+          >
+            <HandHeart className="w-5 h-5" />
+            {myPartnerNeedStatus && myPartnerNeedStatus !== 'great' && (
+              <span className="absolute -bottom-0.5 -right-0.5 text-xs leading-none">
+                {myNeedLevel?.emoji}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={onViewCalendar}
+            className="p-2 hover:bg-accent rounded-full transition-colors"
+            aria-label="Couple calendar"
+            title="Couple calendar"
+          >
+            <Calendar className="w-5 h-5" />
+          </button>
+          <button
             onClick={() => setShowNotificationPanel(true)}
             className="p-2 hover:bg-accent rounded-full transition-colors relative"
           >
@@ -287,6 +340,11 @@ export function HomeScreen({
 
       {/* Content */}
       <div className="flex-1 px-6 py-8 space-y-6 overflow-y-auto">
+        {/* Partner Needs You — partner's check-in (not Shark Mode) */}
+        {partnerNeedStatus && partnerNeedStatus !== 'great' && (
+          <PartnerNeedsBanner partnerName={partnerName} status={partnerNeedStatus} />
+        )}
+
         {/* Shark Mode - Show for BOTH users */}
         {sharkMode && (
           <SharkModeHomeCard
@@ -444,16 +502,6 @@ export function HomeScreen({
             </div>
           )}
 
-          {/* Recent Reactions */}
-          {todayCard?.reactions && todayCard.reactions.length > 0 && (
-            <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
-              <span>Recent:</span>
-              {todayCard.reactions.slice(-5).map((reaction: any, i: number) => (
-                <span key={i} className="text-lg">{reaction.emoji}</span>
-              ))}
-            </div>
-          )}
-
           {/* Update Button */}
           <Button
             variant="gradient"
@@ -494,6 +542,13 @@ export function HomeScreen({
 
       {/* Install Prompt */}
       <InstallPrompt />
+
+      <PartnerNeedsSheet
+        isOpen={showPartnerNeedsSheet}
+        onClose={() => setShowPartnerNeedsSheet(false)}
+        currentStatus={myPartnerNeedStatus}
+        onSave={handleUpdatePartnerNeeds}
+      />
     </div>
   );
 }

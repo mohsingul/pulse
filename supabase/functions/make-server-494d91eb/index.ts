@@ -2564,6 +2564,188 @@ app.get("/make-server-494d91eb/daily-challenge/archive/:coupleId", async (c) => 
 
 // ===== END DAILY CHALLENGE ENDPOINTS =====
 
+// ===== PARTNER NEEDS YOU =====
+
+type PartnerNeedStatus = "great" | "low" | "attention" | "support";
+
+async function getPartnerNeedsRecord(coupleId: string) {
+  const existing = await kv.get(`partner_needs:${coupleId}`);
+  return existing || {
+    coupleId,
+    user1Status: null,
+    user2Status: null,
+    user1UpdatedAt: null,
+    user2UpdatedAt: null,
+  };
+}
+
+app.get("/make-server-494d91eb/partner-needs/:coupleId", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    if (!coupleId) {
+      return c.json({ error: "Couple ID is required" }, 400);
+    }
+
+    const couple = await kv.get(`couple:${coupleId}`);
+    if (!couple) {
+      return c.json({ error: "Couple not found" }, 404);
+    }
+
+    const needs = await getPartnerNeedsRecord(coupleId);
+    return c.json({ partnerNeeds: needs, user1Id: couple.user1Id, user2Id: couple.user2Id });
+  } catch (error: any) {
+    console.error(`[Partner Needs] Error getting status:`, error);
+    return c.json({ error: error.message || "Failed to get partner needs status" }, 500);
+  }
+});
+
+app.post("/make-server-494d91eb/partner-needs/:coupleId", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    const { userId, status } = await c.req.json();
+
+    if (!coupleId || !userId || !status) {
+      return c.json({ error: "Couple ID, user ID, and status are required" }, 400);
+    }
+
+    const validStatuses: PartnerNeedStatus[] = ["great", "low", "attention", "support"];
+    if (!validStatuses.includes(status)) {
+      return c.json({ error: "Invalid status" }, 400);
+    }
+
+    const couple = await kv.get(`couple:${coupleId}`);
+    if (!couple) {
+      return c.json({ error: "Couple not found" }, 404);
+    }
+
+    if (userId !== couple.user1Id && userId !== couple.user2Id) {
+      return c.json({ error: "User is not part of this couple" }, 403);
+    }
+
+    const needs = await getPartnerNeedsRecord(coupleId);
+    const now = new Date().toISOString();
+
+    if (userId === couple.user1Id) {
+      needs.user1Status = status;
+      needs.user1UpdatedAt = now;
+    } else {
+      needs.user2Status = status;
+      needs.user2UpdatedAt = now;
+    }
+
+    await kv.set(`partner_needs:${coupleId}`, needs);
+
+    return c.json({ success: true, partnerNeeds: needs });
+  } catch (error: any) {
+    console.error(`[Partner Needs] Error updating status:`, error);
+    return c.json({ error: error.message || "Failed to update partner needs status" }, 500);
+  }
+});
+
+// ===== COUPLE CALENDAR =====
+
+type CalendarEventType = "anniversary" | "birthday" | "trip" | "important";
+
+app.get("/make-server-494d91eb/calendar/:coupleId", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    if (!coupleId) {
+      return c.json({ error: "Couple ID is required" }, 400);
+    }
+
+    const events = await kv.getByPrefix(`calendar_event:${coupleId}:`);
+    const sorted = events.sort((a: any, b: any) => {
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    });
+
+    return c.json({ events: sorted });
+  } catch (error: any) {
+    console.error(`[Calendar] Error getting events:`, error);
+    return c.json({ error: error.message || "Failed to get calendar events" }, 500);
+  }
+});
+
+app.post("/make-server-494d91eb/calendar/:coupleId", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    const { userId, type, title, date, notes } = await c.req.json();
+
+    if (!coupleId || !userId || !type || !title || !date) {
+      return c.json({ error: "Couple ID, user ID, type, title, and date are required" }, 400);
+    }
+
+    const validTypes: CalendarEventType[] = ["anniversary", "birthday", "trip", "important"];
+    if (!validTypes.includes(type)) {
+      return c.json({ error: "Invalid event type" }, 400);
+    }
+
+    const couple = await kv.get(`couple:${coupleId}`);
+    if (!couple) {
+      return c.json({ error: "Couple not found" }, 404);
+    }
+
+    if (userId !== couple.user1Id && userId !== couple.user2Id) {
+      return c.json({ error: "User is not part of this couple" }, 403);
+    }
+
+    const user = await kv.get(`user:${userId}`);
+    const eventId = crypto.randomUUID();
+    const event = {
+      id: eventId,
+      coupleId,
+      type,
+      title: String(title).trim(),
+      date,
+      notes: notes ? String(notes).trim() : "",
+      createdBy: userId,
+      createdByName: user?.displayName || "Partner",
+      createdAt: new Date().toISOString(),
+    };
+
+    await kv.set(`calendar_event:${coupleId}:${eventId}`, event);
+
+    return c.json({ success: true, event });
+  } catch (error: any) {
+    console.error(`[Calendar] Error creating event:`, error);
+    return c.json({ error: error.message || "Failed to create calendar event" }, 500);
+  }
+});
+
+app.delete("/make-server-494d91eb/calendar/:coupleId/:eventId", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    const eventId = c.req.param("eventId");
+    const userId = c.req.query("userId");
+
+    if (!coupleId || !eventId || !userId) {
+      return c.json({ error: "Couple ID, event ID, and user ID are required" }, 400);
+    }
+
+    const event = await kv.get(`calendar_event:${coupleId}:${eventId}`);
+    if (!event) {
+      return c.json({ error: "Event not found" }, 404);
+    }
+
+    const couple = await kv.get(`couple:${coupleId}`);
+    if (!couple) {
+      return c.json({ error: "Couple not found" }, 404);
+    }
+
+    if (userId !== couple.user1Id && userId !== couple.user2Id) {
+      return c.json({ error: "User is not part of this couple" }, 403);
+    }
+
+    await kv.del(`calendar_event:${coupleId}:${eventId}`);
+
+    return c.json({ success: true });
+  } catch (error: any) {
+    console.error(`[Calendar] Error deleting event:`, error);
+    return c.json({ error: error.message || "Failed to delete calendar event" }, 500);
+  }
+});
+
+// ===== END PARTNER NEEDS & CALENDAR =====
+
 // 404 handler
 app.notFound((c) => {
   console.log(`[404] Route not found: ${c.req.url}`);

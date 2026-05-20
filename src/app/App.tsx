@@ -23,6 +23,7 @@ import { SharkModeArchiveScreen } from '@/app/screens/SharkModeArchiveScreen';
 import { DailyChallengeArchiveScreen } from '@/app/screens/DailyChallengeArchiveScreen';
 import { NotificationSettingsScreen } from '@/app/screens/NotificationSettingsScreen';
 import { NotificationCenterScreen } from '@/app/screens/NotificationCenterScreen';
+import { CoupleCalendarScreen } from '@/app/screens/CoupleCalendarScreen';
 
 // Components
 import { UpdatePulseSheet } from '@/app/components/UpdatePulseSheet';
@@ -52,7 +53,8 @@ type Screen =
   | 'message-archive'
   | 'mood-archive'
   | 'shark-mode-archive'
-  | 'daily-challenge-archive';
+  | 'daily-challenge-archive'
+  | 'couple-calendar';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
@@ -334,6 +336,7 @@ export default function App() {
               onUpdatePulse={() => setShowUpdateSheet(true)}
               onViewHistory={() => setCurrentScreen('history')}
               onViewProfile={() => setCurrentScreen('profile')}
+              onViewCalendar={() => setCurrentScreen('couple-calendar')}
               onViewDailyChallengeArchive={() => setCurrentScreen('daily-challenge-archive')}
             />
             <UpdatePulseSheet
@@ -368,6 +371,7 @@ export default function App() {
             onMoodArchive={() => setCurrentScreen('mood-archive')}
             onSharkModeArchive={() => setCurrentScreen('shark-mode-archive')}
             onDailyChallengeArchive={() => setCurrentScreen('daily-challenge-archive')}
+            onCoupleCalendar={() => setCurrentScreen('couple-calendar')}
           />
         );
 
@@ -502,6 +506,16 @@ export default function App() {
             onBack={() => setCurrentScreen('profile')}
           />
         );
+
+      case 'couple-calendar':
+        return couple ? (
+          <CoupleCalendarScreen
+            coupleId={couple.coupleId}
+            userId={user.userId}
+            partnerName={couple.partner.displayName}
+            onBack={() => setCurrentScreen('home')}
+          />
+        ) : null;
 
       default:
         return <WelcomeScreen onGetStarted={() => setCurrentScreen('create-profile')} onLogin={() => setCurrentScreen('login')} />;
