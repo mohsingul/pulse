@@ -1,0 +1,23 @@
+---
+description: Commit, push to GitHub, and deploy Supabase after code changes
+alwaysApply: true
+---
+
+# Deploy workflow (Aimo Pulse)
+
+After completing any code changes in this project:
+
+1. **Commit and push to GitHub** (`main` → `https://github.com/mohsingul/pulse.git`)
+   - Stage only relevant files; never commit `.env`, credentials, or `supabase/.temp/`
+   - Use `/usr/bin/git commit` with a HEREDOC message if the default `git` fails
+   - Push: `git push origin main`
+
+2. **Deploy Supabase** when `supabase/functions/make-server-494d91eb/` (or shared function deps) changed:
+   ```bash
+   supabase functions deploy make-server-494d91eb --no-verify-jwt
+   ```
+   Project: `iqwfevbjeohdvdbemgxp`
+
+3. **Tell the user** what was pushed (commit hash) and whether Supabase was deployed.
+
+Do not skip push/deploy unless the user explicitly asks to hold changes locally.
