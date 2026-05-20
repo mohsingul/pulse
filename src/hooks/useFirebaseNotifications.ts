@@ -10,6 +10,19 @@ import {
   deleteFCMToken,
 } from '@/utils/firebase-notifications';
 import { userAPI } from '@/utils/api';
+import { showLocalNotification } from '@/utils/firebase-notifications';
+
+function onForegroundPush(payload: any) {
+  console.log('[Notifications] Foreground message:', payload);
+  if (Notification.permission === 'granted') {
+    showLocalNotification(payload.notification?.title || 'Aimo Pulse', {
+      body: payload.notification?.body || payload.data?.body || '',
+      icon: '/icon-192.png',
+      tag: payload.data?.tag || payload.data?.type || 'aimo-pulse',
+      data: payload.data,
+    });
+  }
+}
 
 export interface NotificationState {
   supported: boolean;
@@ -75,10 +88,7 @@ export function useFirebaseNotifications(userId?: string): FirebaseNotificationC
             unsubscribeRef.current();
             unsubscribeRef.current = null;
           }
-          const unsubscribe = setupForegroundMessageListener((payload) => {
-            console.log('[Notifications] Foreground message:', payload);
-            // You can handle foreground notifications here
-          });
+          const unsubscribe = setupForegroundMessageListener(onForegroundPush);
 
           if (unsubscribe) {
             unsubscribeRef.current = unsubscribe;
@@ -161,9 +171,7 @@ export function useFirebaseNotifications(userId?: string): FirebaseNotificationC
             unsubscribeRef.current();
             unsubscribeRef.current = null;
           }
-          const unsubscribe = setupForegroundMessageListener((payload) => {
-            console.log('[Notifications] Foreground message:', payload);
-          });
+          const unsubscribe = setupForegroundMessageListener(onForegroundPush);
 
           if (unsubscribe) {
             unsubscribeRef.current = unsubscribe;

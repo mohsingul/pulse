@@ -35,17 +35,23 @@ export function PartnerStatusSheet({
   );
   const [showDetails, setShowDetails] = useState(false);
   const [saving, setSaving] = useState(false);
+  const wasOpenRef = React.useRef(false);
 
+  // Only sync form when sheet opens — avoid reset from home screen polling (1s) causing flicker
   React.useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !wasOpenRef.current) {
       setStatusId(currentStatus?.statusId ?? 'great');
       setEnergy(currentStatus?.energy ?? DEFAULT_STATUS_INDICATORS.energy);
       setStress(currentStatus?.stress ?? DEFAULT_STATUS_INDICATORS.stress);
       setAffection(currentStatus?.affection ?? DEFAULT_STATUS_INDICATORS.affection);
       setCommunication(currentStatus?.communication ?? DEFAULT_STATUS_INDICATORS.communication);
       setShowDetails(false);
+      wasOpenRef.current = true;
     }
-  }, [isOpen, currentStatus]);
+    if (!isOpen) {
+      wasOpenRef.current = false;
+    }
+  }, [isOpen, currentStatus?.statusId, currentStatus?.energy, currentStatus?.stress, currentStatus?.affection, currentStatus?.communication]);
 
   const handleQuickSave = async () => {
     setSaving(true);
@@ -160,18 +166,24 @@ function IndicatorRow<T extends string>({
     <div>
       <p className="text-sm font-medium mb-2">{label}</p>
       <div className="flex flex-wrap gap-2">
-        {options.map((o) => (
-          <button
-            key={o.id}
-            type="button"
-            onClick={() => onChange(o.id)}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-              value === o.id ? 'bg-[image:var(--pulse-gradient)] text-white' : 'bg-accent'
-            }`}
-          >
-            {o.label}
-          </button>
-        ))}
+        {options.map((o) => {
+          const selected = value === o.id;
+          return (
+            <button
+              key={o.id}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onChange(o.id)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium border-2 ${
+                selected
+                  ? 'border-[#A83FFF] bg-[#A83FFF] text-white'
+                  : 'border-transparent bg-accent text-foreground hover:bg-accent/80'
+              }`}
+            >
+              {o.label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

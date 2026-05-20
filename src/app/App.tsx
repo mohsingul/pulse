@@ -134,6 +134,11 @@ export default function App() {
       if (event.data?.type === 'NAVIGATE_CALENDAR' && event.data.eventId) {
         openCalendarEvent(event.data.eventId);
       }
+      if (event.data?.type === 'NAVIGATE_HOME') {
+        setHighlightCalendarEventId(null);
+        setCurrentScreen('home');
+        clearAppUrlParams();
+      }
     };
 
     navigator.serviceWorker.addEventListener('message', onMessage);
@@ -145,6 +150,15 @@ export default function App() {
       setShowNotificationPermissionPrompt(true);
     }
   }, [user, notificationPermission]);
+
+  // Register FCM token with backend whenever user is logged in and permission is granted
+  useEffect(() => {
+    if (user?.userId && notificationPermission === 'granted') {
+      notifications.checkNotificationStatus().catch((err) => {
+        console.error('[Notifications] Token sync failed:', err);
+      });
+    }
+  }, [user?.userId, notificationPermission]);
 
   // Show notification onboarding after successful pairing
   useEffect(() => {
@@ -200,11 +214,12 @@ export default function App() {
 
   const handleAuthSuccess = (userData: any) => {
     setUser(userData);
-    // storage.saveUser(userData); // Persist user data to localStorage
     checkCouple(userData.userId);
 
     if (notificationPermission !== 'granted') {
       setShowNotificationPermissionPrompt(true);
+    } else {
+      notifications.checkNotificationStatus().catch(console.error);
     }
   };
 
@@ -297,14 +312,26 @@ export default function App() {
 
   const handleEnableNotifications = async () => {
     try {
+      if (user?.userId) {
+        await notifications.enableNotifications();
+        setNotificationPermission('granted');
+        setShowNotificationPermissionPrompt(false);
+        console.log('[Notifications] FCM enabled and token registered');
+        return;
+      }
+
       const permission = await Notification.requestPermission();
-      console.log('[Notifications] Permission requested:', permission);
       setNotificationPermission(permission);
       if (permission === 'granted') {
         setShowNotificationPermissionPrompt(false);
       }
     } catch (error) {
-      console.error('[Notifications] Permission request failed:', error);
+      console.error('[Notifications] Enable failed:', error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : 'Could not enable notifications. Check browser settings and try again.',
+      );
     }
   };
 

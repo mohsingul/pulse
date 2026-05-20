@@ -2643,6 +2643,9 @@ app.post("/make-server-494d91eb/partner-needs/:coupleId", async (c) => {
     const copy = getStatusNotificationCopy(validated.data.statusId, sender?.displayName || "Your partner");
     const appUrl = Deno.env.get("APP_URL") || "https://pulse-one-umber.vercel.app";
 
+    let pushSent = false;
+    let pushError: string | null = null;
+
     if (receiver?.fcmToken) {
       try {
         await sendFcmPush(
@@ -2663,12 +2666,24 @@ app.post("/make-server-494d91eb/partner-needs/:coupleId", async (c) => {
             tag: `partner-status-${coupleId}-${userId}`,
           },
         );
-      } catch (pushError) {
+        pushSent = true;
+        console.log(`[Partner Status] FCM sent to ${receiverId}`);
+      } catch (err: any) {
+        pushError = err?.message || String(err);
         console.log(`[Partner Status] FCM push failed:`, pushError);
       }
+    } else {
+      console.log(`[Partner Status] Partner has no FCM token (${receiverId}). They must enable notifications in the app.`);
     }
 
-    return c.json({ success: true, partnerStatus: record, partnerNeeds: record });
+    return c.json({
+      success: true,
+      partnerStatus: record,
+      partnerNeeds: record,
+      pushSent,
+      pushError,
+      receiverHasToken: !!receiver?.fcmToken,
+    });
   } catch (error: any) {
     console.error(`[Partner Status] Error updating status:`, error);
     return c.json({ error: error.message || "Failed to update partner status" }, 500);

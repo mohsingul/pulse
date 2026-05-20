@@ -82,10 +82,14 @@ self.addEventListener('notificationclick', (event) => {
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
         if ('focus' in client && client.url.includes(self.location.origin)) {
+          const msgType =
+            data.type === 'calendar-reminder' && eventId
+              ? 'NAVIGATE_CALENDAR'
+              : 'NAVIGATE_HOME';
           client.postMessage({
-            type: 'NAVIGATE_CALENDAR',
-            eventId,
-            coupleId,
+            type: msgType,
+            eventId: eventId || '',
+            coupleId: coupleId || '',
             url: urlToOpen,
           });
           return client.focus();

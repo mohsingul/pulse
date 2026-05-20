@@ -12,7 +12,7 @@ window.firebaseConfig = {
 };
 
 
-window.vapidKey = "BOy-X-82yLILsNA7MBFV7BSmiieuQxTE6VTqkN_wUHVd9BQd9xed8Z25ByJNNyCIUbE4d2Pw0CH2vyh7Y9hWTLEBOy-X-82yLILsNA7MBFV7BSmiieuQxTE6VTqkN_wUHVd9BQd9xed8Z25ByJNNyCIUbE4d2Pw0CH2vyh7Y9hWTLE";
+window.vapidKey = "BOy-X-82yLILsNA7MBFV7BSmiieuQxTE6VTqkN_wUHVd9BQd9xed8Z25ByJNNyCIUbE4d2Pw0CH2vyh7Y9hWTLE";
 
 
 console.log('[Firebase Config] Configuration loaded');
