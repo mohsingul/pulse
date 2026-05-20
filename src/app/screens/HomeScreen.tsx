@@ -6,7 +6,8 @@ import { InstallPrompt } from '@/app/components/InstallPrompt';
 import { CalendarRemindersHome } from '@/app/components/CalendarRemindersHome';
 import { SharkModeHomeCard } from '@/app/components/SharkModeHomeCard';
 import { DailyChallenge } from '@/app/components/DailyChallenge';
-import { Sparkles, Clock, History, User, Bell, Calendar, HandHeart } from 'lucide-react';
+import { Sparkles, Clock, History, User, Calendar, HandHeart, Flame } from 'lucide-react';
+import { TeaseOrPleaseHomeCard } from '@/app/components/TeaseOrPleaseHomeCard';
 import { todayAPI, notificationAPI, sharkModeAPI, partnerStatusAPI, calendarAPI } from '@/utils/api';
 import { getUpcomingCalendarReminders } from '@/app/constants/calendar';
 import { formatDistanceToNow } from 'date-fns';
@@ -30,6 +31,7 @@ interface HomeScreenProps {
   onViewProfile: () => void;
   onViewCalendar: () => void;
   onViewDailyChallengeArchive?: () => void;
+  onPlayTeaseOrPlease?: () => void;
 }
 
 const REACTIONS = ['❤️', '🫶', '😘', '😄', '🥺'];
@@ -46,6 +48,7 @@ export function HomeScreen({
   onViewProfile,
   onViewCalendar,
   onViewDailyChallengeArchive,
+  onPlayTeaseOrPlease,
 }: HomeScreenProps) {
   const [todayCard, setTodayCard] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -218,6 +221,16 @@ export function HomeScreen({
       <div className="px-6 py-6 flex items-center justify-between border-b border-border safe-top flex-shrink-0">
         <h1 className="text-2xl font-bold">Today</h1>
         <div className="flex items-center space-x-2">
+          {onPlayTeaseOrPlease && (
+            <button
+              onClick={onPlayTeaseOrPlease}
+              className="p-2 hover:bg-rose-500/15 rounded-full transition-colors relative group"
+              aria-label="Tease or Please"
+              title="Tease or Please — intimate game"
+            >
+              <Flame className="w-5 h-5 text-rose-500 fill-rose-500/25 group-hover:fill-rose-500/40" />
+            </button>
+          )}
           <button
             onClick={() => setShowPartnerStatusSheet(true)}
             className="p-2 hover:bg-accent rounded-full transition-colors relative"
@@ -270,6 +283,13 @@ export function HomeScreen({
           reminders={calendarReminders}
           onViewCalendar={onViewCalendar}
         />
+
+        {onPlayTeaseOrPlease && (
+          <TeaseOrPleaseHomeCard
+            partnerName={partnerName}
+            onPlay={onPlayTeaseOrPlease}
+          />
+        )}
 
         {/* Shark Mode - Show for BOTH users */}
         {sharkMode && (

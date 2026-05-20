@@ -24,6 +24,7 @@ import { DailyChallengeArchiveScreen } from '@/app/screens/DailyChallengeArchive
 import { NotificationSettingsScreen } from '@/app/screens/NotificationSettingsScreen';
 import { NotificationCenterScreen } from '@/app/screens/NotificationCenterScreen';
 import { CoupleCalendarScreen } from '@/app/screens/CoupleCalendarScreen';
+import { TeaseOrPleaseScreen } from '@/app/screens/TeaseOrPleaseScreen';
 
 // Components
 import { UpdatePulseSheet } from '@/app/components/UpdatePulseSheet';
@@ -60,7 +61,8 @@ type Screen =
   | 'mood-archive'
   | 'shark-mode-archive'
   | 'daily-challenge-archive'
-  | 'couple-calendar';
+  | 'couple-calendar'
+  | 'tease-or-please';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
@@ -413,6 +415,7 @@ export default function App() {
               onViewProfile={() => setCurrentScreen('profile')}
               onViewCalendar={() => setCurrentScreen('couple-calendar')}
               onViewDailyChallengeArchive={() => setCurrentScreen('daily-challenge-archive')}
+              onPlayTeaseOrPlease={() => setCurrentScreen('tease-or-please')}
             />
             <UpdatePulseSheet
               isOpen={showUpdateSheet}
@@ -594,6 +597,15 @@ export default function App() {
               setCurrentScreen('home');
             }}
             onClearHighlight={() => setHighlightCalendarEventId(null)}
+          />
+        ) : null;
+
+      case 'tease-or-please':
+        return couple ? (
+          <TeaseOrPleaseScreen
+            userName={user.displayName}
+            partnerName={couple.partner.displayName}
+            onBack={() => setCurrentScreen('home')}
           />
         ) : null;
 
