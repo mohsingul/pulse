@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/app/components/Button';
 import { Card } from '@/app/components/Card';
 import { LoadingSpinner } from '@/app/components/LoadingSpinner';
-import { NotificationPanel } from '@/app/components/NotificationPanel';
 import { InstallPrompt } from '@/app/components/InstallPrompt';
+import { CalendarRemindersHome } from '@/app/components/CalendarRemindersHome';
 import { SharkModeHomeCard } from '@/app/components/SharkModeHomeCard';
 import { DailyChallenge } from '@/app/components/DailyChallenge';
-import { Heart, Sparkles, Clock, History, User, Bell, Calendar, HandHeart } from 'lucide-react';
-import { todayAPI, notificationAPI, sharkModeAPI, partnerNeedsAPI } from '@/utils/api';
+import { Sparkles, Clock, History, User, Bell, Calendar, HandHeart } from 'lucide-react';
+import { todayAPI, notificationAPI, sharkModeAPI, partnerNeedsAPI, calendarAPI } from '@/utils/api';
+import { getUpcomingCalendarReminders } from '@/app/constants/calendar';
 import { formatDistanceToNow } from 'date-fns';
 import { PartnerNeedsBanner } from '@/app/components/PartnerNeedsBanner';
 import { PartnerNeedsSheet } from '@/app/components/PartnerNeedsSheet';
@@ -51,69 +52,21 @@ export function HomeScreen({
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [nudgeCount, setNudgeCount] = useState(0);
   const [showNudgeTooltip, setShowNudgeTooltip] = useState(false);
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [showNotificationPanel, setShowNotificationPanel] = useState(false);
-  const [allNotifications, setAllNotifications] = useState<any[]>([]);
-  const previousNotificationIdsRef = React.useRef<Set<string>>(new Set());
   const [sharkMode, setSharkMode] = useState<any>(null);
   const [partnerNeeds, setPartnerNeeds] = useState<any>(null);
   const [showPartnerNeedsSheet, setShowPartnerNeedsSheet] = useState(false);
-
-  // Create notification sound
-  const notificationSound = React.useMemo(() => {
-    // Using a pleasant notification tone (Web Audio API)
-    return () => {
-      try {
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-
-        // Pleasant double beep sound
-        oscillator.frequency.value = 800;
-        oscillator.type = 'sine';
-
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.1);
-
-        // Second beep
-        setTimeout(() => {
-          const oscillator2 = audioContext.createOscillator();
-          const gainNode2 = audioContext.createGain();
-
-          oscillator2.connect(gainNode2);
-          gainNode2.connect(audioContext.destination);
-
-          oscillator2.frequency.value = 1000;
-          oscillator2.type = 'sine';
-
-          gainNode2.gain.setValueAtTime(0.3, audioContext.currentTime);
-          gainNode2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-
-          oscillator2.start(audioContext.currentTime);
-          oscillator2.stop(audioContext.currentTime + 0.1);
-        }, 150);
-      } catch (error) {
-        console.error('Error playing notification sound:', error);
-      }
-    };
-  }, []);
+  const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
 
   useEffect(() => {
     fetchTodayCard();
-    fetchNotifications();
     fetchSharkMode();
     fetchPartnerNeeds();
+    fetchCalendarEvents();
     const interval = setInterval(() => {
       fetchTodayCard();
-      fetchNotifications();
       fetchSharkMode();
       fetchPartnerNeeds();
+      fetchCalendarEvents();
     }, 1000); // Refresh every 1s for near-instant updates
     return () => clearInterval(interval);
   }, [coupleId]);
@@ -149,6 +102,15 @@ export function HomeScreen({
     }
   };
 
+  const fetchCalendarEvents = async () => {
+    try {
+      const response = await calendarAPI.get(coupleId);
+      setCalendarEvents(response.events || []);
+    } catch (error) {
+      console.error('Error fetching calendar events:', error);
+    }
+  };
+
   const handleUpdatePartnerNeeds = async (status: PartnerNeedStatus) => {
     await partnerNeedsAPI.update(coupleId, userId, status);
     await fetchPartnerNeeds();
@@ -162,31 +124,6 @@ export function HomeScreen({
       console.error('Failed to send reassurance:', error);
       alert(error.message || 'Failed to send reassurance');
       throw error;
-    }
-  };
-
-  const fetchNotifications = async () => {
-    try {
-      const response = await notificationAPI.getNotifications(userId);
-      const unreadNotifications = response.notifications?.filter((n: any) => !n.read) || [];
-      setNotifications(unreadNotifications);
-      setAllNotifications(response.notifications || []);
-      
-      // Check for NEW notification IDs that weren't in the previous set
-      const newNotificationIds = new Set(unreadNotifications.map((n: any) => n.id));
-      const previousNotificationIds = previousNotificationIdsRef.current;
-      
-      const hasNewNotification = Array.from(newNotificationIds).some(id => !previousNotificationIds.has(id));
-      
-      if (hasNewNotification && previousNotificationIds.size > 0) {
-        notificationSound();
-      }
-      
-      // Update the ref with the current notification IDs
-      previousNotificationIdsRef.current = newNotificationIds;
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
-      // Silently fail - don't break the app
     }
   };
 
@@ -213,17 +150,6 @@ export function HomeScreen({
     } catch (error) {
       console.error('Error sending nudge:', error);
       alert('Failed to send nudge. Please try again.');
-    }
-  };
-
-  const handleDismissNotification = async (notificationId: string) => {
-    try {
-      await notificationAPI.markAsRead(notificationId);
-      setNotifications(notifications.filter((n) => n.id !== notificationId));
-    } catch (error) {
-      console.log('Unable to dismiss notification (non-critical):', error);
-      // Still remove it from UI even if server update fails
-      setNotifications(notifications.filter((n) => n.id !== notificationId));
     }
   };
 
@@ -258,7 +184,8 @@ export function HomeScreen({
   const partnerUserId = isUser1 ? user2Id : user1Id;
   const partnerNeedStatus = getPartnerStatusFromRecord(partnerNeeds, partnerUserId, user1Id);
   const myNeedLevel = getPartnerNeedLevel(myPartnerNeedStatus);
-  
+  const calendarReminders = getUpcomingCalendarReminders(calendarEvents);
+
   return (
     <div className="h-full w-full flex flex-col bg-background">
       {/* Server Error Banner */}
@@ -306,20 +233,14 @@ export function HomeScreen({
           </button>
           <button
             onClick={onViewCalendar}
-            className="p-2 hover:bg-accent rounded-full transition-colors"
+            className="p-2 hover:bg-accent rounded-full transition-colors relative"
             aria-label="Couple calendar"
             title="Couple calendar"
           >
             <Calendar className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => setShowNotificationPanel(true)}
-            className="p-2 hover:bg-accent rounded-full transition-colors relative"
-          >
-            <Bell className="w-5 h-5" />
-            {notifications.length > 0 && (
+            {calendarReminders.length > 0 && (
               <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#FB3094] text-white text-xs font-bold rounded-full flex items-center justify-center">
-                {notifications.length}
+                {calendarReminders.length}
               </span>
             )}
           </button>
@@ -344,6 +265,11 @@ export function HomeScreen({
         {partnerNeedStatus && partnerNeedStatus !== 'great' && (
           <PartnerNeedsBanner partnerName={partnerName} status={partnerNeedStatus} />
         )}
+
+        <CalendarRemindersHome
+          reminders={calendarReminders}
+          onViewCalendar={onViewCalendar}
+        />
 
         {/* Shark Mode - Show for BOTH users */}
         {sharkMode && (
@@ -531,14 +457,6 @@ export function HomeScreen({
           </div>
         </div>
       </div>
-
-      {/* Notification Panel */}
-      <NotificationPanel
-        isOpen={showNotificationPanel}
-        notifications={allNotifications}
-        onDismiss={handleDismissNotification}
-        onClose={() => setShowNotificationPanel(false)}
-      />
 
       {/* Install Prompt */}
       <InstallPrompt />

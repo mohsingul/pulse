@@ -1243,18 +1243,22 @@ app.post("/make-server-494d91eb/today/:coupleId", async (c) => {
       updates[`${userPrefix}Intensity`] = intensity;
     }
     if (message !== undefined) {
+      const messageText = String(message);
+      if (messageText.length > 1000) {
+        return c.json({ error: "Message must be 1000 characters or less" }, 400);
+      }
       // Add message to gallery array instead of overwriting
       const messageGalleryKey = `${userPrefix}MessageGallery`;
       const existingMessageGallery = existingCard[messageGalleryKey] || [];
       const newMessageEntry = {
-        message,
+        message: messageText,
         timestamp: new Date().toISOString(),
         userId,
       };
       updates[messageGalleryKey] = [...existingMessageGallery, newMessageEntry];
       
       // Also update the single message field for backward compatibility
-      updates[`${userPrefix}Message`] = message;
+      updates[`${userPrefix}Message`] = messageText;
     }
     if (doodle !== undefined) {
       // Add doodle to gallery array instead of overwriting

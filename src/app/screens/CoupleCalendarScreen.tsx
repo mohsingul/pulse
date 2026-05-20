@@ -61,7 +61,7 @@ export function CoupleCalendarScreen({
 
   const filteredEvents = useMemo(() => {
     const list = filter === 'all' ? events : events.filter((e) => e.type === filter);
-    return [...list].sort((a, b) => daysUntilEvent(a.date) - daysUntilEvent(b.date));
+    return [...list].sort((a, b) => daysUntilEvent(a.date, a.type) - daysUntilEvent(b.date, b.type));
   }, [events, filter]);
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -206,7 +206,7 @@ export function CoupleCalendarScreen({
           <div className="space-y-3">
             {filteredEvents.map((event) => {
               const meta = getCalendarTypeMeta(event.type);
-              const days = daysUntilEvent(event.date);
+              const days = daysUntilEvent(event.date, event.type);
               const daysLabel =
                 days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `In ${days} days`;
 

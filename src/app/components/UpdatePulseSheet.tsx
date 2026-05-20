@@ -20,6 +20,8 @@ const MOODS = [
 
 const INTENSITY_LEVELS = ['Low', 'Medium', 'High'];
 
+const MESSAGE_MAX_LENGTH = 1000;
+
 const MESSAGE_TEMPLATES = [
   'Thinking of you 💭',
   'Busy but okay 📱',
@@ -162,12 +164,12 @@ export function UpdatePulseSheet({ isOpen, onClose, onUpdate, onOpenDoodle }: Up
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="What's on your mind?"
-                maxLength={120}
-                rows={4}
+                maxLength={MESSAGE_MAX_LENGTH}
+                rows={6}
                 className="w-full px-4 py-3 rounded-2xl bg-input-background dark:bg-input border-2 border-transparent focus:border-[#A83FFF] focus:outline-none resize-none"
               />
               <div className="text-right text-sm text-muted-foreground mt-2">
-                {message.length}/120
+                {message.length}/{MESSAGE_MAX_LENGTH}
               </div>
             </div>
 
