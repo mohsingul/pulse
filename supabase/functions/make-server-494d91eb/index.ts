@@ -2,6 +2,7 @@ import { Hono } from "npm:hono";
 import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
 import * as kv from "./kv_store.ts";
+import { processCalendarReminders } from "./calendar_reminders.ts";
 
 const app = new Hono();
 
@@ -2708,10 +2709,51 @@ app.post("/make-server-494d91eb/calendar/:coupleId", async (c) => {
 
     await kv.set(`calendar_event:${coupleId}:${eventId}`, event);
 
+    // Check if a push reminder applies today (5/3/1/0 days before)
+    processCalendarReminders(sendFcmPush, coupleId).catch((err) => {
+      console.error(`[Calendar] Post-create reminder check failed:`, err);
+    });
+
     return c.json({ success: true, event });
   } catch (error: any) {
     console.error(`[Calendar] Error creating event:`, error);
     return c.json({ error: error.message || "Failed to create calendar event" }, 500);
+  }
+});
+
+app.get("/make-server-494d91eb/calendar/:coupleId/event/:eventId", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    const eventId = c.req.param("eventId");
+
+    const event = await kv.get(`calendar_event:${coupleId}:${eventId}`);
+    if (!event) {
+      return c.json({ error: "Event not found" }, 404);
+    }
+
+    return c.json({ event });
+  } catch (error: any) {
+    console.error(`[Calendar] Error getting event:`, error);
+    return c.json({ error: error.message || "Failed to get calendar event" }, 500);
+  }
+});
+
+// Daily cron: send FCM reminders 5, 3, 1, and 0 days before each event
+app.post("/make-server-494d91eb/calendar/process-reminders", async (c) => {
+  try {
+    const cronSecret = Deno.env.get("CRON_SECRET");
+    if (cronSecret) {
+      const provided = c.req.header("x-cron-secret");
+      if (provided !== cronSecret) {
+        return c.json({ error: "Unauthorized" }, 401);
+      }
+    }
+
+    const result = await processCalendarReminders(sendFcmPush);
+    return c.json({ success: true, ...result });
+  } catch (error: any) {
+    console.error(`[Calendar] process-reminders failed:`, error);
+    return c.json({ error: error.message || "Failed to process calendar reminders" }, 500);
   }
 });
 

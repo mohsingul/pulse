@@ -315,6 +315,7 @@ export const NotificationPreferences = {
           pulseUpdates: true,
           dailyChallenges: true,
           sharkMode: true,
+          calendarReminders: true,
           sound: true,
           quietHours: {
             enabled: false,

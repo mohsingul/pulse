@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Card } from '@/app/components/Card';
 import { Button } from '@/app/components/Button';
 import { Input } from '@/app/components/Input';
+import { CalendarEventDetail } from '@/app/components/CalendarEventDetail';
 import { ArrowLeft, Plus, Trash2, Calendar } from 'lucide-react';
 import { calendarAPI } from '@/utils/api';
 import {
@@ -25,16 +26,22 @@ interface CoupleCalendarScreenProps {
   coupleId: string;
   userId: string;
   partnerName: string;
+  highlightEventId?: string | null;
   onBack: () => void;
+  onClearHighlight?: () => void;
 }
 
 export function CoupleCalendarScreen({
   coupleId,
   userId,
   partnerName,
+  highlightEventId,
   onBack,
+  onClearHighlight,
 }: CoupleCalendarScreenProps) {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(highlightEventId ?? null);
+  const eventRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<CalendarEventType | 'all'>('all');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -47,6 +54,22 @@ export function CoupleCalendarScreen({
   useEffect(() => {
     fetchEvents();
   }, [coupleId]);
+
+  useEffect(() => {
+    if (highlightEventId) {
+      setSelectedEventId(highlightEventId);
+    }
+  }, [highlightEventId]);
+
+  useEffect(() => {
+    if (!selectedEventId) return;
+    const el = eventRefs.current[selectedEventId];
+    if (el) {
+      setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+    }
+  }, [selectedEventId, events, loading]);
+
+  const selectedEvent = events.find((e) => e.id === selectedEventId) ?? null;
 
   const fetchEvents = async () => {
     try {
@@ -122,11 +145,21 @@ export function CoupleCalendarScreen({
           <div className="flex items-start gap-3">
             <Calendar className="w-5 h-5 text-[#A83FFF] flex-shrink-0 mt-0.5" />
             <p className="text-sm text-muted-foreground">
-              Keep anniversaries, birthdays, trips, and important moments in one place — so you both
-              remember what matters.
+              Keep anniversaries, birthdays, trips, and important moments in one place. Push
+              reminders go out 5 days, 3 days, and 1 day before, plus on the day.
             </p>
           </div>
         </Card>
+
+        {selectedEvent && (
+          <CalendarEventDetail
+            event={selectedEvent}
+            onClose={() => {
+              setSelectedEventId(null);
+              onClearHighlight?.();
+            }}
+          />
+        )}
 
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
           <button
@@ -211,7 +244,23 @@ export function CoupleCalendarScreen({
                 days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `In ${days} days`;
 
               return (
-                <Card key={event.id} className="p-4">
+                <div
+                  key={event.id}
+                  ref={(el) => {
+                    eventRefs.current[event.id] = el;
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedEventId(event.id)}
+                  onKeyDown={(e) => e.key === 'Enter' && setSelectedEventId(event.id)}
+                >
+                <Card
+                  className={`p-4 cursor-pointer transition-all ${
+                    selectedEventId === event.id
+                      ? 'ring-2 ring-[#A83FFF] border-[#A83FFF]/50'
+                      : ''
+                  }`}
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex gap-3 min-w-0">
                       <span className="text-2xl flex-shrink-0">{meta.emoji}</span>
@@ -228,7 +277,10 @@ export function CoupleCalendarScreen({
                     </div>
                     <button
                       type="button"
-                      onClick={() => handleDelete(event.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(event.id);
+                      }}
                       className="p-2 text-muted-foreground hover:text-destructive rounded-full hover:bg-destructive/10 flex-shrink-0"
                       aria-label="Delete event"
                     >
@@ -236,6 +288,7 @@ export function CoupleCalendarScreen({
                     </button>
                   </div>
                 </Card>
+                </div>
               );
             })}
           </div>

@@ -18,20 +18,21 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   console.log('[Firebase SW] Background message received:', payload);
 
-  // If the payload already contains notification fields, let FCM handle display.
-  if (payload.notification?.title || payload.notification?.body) {
-    return;
-  }
+  const notificationTitle =
+    payload.notification?.title || payload.data?.title || 'Aimo Pulse';
+  const notificationBody =
+    payload.notification?.body || payload.data?.body || 'You have a new update';
 
-  const notificationTitle = payload.notification?.title || payload.data?.title || 'Aimo Pulse';
   const notificationOptions = {
-    body: payload.notification?.body || payload.data?.body || 'You have a new update',
+    body: notificationBody,
     icon: payload.notification?.icon || '/icon-192.png',
     badge: '/icon-192.png',
-    tag: 'aimo-pulse',
+    tag: payload.data?.tag || payload.data?.type || 'aimo-pulse',
     data: {
       url: payload.data?.url || '/',
       type: payload.data?.type || 'default',
+      eventId: payload.data?.eventId || '',
+      coupleId: payload.data?.coupleId || '',
       timestamp: Date.now(),
     },
     requireInteraction: false,
@@ -40,6 +41,10 @@ messaging.onBackgroundMessage((payload) => {
   };
 
   switch (payload.data?.type) {
+    case 'calendar-reminder':
+      notificationOptions.vibrate = [200, 100, 200, 100, 200];
+      notificationOptions.requireInteraction = false;
+      break;
     case 'message':
       notificationOptions.vibrate = [100, 50, 100];
       notificationOptions.actions = [{ action: 'view', title: 'View Message' }];
@@ -65,12 +70,21 @@ self.addEventListener('notificationclick', (event) => {
   console.log('[Service Worker] Notification clicked');
   event.notification.close();
 
-  const urlToOpen = event.notification.data?.url || '/';
+  const data = event.notification.data || {};
+  const urlToOpen = data.url || '/';
+  const eventId = data.eventId || '';
+  const coupleId = data.coupleId || '';
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
         if ('focus' in client && client.url.includes(self.location.origin)) {
+          client.postMessage({
+            type: 'NAVIGATE_CALENDAR',
+            eventId,
+            coupleId,
+            url: urlToOpen,
+          });
           return client.focus();
         }
       }
@@ -78,7 +92,7 @@ self.addEventListener('notificationclick', (event) => {
         return self.clients.openWindow(urlToOpen);
       }
       return null;
-    })
+    }),
   );
 });
 

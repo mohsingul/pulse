@@ -33,6 +33,12 @@ import { NotificationPermissionPrompt } from '@/app/components/NotificationPermi
 
 // Hooks
 import { useFirebaseNotifications } from '@/hooks/useFirebaseNotifications';
+import {
+  parseAppDeepLink,
+  savePendingCalendarEvent,
+  consumePendingCalendarEvent,
+  clearAppUrlParams,
+} from '@/utils/deepLink';
 
 type Screen =
   | 'welcome'
@@ -67,9 +73,30 @@ export default function App() {
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
     typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default'
   );
+  const [highlightCalendarEventId, setHighlightCalendarEventId] = useState<string | null>(null);
 
   // Initialize Firebase notifications
   const notifications = useFirebaseNotifications(user?.userId);
+
+  const openCalendarEvent = (eventId: string) => {
+    setHighlightCalendarEventId(eventId);
+    setCurrentScreen('couple-calendar');
+    clearAppUrlParams();
+  };
+
+  const applyDeepLinkNavigation = () => {
+    const link = parseAppDeepLink();
+    const pendingEventId = consumePendingCalendarEvent();
+    const eventId = link?.eventId || pendingEventId;
+
+    if (link?.screen === 'couple-calendar' && eventId) {
+      if (couple) {
+        openCalendarEvent(eventId);
+      } else {
+        savePendingCalendarEvent(eventId);
+      }
+    }
+  };
 
   useEffect(() => {
     // Initialize theme
@@ -90,7 +117,28 @@ export default function App() {
     if ('Notification' in window) {
       setNotificationPermission(Notification.permission);
     }
+
+    applyDeepLinkNavigation();
   }, []);
+
+  useEffect(() => {
+    if (couple) {
+      applyDeepLinkNavigation();
+    }
+  }, [couple]);
+
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.serviceWorker) return;
+
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'NAVIGATE_CALENDAR' && event.data.eventId) {
+        openCalendarEvent(event.data.eventId);
+      }
+    };
+
+    navigator.serviceWorker.addEventListener('message', onMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage);
+  }, [couple]);
 
   useEffect(() => {
     if (user && notificationPermission !== 'granted') {
@@ -513,7 +561,12 @@ export default function App() {
             coupleId={couple.coupleId}
             userId={user.userId}
             partnerName={couple.partner.displayName}
-            onBack={() => setCurrentScreen('home')}
+            highlightEventId={highlightCalendarEventId}
+            onBack={() => {
+              setHighlightCalendarEventId(null);
+              setCurrentScreen('home');
+            }}
+            onClearHighlight={() => setHighlightCalendarEventId(null)}
           />
         ) : null;
 

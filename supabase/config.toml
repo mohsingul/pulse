@@ -1,0 +1,9 @@
+# Aimo Pulse — Supabase project config
+project_id = "iqwfevbjeohdvdbemgxp"
+
+[functions.make-server-494d91eb]
+verify_jwt = false
+
+# Daily calendar push reminders at 09:00 UTC (5, 3, 1, and 0 days before events)
+[functions.make-server-494d91eb.schedule]
+cron = "0 9 * * *"

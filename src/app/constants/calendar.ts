@@ -36,8 +36,11 @@ export function daysUntilEvent(dateStr: string, type?: CalendarEventType): numbe
   return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-/** Show reminders on home when event is today, tomorrow, or in 2 days. */
-export const CALENDAR_REMINDER_WINDOW_DAYS = 2;
+/** Show reminders on home when event is within push schedule (5, 3, 1, 0 days). */
+export const CALENDAR_REMINDER_WINDOW_DAYS = 5;
+
+/** Push notification schedule (matches server). */
+export const CALENDAR_PUSH_REMINDER_DAYS = [5, 3, 1, 0] as const;
 
 export function getReminderLabel(daysUntil: number): string {
   if (daysUntil === 0) return 'Today';
