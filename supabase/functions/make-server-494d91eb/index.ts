@@ -3,6 +3,11 @@ import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
 import * as kv from "./kv_store.ts";
 import { processCalendarReminders } from "./calendar_reminders.ts";
+import {
+  getPartnerStatusRecord,
+  validateStatusPayload,
+  getStatusNotificationCopy,
+} from "./partner_status.ts";
 
 const app = new Hono();
 
@@ -2569,20 +2574,7 @@ app.get("/make-server-494d91eb/daily-challenge/archive/:coupleId", async (c) => 
 
 // ===== END DAILY CHALLENGE ENDPOINTS =====
 
-// ===== PARTNER NEEDS YOU =====
-
-type PartnerNeedStatus = "great" | "low" | "attention" | "support";
-
-async function getPartnerNeedsRecord(coupleId: string) {
-  const existing = await kv.get(`partner_needs:${coupleId}`);
-  return existing || {
-    coupleId,
-    user1Status: null,
-    user2Status: null,
-    user1UpdatedAt: null,
-    user2UpdatedAt: null,
-  };
-}
+// ===== PARTNER STATUS (formerly Partner Needs You) =====
 
 app.get("/make-server-494d91eb/partner-needs/:coupleId", async (c) => {
   try {
@@ -2596,26 +2588,32 @@ app.get("/make-server-494d91eb/partner-needs/:coupleId", async (c) => {
       return c.json({ error: "Couple not found" }, 404);
     }
 
-    const needs = await getPartnerNeedsRecord(coupleId);
-    return c.json({ partnerNeeds: needs, user1Id: couple.user1Id, user2Id: couple.user2Id });
+    const partnerStatus = await getPartnerStatusRecord(coupleId);
+    return c.json({
+      partnerStatus,
+      partnerNeeds: partnerStatus,
+      user1Id: couple.user1Id,
+      user2Id: couple.user2Id,
+    });
   } catch (error: any) {
-    console.error(`[Partner Needs] Error getting status:`, error);
-    return c.json({ error: error.message || "Failed to get partner needs status" }, 500);
+    console.error(`[Partner Status] Error getting status:`, error);
+    return c.json({ error: error.message || "Failed to get partner status" }, 500);
   }
 });
 
 app.post("/make-server-494d91eb/partner-needs/:coupleId", async (c) => {
   try {
     const coupleId = c.req.param("coupleId");
-    const { userId, status } = await c.req.json();
+    const body = await c.req.json();
+    const { userId } = body;
 
-    if (!coupleId || !userId || !status) {
-      return c.json({ error: "Couple ID, user ID, and status are required" }, 400);
+    if (!coupleId || !userId) {
+      return c.json({ error: "Couple ID and user ID are required" }, 400);
     }
 
-    const validStatuses: PartnerNeedStatus[] = ["great", "low", "attention", "support"];
-    if (!validStatuses.includes(status)) {
-      return c.json({ error: "Invalid status" }, 400);
+    const validated = validateStatusPayload(body);
+    if (!validated.ok) {
+      return c.json({ error: validated.error }, 400);
     }
 
     const couple = await kv.get(`couple:${coupleId}`);
@@ -2627,23 +2625,53 @@ app.post("/make-server-494d91eb/partner-needs/:coupleId", async (c) => {
       return c.json({ error: "User is not part of this couple" }, 403);
     }
 
-    const needs = await getPartnerNeedsRecord(coupleId);
+    const record = await getPartnerStatusRecord(coupleId);
     const now = new Date().toISOString();
+    const payload = { ...validated.data, updatedAt: now };
 
     if (userId === couple.user1Id) {
-      needs.user1Status = status;
-      needs.user1UpdatedAt = now;
+      record.user1 = payload;
     } else {
-      needs.user2Status = status;
-      needs.user2UpdatedAt = now;
+      record.user2 = payload;
     }
 
-    await kv.set(`partner_needs:${coupleId}`, needs);
+    await kv.set(`partner_needs:${coupleId}`, record);
 
-    return c.json({ success: true, partnerNeeds: needs });
+    const sender = await kv.get(`user:${userId}`);
+    const receiverId = couple.user1Id === userId ? couple.user2Id : couple.user1Id;
+    const receiver = await kv.get(`user:${receiverId}`);
+    const copy = getStatusNotificationCopy(validated.data.statusId, sender?.displayName || "Your partner");
+    const appUrl = Deno.env.get("APP_URL") || "https://pulse-one-umber.vercel.app";
+
+    if (receiver?.fcmToken) {
+      try {
+        await sendFcmPush(
+          receiver.fcmToken,
+          {
+            title: copy.pushTitle(sender?.displayName || "Your partner"),
+            body: copy.pushBody(sender?.displayName || "Your partner"),
+            icon: "/icon-192.png",
+            badge: "/icon-192.png",
+          },
+          {
+            type: "partner-status",
+            coupleId,
+            senderId: userId,
+            receiverId,
+            statusId: validated.data.statusId,
+            url: `${appUrl}/?screen=home`,
+            tag: `partner-status-${coupleId}-${userId}`,
+          },
+        );
+      } catch (pushError) {
+        console.log(`[Partner Status] FCM push failed:`, pushError);
+      }
+    }
+
+    return c.json({ success: true, partnerStatus: record, partnerNeeds: record });
   } catch (error: any) {
-    console.error(`[Partner Needs] Error updating status:`, error);
-    return c.json({ error: error.message || "Failed to update partner needs status" }, 500);
+    console.error(`[Partner Status] Error updating status:`, error);
+    return c.json({ error: error.message || "Failed to update partner status" }, 500);
   }
 });
 

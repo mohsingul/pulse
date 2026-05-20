@@ -7,16 +7,16 @@ import { CalendarRemindersHome } from '@/app/components/CalendarRemindersHome';
 import { SharkModeHomeCard } from '@/app/components/SharkModeHomeCard';
 import { DailyChallenge } from '@/app/components/DailyChallenge';
 import { Sparkles, Clock, History, User, Bell, Calendar, HandHeart } from 'lucide-react';
-import { todayAPI, notificationAPI, sharkModeAPI, partnerNeedsAPI, calendarAPI } from '@/utils/api';
+import { todayAPI, notificationAPI, sharkModeAPI, partnerStatusAPI, calendarAPI } from '@/utils/api';
 import { getUpcomingCalendarReminders } from '@/app/constants/calendar';
 import { formatDistanceToNow } from 'date-fns';
-import { PartnerNeedsBanner } from '@/app/components/PartnerNeedsBanner';
-import { PartnerNeedsSheet } from '@/app/components/PartnerNeedsSheet';
+import { PartnerStatusHomeCard } from '@/app/components/PartnerStatusHomeCard';
+import { PartnerStatusSheet } from '@/app/components/PartnerStatusSheet';
 import {
-  getPartnerStatusFromRecord,
-  getPartnerNeedLevel,
-  type PartnerNeedStatus,
-} from '@/app/constants/partnerNeeds';
+  getUserStatusFromRecord,
+  getPartnerStatusMeta,
+  type PartnerStatusData,
+} from '@/app/constants/partnerStatus';
 
 interface HomeScreenProps {
   userId: string;
@@ -53,19 +53,19 @@ export function HomeScreen({
   const [nudgeCount, setNudgeCount] = useState(0);
   const [showNudgeTooltip, setShowNudgeTooltip] = useState(false);
   const [sharkMode, setSharkMode] = useState<any>(null);
-  const [partnerNeeds, setPartnerNeeds] = useState<any>(null);
-  const [showPartnerNeedsSheet, setShowPartnerNeedsSheet] = useState(false);
+  const [partnerStatusRecord, setPartnerStatusRecord] = useState<any>(null);
+  const [showPartnerStatusSheet, setShowPartnerStatusSheet] = useState(false);
   const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
 
   useEffect(() => {
     fetchTodayCard();
     fetchSharkMode();
-    fetchPartnerNeeds();
+    fetchPartnerStatus();
     fetchCalendarEvents();
     const interval = setInterval(() => {
       fetchTodayCard();
       fetchSharkMode();
-      fetchPartnerNeeds();
+      fetchPartnerStatus();
       fetchCalendarEvents();
     }, 1000); // Refresh every 1s for near-instant updates
     return () => clearInterval(interval);
@@ -93,12 +93,12 @@ export function HomeScreen({
     }
   };
 
-  const fetchPartnerNeeds = async () => {
+  const fetchPartnerStatus = async () => {
     try {
-      const response = await partnerNeedsAPI.get(coupleId);
-      setPartnerNeeds(response.partnerNeeds);
+      const response = await partnerStatusAPI.get(coupleId);
+      setPartnerStatusRecord(response.partnerStatus ?? response.partnerNeeds);
     } catch (error) {
-      console.error('Error fetching partner needs:', error);
+      console.error('Error fetching partner status:', error);
     }
   };
 
@@ -111,9 +111,95 @@ export function HomeScreen({
     }
   };
 
-  const handleUpdatePartnerNeeds = async (status: PartnerNeedStatus) => {
-    await partnerNeedsAPI.update(coupleId, userId, status);
-    await fetchPartnerNeeds();
+  const handleUpdatePartnerStatus = async (data: Omit<PartnerStatusData, 'updatedAt'>) => {
+    await partnerStatusAPI.update(coupleId, userId, data);
+    await fetchPartnerStatus();
+  };
+
+  const handleSendLove = async () => {
+    try {
+      await notificationAPI.sendMessageUpdate(
+        coupleId,
+        userId,
+        `Sending you love ❤️ — ${userName}`,
+      );
+      alert(`Love sent to ${partnerName}! 💕`);
+    } catch {
+      alert('Could not send — try a nudge instead.');
+    }
+  };
+
+  const handleThinkingOfYou = async () => {
+    if (nudgeCount >= 3) {
+      setShowNudgeTooltip(true);
+      setTimeout(() => setShowNudgeTooltip(false), 2000);
+      return;
+    }
+    try {
+      await notificationAPI.sendNudge(coupleId, userId);
+      setNudgeCount(nudgeCount + 1);
+      alert(`Thinking of you sent to ${partnerName}! 💗`);
+    } catch {
+      alert('Failed to send. Please try again.');
+    }
+  };
+
+  const handleCallPartner = () => {
+    alert(`Call ${partnerName} 💕\n\nUse your phone app to reach them — add their number to contacts for one-tap calling.`);
+  };
+
+  const handleSuggestionAction = async (action: string) => {
+    switch (action) {
+      case 'nudge':
+        await handleThinkingOfYou();
+        break;
+      case 'call':
+        handleCallPartner();
+        break;
+      case 'encourage':
+        try {
+          await notificationAPI.sendMessageUpdate(
+            coupleId,
+            userId,
+            `You're on my mind today. I'm here for you ❤️`,
+          );
+          alert(`Encouragement sent to ${partnerName}!`);
+        } catch {
+          alert('Failed to send message.');
+        }
+        break;
+      case 'message':
+      case 'love_note':
+        try {
+          await notificationAPI.sendMessageUpdate(
+            coupleId,
+            userId,
+            action === 'love_note'
+              ? `A love note for you 💕 — ${userName}`
+              : `Hey ${partnerName}, wanted to check in with you 💬`,
+          );
+          alert(`Message sent to ${partnerName}!`);
+        } catch {
+          onUpdatePulse();
+        }
+        break;
+      case 'date':
+      case 'playlist':
+      case 'evening':
+      case 'thoughtful':
+        alert(
+          action === 'date'
+            ? `🌹 Plan a date night with ${partnerName}! Open your calendar to pick a time.`
+            : action === 'playlist'
+              ? `🎵 Create a romantic playlist for ${partnerName} and share the link.`
+              : action === 'evening'
+                ? `🍷 Plan a cozy evening together with ${partnerName}.`
+                : `🎁 Plan something thoughtful for ${partnerName} — even a small surprise counts.`,
+        );
+        break;
+      default:
+        onUpdatePulse();
+    }
   };
 
   const handleSendReassurance = async (reassurance: string) => {
@@ -180,10 +266,10 @@ export function HomeScreen({
   const partnerDoodle = todayCard?.[`${partnerPrefix}Doodle`];
   const partnerUpdatedAt = todayCard?.[`${partnerPrefix}UpdatedAt`];
 
-  const myPartnerNeedStatus = getPartnerStatusFromRecord(partnerNeeds, userId, user1Id);
+  const myStatus = getUserStatusFromRecord(partnerStatusRecord, userId, user1Id);
   const partnerUserId = isUser1 ? user2Id : user1Id;
-  const partnerNeedStatus = getPartnerStatusFromRecord(partnerNeeds, partnerUserId, user1Id);
-  const myNeedLevel = getPartnerNeedLevel(myPartnerNeedStatus);
+  const partnerStatus = getUserStatusFromRecord(partnerStatusRecord, partnerUserId, user1Id);
+  const myStatusMeta = myStatus ? getPartnerStatusMeta(myStatus.statusId) : null;
   const calendarReminders = getUpcomingCalendarReminders(calendarEvents);
 
   return (
@@ -219,15 +305,15 @@ export function HomeScreen({
         <h1 className="text-2xl font-bold">Today</h1>
         <div className="flex items-center space-x-2">
           <button
-            onClick={() => setShowPartnerNeedsSheet(true)}
+            onClick={() => setShowPartnerStatusSheet(true)}
             className="p-2 hover:bg-accent rounded-full transition-colors relative"
-            aria-label="Update how you're feeling"
-            title="How are you feeling?"
+            aria-label="Partner Status"
+            title="❤️ Partner Status"
           >
             <HandHeart className="w-5 h-5" />
-            {myPartnerNeedStatus && myPartnerNeedStatus !== 'great' && (
+            {myStatusMeta && (
               <span className="absolute -bottom-0.5 -right-0.5 text-xs leading-none">
-                {myNeedLevel?.emoji}
+                {myStatusMeta.emoji}
               </span>
             )}
           </button>
@@ -261,9 +347,16 @@ export function HomeScreen({
 
       {/* Content */}
       <div className="flex-1 px-6 py-8 space-y-6 overflow-y-auto">
-        {/* Partner Needs You — partner's check-in (not Shark Mode) */}
-        {partnerNeedStatus && partnerNeedStatus !== 'great' && (
-          <PartnerNeedsBanner partnerName={partnerName} status={partnerNeedStatus} />
+        {/* Partner Status — emotional awareness (not Shark Mode) */}
+        {partnerStatus && (
+          <PartnerStatusHomeCard
+            partnerName={partnerName}
+            status={partnerStatus}
+            onSendLove={handleSendLove}
+            onThinkingOfYou={handleThinkingOfYou}
+            onCall={handleCallPartner}
+            onSuggestionAction={handleSuggestionAction}
+          />
         )}
 
         <CalendarRemindersHome
@@ -461,11 +554,11 @@ export function HomeScreen({
       {/* Install Prompt */}
       <InstallPrompt />
 
-      <PartnerNeedsSheet
-        isOpen={showPartnerNeedsSheet}
-        onClose={() => setShowPartnerNeedsSheet(false)}
-        currentStatus={myPartnerNeedStatus}
-        onSave={handleUpdatePartnerNeeds}
+      <PartnerStatusSheet
+        isOpen={showPartnerStatusSheet}
+        onClose={() => setShowPartnerStatusSheet(false)}
+        currentStatus={myStatus}
+        onSave={handleUpdatePartnerStatus}
       />
     </div>
   );

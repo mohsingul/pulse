@@ -332,17 +332,30 @@ export const challengesAPI = {
     apiRequest(`/challenges/history/${coupleId}`),
 };
 
-// Partner Needs You API
-export const partnerNeedsAPI = {
+// Partner Status API (route: partner-needs for backwards compatibility)
+export const partnerStatusAPI = {
   get: (coupleId: string) =>
     apiRequest(`/partner-needs/${coupleId}`),
 
-  update: (coupleId: string, userId: string, status: 'great' | 'low' | 'attention' | 'support') =>
+  update: (
+    coupleId: string,
+    userId: string,
+    data: {
+      statusId: string;
+      energy?: string;
+      stress?: string;
+      affection?: string;
+      communication?: string;
+    },
+  ) =>
     apiRequest(`/partner-needs/${coupleId}`, {
       method: 'POST',
-      body: JSON.stringify({ userId, status }),
+      body: JSON.stringify({ userId, ...data }),
     }),
 };
+
+/** @deprecated Use partnerStatusAPI */
+export const partnerNeedsAPI = partnerStatusAPI;
 
 // Couple Calendar API
 export const calendarAPI = {
