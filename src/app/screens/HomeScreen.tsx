@@ -7,11 +7,7 @@ import { InstallPrompt } from '@/app/components/InstallPrompt';
 import { SharkModeHomeCard } from '@/app/components/SharkModeHomeCard';
 import { DailyChallenge } from '@/app/components/DailyChallenge';
 import { Heart, SmilePlus, Sparkles, Clock, History, User, Bell, X } from 'lucide-react';
-import { todayAPI, notificationAPI, sharkModeAPI, coupleAPI } from '@/utils/api';
-import { PartnerPulseWidget } from '@/app/components/widgets/PartnerPulseWidget';
-import { AnniversaryCountdownWidget } from '@/app/components/widgets/AnniversaryCountdownWidget';
-import { LastDoodleWidget } from '@/app/components/widgets/LastDoodleWidget';
-import { ThinkingOfYouQuickSend } from '@/app/components/widgets/ThinkingOfYouQuickSend';
+import { todayAPI, notificationAPI, sharkModeAPI } from '@/utils/api';
 import { formatDistanceToNow } from 'date-fns';
 
 interface HomeScreenProps {
@@ -108,22 +104,6 @@ export function HomeScreen({
     }, 1000); // Refresh every 1s for near-instant updates
     return () => clearInterval(interval);
   }, [coupleId]);
-
-  const [anniversaryDate, setAnniversaryDate] = useState<string | null>(null);
-
-  useEffect(() => {
-    const loadCouple = async () => {
-      try {
-        const resp = await coupleAPI.get(userId);
-        // coupleAPI.get(userId) returns couple metadata; try common fields
-        const ann = resp?.couple?.anniversary || resp?.anniversary || resp?.anniversaryDate || null;
-        setAnniversaryDate(ann ?? null);
-      } catch (err) {
-        // ignore
-      }
-    };
-    loadCouple();
-  }, [userId]);
 
   const fetchTodayCard = async () => {
     try {
@@ -327,23 +307,6 @@ export function HomeScreen({
           partnerName={partnerName}
           onViewArchive={() => onViewDailyChallengeArchive?.()}
         />
-
-        {/* Couple Widgets */}
-        <div className="grid grid-cols-2 gap-4">
-          <PartnerPulseWidget
-            partnerName={partnerName}
-            mood={partnerMood}
-            intensity={partnerIntensity}
-            updatedAt={partnerUpdatedAt}
-            onReact={handleReaction}
-          />
-
-          <AnniversaryCountdownWidget anniversaryDate={anniversaryDate} />
-
-          <LastDoodleWidget doodleUrl={partnerDoodle} onOpen={() => partnerDoodle && window.open(partnerDoodle)} />
-
-          <ThinkingOfYouQuickSend coupleId={coupleId} userId={userId} />
-        </div>
 
         {/* Your Mood Summary - Show ONLY the current user's mood */}
         {myMood && myUpdatedAt && (
