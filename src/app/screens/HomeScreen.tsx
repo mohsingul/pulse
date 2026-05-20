@@ -218,7 +218,7 @@ export function HomeScreen({
       )}
 
       {/* Header */}
-      <div className="px-6 py-6 flex items-center justify-between border-b border-border safe-top flex-shrink-0">
+      <div className="px-6 py-4 flex items-center justify-between safe-top flex-shrink-0">
         <h1 className="text-2xl font-bold">Today</h1>
         <div className="flex items-center space-x-2">
           <button
@@ -261,6 +261,14 @@ export function HomeScreen({
           </button>
         </div>
       </div>
+
+      {onPlayTeaseOrPlease && (
+        <HomeTabBar
+          active="today"
+          onToday={() => {}}
+          onTeaseOrPlease={onPlayTeaseOrPlease}
+        />
+      )}
 
       {/* Content */}
       <div className="flex-1 px-6 py-8 space-y-6 overflow-y-auto">
@@ -463,14 +471,6 @@ export function HomeScreen({
 
       {/* Install Prompt */}
       <InstallPrompt />
-
-      {onPlayTeaseOrPlease && (
-        <HomeTabBar
-          active="today"
-          onToday={() => {}}
-          onTeaseOrPlease={onPlayTeaseOrPlease}
-        />
-      )}
 
       <PartnerStatusSheet
         isOpen={showPartnerStatusSheet}

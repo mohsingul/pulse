@@ -111,43 +111,52 @@ export function TeaseOrPleaseScreen({
 
   const completeDrawnCard = () => {
     setDrawnCard(null);
-    setActivePlayer((p) => (p === 0 ? 1 : 0));
+    if (mode !== 'memory' || phase !== 'finished') {
+      setActivePlayer((p) => (p === 0 ? 1 : 0));
+    }
   };
 
   const handleMemoryFlip = (index: number) => {
-    const cell = memoryGrid[index];
-    if (cell.faceUp || cell.matched || flippedIndices.length >= 2) return;
+    if (flippedIndices.length >= 2 || drawnCard) return;
 
-    const next = memoryGrid.map((c, i) =>
+    const cell = memoryGrid[index];
+    if (!cell || cell.faceUp || cell.matched) return;
+
+    const nextGrid = memoryGrid.map((c, i) =>
       i === index ? { ...c, faceUp: true } : c,
     );
     const newFlipped = [...flippedIndices, index];
-    setMemoryGrid(next);
+    setMemoryGrid(nextGrid);
     setFlippedIndices(newFlipped);
 
-    if (newFlipped.length === 2) {
-      const [a, b] = newFlipped;
-      const match = next[a].card.pairId === next[b].card.pairId;
-      setTimeout(() => {
-        if (match) {
-          setMemoryGrid((grid) =>
-            grid.map((c, i) =>
-              i === a || i === b ? { ...c, matched: true, faceUp: true } : c,
-            ),
-          );
-          setDrawnCard(next[a].card);
-          if (next[a].card.kind === 'homerun') setPhase('finished');
-        } else {
-          setMemoryGrid((grid) =>
-            grid.map((c, i) =>
-              i === a || i === b ? { ...c, faceUp: false } : c,
-            ),
-          );
-          setActivePlayer((p) => (p === 0 ? 1 : 0));
+    if (newFlipped.length < 2) return;
+
+    const [a, b] = newFlipped;
+    const cardA = nextGrid[a].card;
+    const cardB = nextGrid[b].card;
+    const isMatch = cardA.pairId === cardB.pairId;
+
+    window.setTimeout(() => {
+      if (isMatch) {
+        setMemoryGrid((grid) =>
+          grid.map((c, i) =>
+            i === a || i === b ? { ...c, matched: true, faceUp: true } : c,
+          ),
+        );
+        setDrawnCard(cardA);
+        if (cardA.kind === 'homerun') {
+          setPhase('finished');
         }
-        setFlippedIndices([]);
-      }, 700);
-    }
+      } else {
+        setMemoryGrid((grid) =>
+          grid.map((c, i) =>
+            i === a || i === b ? { ...c, faceUp: false } : c,
+          ),
+        );
+        setActivePlayer((p) => (p === 0 ? 1 : 0));
+      }
+      setFlippedIndices([]);
+    }, 800);
   };
 
   const checkHandForMatch = (cards: TeasePleaseCard[]) => {
@@ -404,7 +413,9 @@ export function TeaseOrPleaseScreen({
                   }`}
                 >
                   {cell.faceUp || cell.matched ? (
-                    <span className="text-lg">{getKindMeta(cell.card.kind).emoji}</span>
+                    <span className="text-[7px] sm:text-[8px] font-bold uppercase leading-tight text-center px-0.5 line-clamp-4">
+                      {cell.card.title}
+                    </span>
                   ) : (
                     <span className="text-[8px] font-bold text-purple-900/70 leading-none text-center px-0.5">
                       T/O P
@@ -448,12 +459,17 @@ export function TeaseOrPleaseScreen({
         )}
 
         {drawnCard && (
-          <CardReveal
-            card={drawnCard}
-            partnerName={partnerName}
-            onDone={completeDrawnCard}
-            onSkip={completeDrawnCard}
-          />
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 safe-top safe-bottom">
+            <div className="w-full max-w-md max-h-[90vh] overflow-y-auto">
+              <CardReveal
+                card={drawnCard}
+                partnerName={partnerName}
+                onDone={completeDrawnCard}
+                onSkip={completeDrawnCard}
+                isMatch={mode === 'memory'}
+              />
+            </div>
+          </div>
         )}
 
         {phase === 'finished' && (
@@ -486,17 +502,24 @@ function CardReveal({
   partnerName,
   onDone,
   onSkip,
+  isMatch = false,
 }: {
   card: TeasePleaseCard;
   partnerName: string;
   onDone: () => void;
   onSkip: () => void;
+  isMatch?: boolean;
 }) {
   const meta = getKindMeta(card.kind);
   const twoLine = cardHasInstruction(card);
 
   return (
     <div className="max-w-md mx-auto space-y-6">
+      {isMatch && (
+        <p className="text-center text-sm font-semibold text-rose-300 uppercase tracking-wider">
+          It&apos;s a match — do the task
+        </p>
+      )}
       <div
         className={`relative rounded-3xl border-4 ${meta.border} p-8 shadow-2xl ${meta.glow} overflow-hidden`}
         style={{

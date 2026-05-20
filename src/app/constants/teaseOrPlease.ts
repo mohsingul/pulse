@@ -237,13 +237,13 @@ const SHEET_STEAMY: TeasePleaseCardDef[] = [
 /** PDF sheet 3 — wild, bases, home run, bonus, blanks (12 slots) */
 const SHEET_FINALE: TeasePleaseCardDef[] = [
   {
-    pairId: 'wild-a',
+    pairId: 'wild-card',
     kind: 'wild',
     title: 'WILD CARD',
     task: 'YOUR CHOICE FOR 1 MINUTE',
   },
   {
-    pairId: 'wild-b',
+    pairId: 'wild-card',
     kind: 'wild',
     title: 'WILD CARD',
     task: 'YOUR CHOICE FOR 1 MINUTE',

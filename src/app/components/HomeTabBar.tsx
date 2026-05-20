@@ -12,10 +12,10 @@ interface HomeTabBarProps {
 export function HomeTabBar({ active, onToday, onTeaseOrPlease }: HomeTabBarProps) {
   return (
     <nav
-      className="flex-shrink-0 border-t border-border bg-background/95 backdrop-blur-md safe-bottom px-2 pt-2 pb-2"
+      className="flex-shrink-0 border-b border-border bg-background/95 backdrop-blur-md px-4 py-2"
       aria-label="Home sections"
     >
-      <div className="flex gap-2 max-w-lg mx-auto">
+      <div className="flex gap-2 max-w-lg mx-auto w-full">
         <button
           type="button"
           onClick={onToday}
