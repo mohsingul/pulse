@@ -1,5 +1,5 @@
 
-  This Webapp is deployed on Vercel https://pulse-one-umber.vercel.app/
+  This Webapp is deployed on Vercel https://aimopulse.vercel.app/
 
   ## Running the code
 

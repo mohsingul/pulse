@@ -2628,7 +2628,7 @@ app.post("/make-server-494d91eb/partner-needs/:coupleId", async (c) => {
     const receiverId = couple.user1Id === userId ? couple.user2Id : couple.user1Id;
     const receiver = await kv.get(`user:${receiverId}`);
     const copy = getStatusNotificationCopy(validated.data.statusId, sender?.displayName || "Your partner");
-    const appUrl = Deno.env.get("APP_URL") || "https://pulse-one-umber.vercel.app";
+    const appUrl = Deno.env.get("APP_URL") || "https://aimopulse.vercel.app";
 
     let pushSent = false;
     let pushError: string | null = null;

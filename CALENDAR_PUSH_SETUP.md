@@ -9,7 +9,7 @@ In [Supabase Dashboard → Project Settings → Edge Functions → Secrets](http
 | Secret | Example |
 |--------|---------|
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | Full Firebase service account JSON (same as other push) |
-| `APP_URL` | `https://pulse-one-umber.vercel.app` |
+| `APP_URL` | `https://aimopulse.vercel.app` |
 | `CRON_SECRET` | A long random string (protects the cron endpoint) |
 
 ## Daily schedule

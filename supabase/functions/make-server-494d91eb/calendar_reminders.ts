@@ -1,7 +1,7 @@
 import * as kv from "./kv_store.ts";
 
 const REMINDER_DAYS = [5, 3, 1, 0] as const;
-const APP_URL = Deno.env.get("APP_URL") || "https://pulse-one-umber.vercel.app";
+const APP_URL = Deno.env.get("APP_URL") || "https://aimopulse.vercel.app";
 
 type CalendarEventType = "anniversary" | "birthday" | "trip" | "important";
 
