@@ -14,14 +14,15 @@ import { showLocalNotification } from '@/utils/firebase-notifications';
 
 function onForegroundPush(payload: any) {
   console.log('[Notifications] Foreground message:', payload);
-  if (Notification.permission === 'granted') {
-    showLocalNotification(payload.notification?.title || 'Aimo Pulse', {
-      body: payload.notification?.body || payload.data?.body || '',
-      icon: '/icon-192.png',
-      tag: payload.data?.tag || payload.data?.type || 'aimo-pulse',
-      data: payload.data,
-    });
-  }
+  if (Notification.permission !== 'granted') return;
+
+  const tag = payload.data?.tag || `${payload.data?.type || 'aimo'}-${payload.data?.notificationId || payload.data?.senderId || ''}`;
+  showLocalNotification(payload.data?.title || payload.notification?.title || 'Aimo Pulse', {
+    body: payload.data?.body || payload.notification?.body || '',
+    icon: '/icon-192.png',
+    tag,
+    data: payload.data,
+  });
 }
 
 export interface NotificationState {

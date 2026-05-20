@@ -116,92 +116,6 @@ export function HomeScreen({
     await fetchPartnerStatus();
   };
 
-  const handleSendLove = async () => {
-    try {
-      await notificationAPI.sendMessageUpdate(
-        coupleId,
-        userId,
-        `Sending you love ❤️ — ${userName}`,
-      );
-      alert(`Love sent to ${partnerName}! 💕`);
-    } catch {
-      alert('Could not send — try a nudge instead.');
-    }
-  };
-
-  const handleThinkingOfYou = async () => {
-    if (nudgeCount >= 3) {
-      setShowNudgeTooltip(true);
-      setTimeout(() => setShowNudgeTooltip(false), 2000);
-      return;
-    }
-    try {
-      await notificationAPI.sendNudge(coupleId, userId);
-      setNudgeCount(nudgeCount + 1);
-      alert(`Thinking of you sent to ${partnerName}! 💗`);
-    } catch {
-      alert('Failed to send. Please try again.');
-    }
-  };
-
-  const handleCallPartner = () => {
-    alert(`Call ${partnerName} 💕\n\nUse your phone app to reach them — add their number to contacts for one-tap calling.`);
-  };
-
-  const handleSuggestionAction = async (action: string) => {
-    switch (action) {
-      case 'nudge':
-        await handleThinkingOfYou();
-        break;
-      case 'call':
-        handleCallPartner();
-        break;
-      case 'encourage':
-        try {
-          await notificationAPI.sendMessageUpdate(
-            coupleId,
-            userId,
-            `You're on my mind today. I'm here for you ❤️`,
-          );
-          alert(`Encouragement sent to ${partnerName}!`);
-        } catch {
-          alert('Failed to send message.');
-        }
-        break;
-      case 'message':
-      case 'love_note':
-        try {
-          await notificationAPI.sendMessageUpdate(
-            coupleId,
-            userId,
-            action === 'love_note'
-              ? `A love note for you 💕 — ${userName}`
-              : `Hey ${partnerName}, wanted to check in with you 💬`,
-          );
-          alert(`Message sent to ${partnerName}!`);
-        } catch {
-          onUpdatePulse();
-        }
-        break;
-      case 'date':
-      case 'playlist':
-      case 'evening':
-      case 'thoughtful':
-        alert(
-          action === 'date'
-            ? `🌹 Plan a date night with ${partnerName}! Open your calendar to pick a time.`
-            : action === 'playlist'
-              ? `🎵 Create a romantic playlist for ${partnerName} and share the link.`
-              : action === 'evening'
-                ? `🍷 Plan a cozy evening together with ${partnerName}.`
-                : `🎁 Plan something thoughtful for ${partnerName} — even a small surprise counts.`,
-        );
-        break;
-      default:
-        onUpdatePulse();
-    }
-  };
-
   const handleSendReassurance = async (reassurance: string) => {
     try {
       await sharkModeAPI.sendReassurance(coupleId, userId, reassurance);
@@ -349,14 +263,7 @@ export function HomeScreen({
       <div className="flex-1 px-6 py-8 space-y-6 overflow-y-auto">
         {/* Partner Status — emotional awareness (not Shark Mode) */}
         {partnerStatus && (
-          <PartnerStatusHomeCard
-            partnerName={partnerName}
-            status={partnerStatus}
-            onSendLove={handleSendLove}
-            onThinkingOfYou={handleThinkingOfYou}
-            onCall={handleCallPartner}
-            onSuggestionAction={handleSuggestionAction}
-          />
+          <PartnerStatusHomeCard partnerName={partnerName} status={partnerStatus} />
         )}
 
         <CalendarRemindersHome

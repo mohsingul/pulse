@@ -19,9 +19,9 @@ messaging.onBackgroundMessage((payload) => {
   console.log('[Firebase SW] Background message received:', payload);
 
   const notificationTitle =
-    payload.notification?.title || payload.data?.title || 'Aimo Pulse';
+    payload.data?.title || payload.notification?.title || 'Aimo Pulse';
   const notificationBody =
-    payload.notification?.body || payload.data?.body || 'You have a new update';
+    payload.data?.body || payload.notification?.body || 'You have a new update';
 
   const notificationOptions = {
     body: notificationBody,

@@ -158,19 +158,6 @@ export function setupForegroundMessageListener(
   const unsubscribe = onMessage(messaging, (payload) => {
     console.log('[Firebase] Foreground message received:', payload);
     onMessageReceived(payload);
-
-    // Show notification if app is in foreground
-    if (Notification.permission === 'granted') {
-      showLocalNotification(
-        payload.notification?.title || 'Aimo Pulse',
-        {
-          body: payload.notification?.body || 'You have a new update',
-          icon: payload.notification?.icon || '/icon-192.png',
-          tag: 'aimo-pulse',
-          data: payload.data,
-        }
-      );
-    }
   });
 
   return unsubscribe;

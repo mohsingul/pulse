@@ -155,28 +155,21 @@ async function sendFcmPush(
   notification: { title: string; body: string; icon?: string; badge?: string },
   data: Record<string, unknown> = {},
 ) {
-  const normalizedData = normalizeFcmData(data);
+  // Data-only payload: top-level + webpush notification fields cause duplicate alerts on web/PWA
+  const normalizedData = normalizeFcmData({
+    ...data,
+    title: notification.title,
+    body: notification.body,
+    icon: notification.icon || '/icon-192.png',
+    badge: notification.badge || '/icon-192.png',
+  });
   const message = {
     message: {
       token: fcmToken,
-      notification: {
-        title: notification.title,
-        body: notification.body,
-      },
       data: normalizedData,
       webpush: {
         headers: {
           Urgency: 'high',
-        },
-        notification: {
-          title: notification.title,
-          body: notification.body,
-          icon: notification.icon || '/icon-192.png',
-          badge: notification.badge || '/icon-192.png',
-          tag: normalizedData.tag || undefined,
-          data: {
-            url: normalizedData.url || '/',
-          },
         },
         fcmOptions: {
           link: normalizedData.url || '/',
@@ -218,23 +211,13 @@ async function sendFcmPush(
   const legacyPayload = {
     to: fcmToken,
     priority: 'high',
-    notification: {
-      title: notification.title,
-      body: notification.body,
-      icon: notification.icon || '/icon-192.png',
-      badge: notification.badge || '/icon-192.png',
-      click_action: '/',
-    },
     data: normalizedData,
     webpush: {
       headers: {
         Urgency: 'high',
       },
-      notification: {
-        title: notification.title,
-        body: notification.body,
-        icon: notification.icon || '/icon-192.png',
-        badge: notification.badge || '/icon-192.png',
+      fcmOptions: {
+        link: normalizedData.url || '/',
       },
     },
   };
@@ -1432,6 +1415,7 @@ app.post("/make-server-494d91eb/notifications/nudge", async (c) => {
             senderId,
             receiverId,
             notificationId,
+            tag: `nudge-${coupleId}-${senderId}`,
           },
         );
         notificationSent = true;
@@ -1520,6 +1504,7 @@ app.post("/make-server-494d91eb/notifications/mood-update", async (c) => {
             notificationId,
             mood,
             intensity,
+            tag: `mood-update-${coupleId}-${senderId}`,
           },
         );
         notificationSent = true;
@@ -1595,6 +1580,7 @@ app.post("/make-server-494d91eb/notifications/message-update", async (c) => {
             receiverId,
             notificationId,
             message,
+            tag: `message-update-${coupleId}-${senderId}`,
           },
         );
         notificationSent = true;
@@ -1677,6 +1663,7 @@ app.post("/make-server-494d91eb/notifications/doodle-update", async (c) => {
             senderId,
             receiverId,
             notificationId,
+            tag: `doodle-update-${coupleId}-${senderId}`,
           },
         );
         notificationSent = true;
