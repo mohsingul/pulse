@@ -1,25 +1,67 @@
 /**
- * Tease or Please — intimate couples card game
- * Inspired by the printable game rules (matching pairs, tease vs please, wild, home run).
- * Original prompts for in-app use. 18+ only.
+ * Tease or Please — card text & rules from the printable PDF
+ * (Bee-ingMommy / Danielle). 18+ only. Play responsibly.
  */
 
-export type CardKind = 'tease' | 'please' | 'wild' | 'homerun';
+export type CardKind = 'task' | 'wild' | 'homerun' | 'bonus' | 'blank';
 export type GameMode = 'pleasing' | 'memory' | 'teasing';
-export type HeatLevel = 1 | 2 | 3;
 
 export interface TeasePleaseCardDef {
   pairId: string;
   kind: CardKind;
   title: string;
   task: string;
-  heat: HeatLevel;
-  duration?: string;
+  subtitle?: string;
 }
 
 export interface TeasePleaseCard extends TeasePleaseCardDef {
   id: string;
 }
+
+/** Rules transcribed from PDF page 1 */
+export const OFFICIAL_RULES = {
+  attribution: 'Tease or Please · Bee-ingMommy.blogspot.com · 18+ · Play responsibly',
+  contents: [
+    '72 Game Cards (2 of each card): 62 Task Cards, 4 Wild Cards, 6 Blank Cards',
+    'Timer and supplies needed to tease/please are NOT included',
+  ],
+  object:
+    'Spend quality time with your significant other, teasing or pleasing them as the cards suggest. Remove any cards you are uncomfortable with before you begin.',
+  modes: [
+    {
+      id: 'memory' as GameMode,
+      name: 'Game 1: Tease or Please (Matching)',
+      steps: [
+        'Mix the cards and lay them face down in a square.',
+        'Player 1 flips one card, then another. If they match, perform the task on the card.',
+        'After the task, it is Player 2\'s turn. If they do not match, flip them back and Player 2 goes.',
+        'Game ends when you complete the HOME RUN card.',
+      ],
+    },
+    {
+      id: 'teasing' as GameMode,
+      name: 'Game 2: Teasing (Go Fish)',
+      steps: [
+        'Shuffle all cards. Deal five cards to each player.',
+        'If you are dealt a match, lay it down and complete the task.',
+        'Player 1 asks Player 2 for a card. If Player 2 has it, they give it and complete the task; Player 1 goes again.',
+        'If not, Player 2 says "Quit teasing me." Player 1 draws from the pile.',
+        'If the draw completes the pair they asked for, lay them down and complete the task.',
+        'Game ends when a player gets five matches.',
+      ],
+    },
+    {
+      id: 'pleasing' as GameMode,
+      name: 'Game 3: Pleasing (Drawing)',
+      steps: [
+        'Place all cards in a pile or bowl.',
+        'Player 1 draws a card — both perform the task. Then Player 2 draws.',
+        'Repeat until satisfied or you draw the HOME RUN card.',
+        'You may remove duplicate cards before playing if you do not want to repeat tasks.',
+      ],
+    },
+  ],
+};
 
 export const GAME_MODES: {
   id: GameMode;
@@ -28,277 +70,261 @@ export const GAME_MODES: {
   emoji: string;
 }[] = [
   {
-    id: 'pleasing',
-    label: 'Pleasing',
-    subtitle: 'Take turns drawing cards — perform every task together',
-    emoji: '💋',
-  },
-  {
     id: 'memory',
     label: 'Tease or Please',
-    subtitle: 'Flip two cards — match the pair, then do the dare',
-    emoji: '🔥',
+    subtitle: OFFICIAL_RULES.modes[0].name.replace('Game 1: ', ''),
+    emoji: '🃏',
   },
   {
     id: 'teasing',
     label: 'Teasing',
-    subtitle: 'Collect matching pairs in your hand — quit teasing when they say no',
+    subtitle: 'Go Fish — say "Quit teasing me"',
     emoji: '😈',
   },
+  {
+    id: 'pleasing',
+    label: 'Pleasing',
+    subtitle: 'Draw from the pile · take turns',
+    emoji: '💋',
+  },
 ];
 
-/** Core task library — each pairId appears twice in the full deck */
+/** All unique cards from PDF pages 9–14 (verbatim / faithful transcription) */
 export const CARD_LIBRARY: TeasePleaseCardDef[] = [
-  // —— TEASE (anticipation, denial, slow burn) ——
+  { pairId: 'strip-tease', kind: 'task', title: 'Strip Tease', task: 'Strip tease for your partner.' },
+  { pairId: 'lap-dance', kind: 'task', title: 'Lap Dance', task: 'Give your partner a lap dance.' },
   {
-    pairId: 't01',
-    kind: 'tease',
-    title: 'Slow burn',
-    task: 'Whisper what you want to do later tonight — but no touching for the next 3 minutes.',
-    heat: 2,
-    duration: '3 min',
+    pairId: 'kiss-head-toe',
+    kind: 'task',
+    title: 'Kiss Me From Head To Toe',
+    task: 'Kiss your partner from head to toe.',
   },
   {
-    pairId: 't02',
-    kind: 'tease',
-    title: 'Eyes only',
-    task: 'Describe your favorite part of their body in detail while they can only watch you.',
-    heat: 2,
+    pairId: 'senses-hear',
+    kind: 'task',
+    title: '5 Senses: Hear',
+    task: 'Whisper sweet nothings in my ear.',
   },
   {
-    pairId: 't03',
-    kind: 'tease',
-    title: 'Almost kiss',
-    task: 'Hover your lips near theirs for 20 seconds — pull away if they lean in.',
-    heat: 2,
-    duration: '20 sec',
+    pairId: 'senses-smell',
+    kind: 'task',
+    title: '5 Senses: Smell',
+    task: 'Spritz a body part with a sweet scent — can your partner find it?',
   },
   {
-    pairId: 't04',
-    kind: 'tease',
-    title: 'Blind desire',
-    task: 'Blindfold them. Trace one line from neck to collarbone with one finger only.',
-    heat: 3,
+    pairId: 'senses-see',
+    kind: 'task',
+    title: '5 Senses: See',
+    task: 'Change into something sexy and give me a mini show.',
   },
   {
-    pairId: 't05',
-    kind: 'tease',
-    title: 'Voice note',
-    task: 'Record a 15-second voice note telling them exactly what you’re thinking about them.',
-    heat: 2,
-    duration: '15 sec',
+    pairId: 'senses-touch',
+    kind: 'task',
+    title: '5 Senses: Touch',
+    task: 'Gently rub your hands up and down my body.',
   },
   {
-    pairId: 't06',
-    kind: 'tease',
-    title: 'Hands tied',
-    task: 'Let them tie your hands (scarf works). They get to tease you for one minute — you can’t touch back.',
-    heat: 3,
-    duration: '1 min',
+    pairId: 'senses-taste',
+    kind: 'task',
+    title: '5 Senses: Taste',
+    task: 'Taste test something from the fridge off my body.',
   },
   {
-    pairId: 't07',
-    kind: 'tease',
-    title: 'Ice & heat',
-    task: 'Hold an ice cube in your mouth, then kiss their wrist once. Ask if they want more.',
-    heat: 3,
+    pairId: 'talk-dirty',
+    kind: 'task',
+    title: 'Talk Dirty To Me',
+    task: 'Tell me what you want me to do to you.',
   },
   {
-    pairId: 't08',
-    kind: 'tease',
-    title: 'Outfit reveal',
-    task: 'Step away and change into something that makes you feel sexy. Come back — no words for 10 seconds.',
-    heat: 2,
+    pairId: 'remember-when',
+    kind: 'task',
+    title: 'Remember When',
+    task: 'Share your favorite sexual memory.',
   },
   {
-    pairId: 't09',
-    kind: 'tease',
-    title: 'Text tease',
-    task: 'Send them one text right now they’re not allowed to open until you say “now.”',
-    heat: 1,
+    pairId: 'red-light',
+    kind: 'task',
+    title: 'Red Light, Green Light',
+    task: 'When things get heated up, randomly stop.',
   },
   {
-    pairId: 't10',
-    kind: 'tease',
-    title: 'Breath play (light)',
-    task: 'Breathe slowly on the back of their neck for 30 seconds without kissing.',
-    heat: 2,
-    duration: '30 sec',
+    pairId: 'sneak-peak',
+    kind: 'task',
+    title: 'Sneak Peak',
+    task: 'Flash me your goodies.',
   },
   {
-    pairId: 't11',
-    kind: 'tease',
-    title: 'Strip one',
-    task: 'Remove exactly one item of your clothing — then make them wait 2 minutes for the next move.',
-    heat: 3,
-    duration: '2 min',
+    pairId: 'math-69',
+    kind: 'task',
+    title: '(9×8)−3 = ?',
+    subtitle: "Let's practice some math",
+    task: "Let's practice some math — (the answer is 69).",
   },
   {
-    pairId: 't12',
-    kind: 'tease',
-    title: 'Fantasy hint',
-    task: 'Share the first sentence of a fantasy you’ve never said out loud. Stop there.',
-    heat: 3,
-  },
-
-  // —— PLEASE (giving pleasure, romance, heat) ——
-  {
-    pairId: 'p01',
-    kind: 'please',
-    title: 'Deep kiss',
-    task: 'Kiss them slowly for 45 seconds — hands in their hair or on their waist only.',
-    heat: 2,
-    duration: '45 sec',
+    pairId: 'ice-ice-baby',
+    kind: 'task',
+    title: 'Ice Ice Baby',
+    task: "Rub an ice cube anywhere on your partner's body.",
   },
   {
-    pairId: 'p02',
-    kind: 'please',
-    title: 'Massage',
-    task: 'Give a 2-minute massage wherever they point — use oil or lotion if you have it.',
-    heat: 2,
-    duration: '2 min',
+    pairId: 'no-hands-30',
+    kind: 'task',
+    title: 'No Hands Allowed For 30 Seconds',
+    task: 'Kiss me somewhere naughty.',
+    subtitle: '30 seconds',
   },
   {
-    pairId: 'p03',
-    kind: 'please',
-    title: 'Praise',
-    task: 'Tell them three specific things that turn you on about them — look them in the eyes.',
-    heat: 1,
+    pairId: 'play-yourself',
+    kind: 'task',
+    title: 'Play With Yourself For 15 Seconds',
+    task: 'Play with yourself for 15 seconds.',
   },
   {
-    pairId: 'p04',
-    kind: 'please',
-    title: 'Neck worship',
-    task: 'Kiss and lightly nibble along their neck and jawline for one minute.',
-    heat: 3,
-    duration: '1 min',
+    pairId: 'makeout-2',
+    kind: 'task',
+    title: '2 Minute Make Out Session',
+    task: '2 minute make out session — no peeking at the timer.',
   },
   {
-    pairId: 'p05',
-    kind: 'please',
-    title: 'Dance for them',
-    task: 'Put on one song and move for them however you want — they can’t touch until the song ends.',
-    heat: 2,
+    pairId: 'remove-yours',
+    kind: 'task',
+    title: 'Remove An Article Of Clothing',
+    task: 'Remove an article of clothing — your choice.',
   },
   {
-    pairId: 'p06',
-    kind: 'please',
-    title: 'Undress them',
-    task: 'Slowly remove one layer they choose — kiss each new inch of skin you reveal.',
-    heat: 3,
+    pairId: 'remove-partners',
+    kind: 'task',
+    title: 'Remove An Article Of Clothing',
+    task: "Remove an article of clothing — partner's choice.",
   },
   {
-    pairId: 'p07',
-    kind: 'please',
-    title: 'Feed & sip',
-    task: 'Feed them something sweet or share a drink from the same glass — maintain eye contact.',
-    heat: 1,
+    pairId: 'pick-up',
+    kind: 'task',
+    title: 'Try To Pick Me Up',
+    task: 'Give me your best pick up line.',
   },
   {
-    pairId: 'p08',
-    kind: 'please',
-    title: 'Full body scan',
-    task: 'With flat palms, trace from shoulders to hips over clothes (or skin) for 90 seconds.',
-    heat: 2,
-    duration: '90 sec',
+    pairId: 'sex-position',
+    kind: 'task',
+    title: 'Choose A New Sex Position',
+    task: 'Practice it fully clothed.',
   },
   {
-    pairId: 'p09',
-    kind: 'please',
-    title: 'Ear whispers',
-    task: 'Whisper five dirty-sweet things only they get to hear.',
-    heat: 3,
+    pairId: 'make-laugh',
+    kind: 'task',
+    title: 'Make Me Laugh',
+    task: 'Succeed and you can do whatever you want to me for 30 seconds.',
   },
   {
-    pairId: 'p10',
-    kind: 'please',
-    title: 'Shower invite',
-    task: 'Draw them a warm shower or bath — wash one part of them they choose.',
-    heat: 3,
+    pairId: 'sex-toy',
+    kind: 'task',
+    title: 'Use Your Favorite Sexual Toy On Your Partner',
+    task: 'Buzz buzz anyone.',
   },
   {
-    pairId: 'p11',
-    kind: 'please',
-    title: 'Mirror moment',
-    task: 'Stand behind them at a mirror — tell them what you see that drives you wild.',
-    heat: 2,
+    pairId: 'head-south',
+    kind: 'task',
+    title: 'Head Down South',
+    task: 'Head down south for a minute or two.',
   },
   {
-    pairId: 'p12',
-    kind: 'please',
-    title: 'Bed reset',
-    task: 'Lead them to bed, fresh sheets if you can — lie together 2 minutes, only kissing and holding.',
-    heat: 2,
-    duration: '2 min',
-  },
-  {
-    pairId: 'p13',
-    kind: 'please',
-    title: 'Their choice',
-    task: 'Ask “What do you want right now?” — do exactly that for 3 minutes (within your comfort).',
-    heat: 3,
-    duration: '3 min',
-  },
-  {
-    pairId: 'p14',
-    kind: 'please',
-    title: 'Love letter',
-    task: 'Write one sentence on their skin with your finger (or lipstick) — they pick the word.',
-    heat: 2,
-  },
-
-  // —— WILD ——
-  {
-    pairId: 'w01',
+    pairId: 'wild-a',
     kind: 'wild',
-    title: 'Wild card',
-    task: 'Your partner picks: draw another card from the deck — you perform it no matter tease or please.',
-    heat: 3,
+    title: 'Wild Card',
+    task: 'Your choice for 1 minute.',
   },
   {
-    pairId: 'w02',
+    pairId: 'wild-b',
     kind: 'wild',
-    title: 'Role swap',
-    task: 'Swap roles for the next 2 cards — the usual receiver gives all the pleasure.',
-    heat: 3,
+    title: 'Wild Card',
+    task: 'Your choice for 1 minute.',
   },
   {
-    pairId: 'w03',
-    kind: 'wild',
-    title: 'Double or nothing',
-    task: 'Do the next card together at the same time — sync or laugh trying.',
-    heat: 2,
+    pairId: 'first-base',
+    kind: 'task',
+    title: 'First Base',
+    task: "Kiss me like it's our first time.",
   },
   {
-    pairId: 'w04',
-    kind: 'wild',
-    title: 'Timer challenge',
-    task: 'Set a 5-minute timer. Whatever happens before it rings stays between you tonight.',
-    heat: 3,
-    duration: '5 min',
+    pairId: 'second-base',
+    kind: 'task',
+    title: 'Second Base',
+    task: 'Show the twins some love.',
   },
-
-  // —— HOME RUN ——
   {
-    pairId: 'hr',
+    pairId: 'third-base',
+    kind: 'task',
+    title: 'Third Base',
+    task: 'Show me what your hands can do.',
+  },
+  {
+    pairId: 'homerun',
     kind: 'homerun',
-    title: 'Home run',
-    task: 'Finale: each share one fantasy for tonight. Then decide together — tease first, or please all night.',
-    heat: 3,
+    title: 'Home Run',
+    task: 'Just do it already.',
   },
+  {
+    pairId: 'foot-massage',
+    kind: 'bonus',
+    title: 'Mini Foot Massage',
+    task: 'Give a mini foot massage.',
+  },
+  {
+    pairId: 'back-massage',
+    kind: 'bonus',
+    title: '3 Minute Back Massage',
+    task: 'Give a 3 minute back massage.',
+  },
+  {
+    pairId: 'another-turn',
+    kind: 'bonus',
+    title: 'Take Another Turn',
+    task: 'Take another turn.',
+  },
+  { pairId: 'blank-1', kind: 'blank', title: 'Blank Card', task: 'Create your own task.' },
+  { pairId: 'blank-2', kind: 'blank', title: 'Blank Card', task: 'Create your own task.' },
+  { pairId: 'blank-3', kind: 'blank', title: 'Blank Card', task: 'Create your own task.' },
 ];
+
+const CUSTOM_BLANK_KEY = 'tease_or_please_blanks';
+
+export function getCustomBlankTasks(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(CUSTOM_BLANK_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function setCustomBlankTask(pairId: string, task: string) {
+  const all = getCustomBlankTasks();
+  all[pairId] = task;
+  localStorage.setItem(CUSTOM_BLANK_KEY, JSON.stringify(all));
+}
 
 export function buildDeck(includeDuplicates = true): TeasePleaseCard[] {
+  const customs = getCustomBlankTasks();
   const cards: TeasePleaseCard[] = [];
   let idx = 0;
 
   for (const def of CARD_LIBRARY) {
-    const copies = def.kind === 'homerun' ? 1 : includeDuplicates ? 2 : 1;
+    if (def.kind === 'blank') {
+      const customTask = customs[def.pairId];
+      const resolved = customTask?.trim()
+        ? { ...def, task: customTask.trim() }
+        : def;
+      const copies = includeDuplicates ? 2 : 1;
+      for (let c = 0; c < copies; c++) {
+        cards.push({ ...resolved, id: `${def.pairId}-${c}-${idx++}` });
+      }
+      continue;
+    }
+
+    const copies =
+      def.kind === 'homerun' ? 1 : includeDuplicates ? 2 : 1;
     for (let c = 0; c < copies; c++) {
-      cards.push({
-        ...def,
-        id: `${def.pairId}-${c}-${idx++}`,
-      });
+      cards.push({ ...def, id: `${def.pairId}-${c}-${idx++}` });
     }
   }
 
@@ -322,47 +348,45 @@ export function getKindMeta(kind: CardKind): {
   glow: string;
 } {
   switch (kind) {
-    case 'tease':
+    case 'task':
       return {
-        label: 'Tease',
-        emoji: '😈',
-        gradient: 'from-rose-950/90 via-fuchsia-900/80 to-purple-950/90',
-        border: 'border-fuchsia-500/40',
-        glow: 'shadow-fuchsia-500/25',
-      };
-    case 'please':
-      return {
-        label: 'Please',
-        emoji: '💋',
-        gradient: 'from-rose-900/90 via-pink-800/80 to-red-950/90',
-        border: 'border-rose-400/40',
-        glow: 'shadow-rose-500/30',
+        label: 'Task',
+        emoji: '💜',
+        gradient: 'from-purple-900/95 via-violet-900/90 to-purple-950/95',
+        border: 'border-purple-400/40',
+        glow: 'shadow-purple-500/25',
       };
     case 'wild':
       return {
-        label: 'Wild',
+        label: 'Wild Card',
         emoji: '✨',
-        gradient: 'from-violet-950/90 via-purple-800/80 to-fuchsia-950/90',
+        gradient: 'from-violet-950/90 via-fuchsia-900/85 to-purple-950/90',
         border: 'border-violet-400/50',
         glow: 'shadow-violet-500/35',
       };
     case 'homerun':
       return {
-        label: 'Home run',
+        label: 'Home Run',
         emoji: '🏠',
-        gradient: 'from-amber-950/90 via-rose-900/80 to-fuchsia-950/90',
-        border: 'border-amber-400/50',
-        glow: 'shadow-amber-500/35',
+        gradient: 'from-rose-950/90 via-purple-900/85 to-fuchsia-950/90',
+        border: 'border-rose-400/50',
+        glow: 'shadow-rose-500/35',
+      };
+    case 'bonus':
+      return {
+        label: 'Bonus',
+        emoji: '🎁',
+        gradient: 'from-purple-800/90 via-purple-900/85 to-violet-950/90',
+        border: 'border-purple-300/35',
+        glow: 'shadow-purple-400/20',
+      };
+    case 'blank':
+      return {
+        label: 'Your Card',
+        emoji: '✏️',
+        gradient: 'from-purple-950/90 to-violet-950/90',
+        border: 'border-dashed border-purple-400/50',
+        glow: 'shadow-purple-500/15',
       };
   }
-}
-
-export function heatLabel(heat: HeatLevel): string {
-  if (heat === 1) return 'Warm';
-  if (heat === 2) return 'Hot';
-  return 'Steam';
-}
-
-export function heatFlames(heat: HeatLevel): string {
-  return '🔥'.repeat(heat);
 }

@@ -13,9 +13,8 @@ import {
   buildDeck,
   shuffle,
   GAME_MODES,
+  OFFICIAL_RULES,
   getKindMeta,
-  heatLabel,
-  heatFlames,
   type GameMode,
   type TeasePleaseCard,
 } from '@/app/constants/teaseOrPlease';
@@ -190,23 +189,8 @@ export function TeaseOrPleaseScreen({
     setHand([]);
   };
 
-  const rulesCopy: Record<GameMode, string[]> = {
-    pleasing: [
-      'Cards stay in a pile — take turns drawing one.',
-      'Read the task aloud and do it together (or for each other).',
-      'Pass the phone when done. Game ends on Home Run.',
-    ],
-    memory: [
-      'Tap two cards. If they match, perform the task on the card.',
-      'No match? Cards flip back and your partner goes.',
-      'Ends when you match Home Run or clear the board.',
-    ],
-    teasing: [
-      `You hold 5 cards. Find pairs in your hand and complete the task.`,
-      `No pair? Draw from the pile — "Quit teasing me" if they don't have yours.`,
-      `First to 5 matches wins the night.`,
-    ],
-  };
+  const rulesForMode = (id: GameMode) =>
+    OFFICIAL_RULES.modes.find((m) => m.id === id)?.steps ?? [];
 
   return (
     <div className="h-full w-full flex flex-col bg-background">
@@ -251,13 +235,23 @@ export function TeaseOrPleaseScreen({
                 <div className="text-5xl">🔥</div>
                 <h2 className="text-2xl font-bold text-white">Tonight is yours</h2>
                 <p className="text-sm text-rose-100/80 leading-relaxed">
-                  Romantic. Steamy. Built for couples who want to tease, please, and lose
-                  track of time together.
+                  {OFFICIAL_RULES.object}
                 </p>
                 <p className="text-[10px] text-rose-200/60 uppercase tracking-widest">
-                  18+ · Play responsibly · Skip any card you&apos;re not into
+                  {OFFICIAL_RULES.attribution}
                 </p>
               </div>
+            </div>
+
+            <div className="rounded-2xl border border-purple-500/20 bg-purple-950/20 p-4 space-y-2">
+              <p className="text-xs font-semibold text-purple-200 uppercase tracking-wider">
+                Deck
+              </p>
+              <ul className="text-xs text-muted-foreground space-y-1">
+                {OFFICIAL_RULES.contents.map((line) => (
+                  <li key={line}>• {line}</li>
+                ))}
+              </ul>
             </div>
 
             <div className="space-y-3">
@@ -291,11 +285,16 @@ export function TeaseOrPleaseScreen({
                 </div>
               ))}
               {showRulesMode && (
-                <ul className="text-sm text-muted-foreground space-y-1.5 px-4 py-3 rounded-xl bg-accent/50 list-disc list-inside">
-                  {rulesCopy[showRulesMode].map((line) => (
-                    <li key={line}>{line}</li>
-                  ))}
-                </ul>
+                <div className="px-4 py-3 rounded-xl bg-accent/50 space-y-2">
+                  <p className="text-sm font-semibold text-foreground">
+                    {OFFICIAL_RULES.modes.find((m) => m.id === showRulesMode)?.name}
+                  </p>
+                  <ol className="text-sm text-muted-foreground space-y-1.5 list-decimal list-inside">
+                    {rulesForMode(showRulesMode).map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ol>
+                </div>
               )}
             </div>
           </div>
@@ -304,15 +303,16 @@ export function TeaseOrPleaseScreen({
         {phase === 'playing' && mode === 'pleasing' && !drawnCard && (
           <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-8 max-w-md mx-auto">
             <div className="relative">
-              <div className="w-40 h-56 rounded-3xl bg-gradient-to-br from-rose-600 via-fuchsia-600 to-purple-700 shadow-2xl shadow-rose-900/50 flex flex-col items-center justify-center border-2 border-white/20">
-                <Flame className="w-12 h-12 text-white/90 mb-2" />
-                <p className="text-white font-bold text-sm tracking-widest uppercase">
-                  Tease
-                </p>
-                <p className="text-white/80 text-xs">or</p>
-                <p className="text-white font-bold text-sm tracking-widest uppercase">
-                  Please
-                </p>
+              <div className="w-40 h-56 rounded-3xl bg-[repeating-linear-gradient(0deg,#5b2d82,#5b2d82_8px,#e8e0ef_8px,#e8e0ef_16px)] shadow-2xl shadow-purple-900/50 flex flex-col items-center justify-center border-4 border-purple-800 p-4">
+                <div className="w-full h-full rounded-full bg-white border-4 border-purple-700 flex flex-col items-center justify-center text-center px-2">
+                  <p className="text-purple-800 font-bold text-xs tracking-wide leading-tight">
+                    TEASE
+                  </p>
+                  <p className="text-purple-700 text-[10px] font-semibold">OR</p>
+                  <p className="text-purple-800 font-bold text-xs tracking-wide leading-tight">
+                    PLEASE
+                  </p>
+                </div>
               </div>
               <p className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs text-muted-foreground whitespace-nowrap">
                 {pileCount} cards left
@@ -346,13 +346,15 @@ export function TeaseOrPleaseScreen({
                       ? 'opacity-40 scale-95 bg-rose-500/20 border border-rose-500/30'
                       : cell.faceUp
                         ? 'bg-gradient-to-br from-rose-800 to-fuchsia-900 text-white border-rose-400/50'
-                        : 'bg-gradient-to-br from-rose-950 to-purple-950 border-rose-500/30 hover:border-rose-400/60 shadow-md'
+                        : 'bg-[repeating-linear-gradient(0deg,#4a2568,#4a2568_4px,#d8d0e4_4px,#d8d0e4_8px)] border-purple-600/50 hover:border-purple-400/60 shadow-md'
                   }`}
                 >
                   {cell.faceUp || cell.matched ? (
                     <span className="text-lg">{getKindMeta(cell.card.kind).emoji}</span>
                   ) : (
-                    <Flame className="w-5 h-5 mx-auto text-rose-400/60" />
+                    <span className="text-[8px] font-bold text-purple-900/70 leading-none text-center px-0.5">
+                      T/O P
+                    </span>
                   )}
                 </button>
               ))}
@@ -401,9 +403,9 @@ export function TeaseOrPleaseScreen({
             <h2 className="text-2xl font-bold bg-gradient-to-r from-rose-400 via-fuchsia-400 to-purple-400 bg-clip-text text-transparent">
               Home run
             </h2>
-            <p className="text-muted-foreground">
-              You made it through the deck. However the night goes from here — make it count
-              together.
+            <p className="text-muted-foreground font-medium">Just do it already.</p>
+            <p className="text-sm text-muted-foreground">
+              You drew the HOME RUN card. Game over — the rest of the night is yours.
             </p>
             <Button variant="gradient" onClick={resetAll}>
               Play again
@@ -438,22 +440,21 @@ function CardReveal({
       >
         <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full blur-3xl" />
         <div className="relative space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs uppercase tracking-[0.15em] text-white/70 font-semibold">
-              {meta.label}
-            </span>
-            <span className="text-xs text-white/60">{heatFlames(card.heat)} {heatLabel(card.heat)}</span>
-          </div>
+          <span className="text-xs uppercase tracking-[0.15em] text-white/70 font-semibold">
+            {meta.label}
+          </span>
           <div className="text-4xl">{meta.emoji}</div>
-          <h3 className="text-2xl font-bold text-white">{card.title}</h3>
-          <p className="text-rose-50/95 leading-relaxed text-base">{card.task}</p>
-          {card.duration && (
-            <p className="text-xs text-white/50">⏱ {card.duration}</p>
+          <h3 className="text-2xl font-bold text-white uppercase tracking-tight">{card.title}</h3>
+          {card.subtitle && (
+            <p className="text-sm text-purple-200/90 border-t border-dashed border-white/20 pt-3 uppercase">
+              {card.subtitle}
+            </p>
           )}
-          {card.kind === 'please' && (
+          <p className="text-purple-50/95 leading-relaxed text-base">{card.task}</p>
+          {card.kind === 'homerun' && (
             <p className="text-xs text-rose-200/70 flex items-center gap-1">
               <Heart className="w-3 h-3 fill-current" />
-              Make {partnerName} feel wanted
+              Finishing move with {partnerName}
             </p>
           )}
         </div>
