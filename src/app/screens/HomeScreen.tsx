@@ -6,8 +6,7 @@ import { InstallPrompt } from '@/app/components/InstallPrompt';
 import { CalendarRemindersHome } from '@/app/components/CalendarRemindersHome';
 import { SharkModeHomeCard } from '@/app/components/SharkModeHomeCard';
 import { DailyChallenge } from '@/app/components/DailyChallenge';
-import { Sparkles, Clock, History, User, Calendar, HandHeart, Bell } from 'lucide-react';
-import { HomeTabBar } from '@/app/components/HomeTabBar';
+import { Sparkles, History, User, Calendar, HandHeart, Bell, Flame } from 'lucide-react';
 import { todayAPI, notificationAPI, sharkModeAPI, partnerStatusAPI, calendarAPI } from '@/utils/api';
 import { getUpcomingCalendarReminders } from '@/app/constants/calendar';
 import { formatDistanceToNow } from 'date-fns';
@@ -218,14 +217,23 @@ export function HomeScreen({
       )}
 
       {/* Header */}
-      <div className="px-6 py-4 flex items-center justify-between safe-top flex-shrink-0">
-        <h1 className="text-2xl font-bold">Today</h1>
-        <div className="flex items-center space-x-2">
+      <div className="px-6 py-4 flex items-center justify-end safe-top flex-shrink-0 border-b border-border">
+        <div className="flex items-center space-x-1">
+          {onPlayTeaseOrPlease && (
+            <button
+              onClick={onPlayTeaseOrPlease}
+              className="p-2 hover:bg-rose-500/10 rounded-full transition-colors"
+              aria-label="Tease or Please"
+              title="Tease or Please"
+            >
+              <Flame className="w-5 h-5 text-[#FB3094] fill-[#FB3094]/25" />
+            </button>
+          )}
           <button
             onClick={() => setShowPartnerStatusSheet(true)}
             className="p-2 hover:bg-accent rounded-full transition-colors relative"
             aria-label="Partner Status"
-            title="❤️ Partner Status"
+            title="Partner Status"
           >
             <HandHeart className="w-5 h-5" />
             {myStatusMeta && (
@@ -261,14 +269,6 @@ export function HomeScreen({
           </button>
         </div>
       </div>
-
-      {onPlayTeaseOrPlease && (
-        <HomeTabBar
-          active="today"
-          onToday={() => {}}
-          onTeaseOrPlease={onPlayTeaseOrPlease}
-        />
-      )}
 
       {/* Content */}
       <div className="flex-1 px-6 py-8 space-y-6 overflow-y-auto">
