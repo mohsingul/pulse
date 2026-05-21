@@ -55,7 +55,7 @@ interface GameSyncView {
     activeUserId: string;
     tableCard: SyncCard | null;
     tableCardFromUserId: string | null;
-    memory: { cells: MemoryCellView[]; flippedIndices: number[] };
+    memory: { cells: MemoryCellView[]; flippedIndices: number[]; resolveAt: number | null };
     teasing: { matches: Record<string, number> };
   } | null;
   isHost: boolean;
@@ -98,6 +98,14 @@ export function TeaseOrPleaseScreen({
     const id = setInterval(refresh, 1500);
     return () => clearInterval(id);
   }, [refresh]);
+
+  const memoryResolveAt = sync?.session?.memory?.resolveAt ?? null;
+  useEffect(() => {
+    if (!memoryResolveAt) return;
+    const delay = Math.max(50, memoryResolveAt - Date.now() + 80);
+    const t = setTimeout(() => refresh(), delay);
+    return () => clearTimeout(t);
+  }, [memoryResolveAt, refresh]);
 
   const runAction = async (action: string, payload?: Record<string, unknown>) => {
     setActionLoading(true);
@@ -423,6 +431,8 @@ function ActiveGameBoard({
   onAction: (action: string, payload?: Record<string, unknown>) => void;
 }) {
   const flipped = session.memory.flippedIndices?.length ?? 0;
+  const memoryResolving =
+    Boolean(session.memory?.resolveAt) && (session.memory.resolveAt ?? 0) > Date.now();
 
   if (mode === 'pleasing') {
     return (
@@ -457,14 +467,20 @@ function ActiveGameBoard({
     return (
       <div className="max-w-md mx-auto">
         <p className="text-center text-sm text-muted-foreground mb-4">
-          {isYourTurn ? 'Your turn — flip two cards' : `Waiting for ${partnerLabel}…`}
+          {memoryResolving
+            ? 'Take a look…'
+            : isYourTurn
+              ? 'Your turn — flip two cards'
+              : `Waiting for ${partnerLabel}…`}
         </p>
         <div className="grid grid-cols-4 gap-2">
           {cells.map((cell, i) => (
             <button
               key={`${cell.card.id}-${i}`}
               type="button"
-              disabled={!isYourTurn || cell.matched || flipped >= 2 || actionLoading}
+              disabled={
+                !isYourTurn || cell.matched || flipped >= 2 || memoryResolving || actionLoading
+              }
               onClick={() => onAction('memory_flip', { index: i })}
               className={`aspect-[3/4] rounded-xl text-[7px] font-bold uppercase p-1 transition-all ${
                 cell.matched

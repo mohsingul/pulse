@@ -333,13 +333,56 @@ function switchTurn(session: TeaseGameSession) {
   session.activeUserId = partnerId(session, session.activeUserId);
 }
 
+const MEMORY_REVEAL_MS = 2500;
+
+/** After two flips, keep both cards face-up briefly before match resolve or turn switch. */
+function applyMemoryResolveIfDue(session: TeaseGameSession): boolean {
+  if (session.mode !== "memory") return false;
+  const { resolveAt, flippedIndices } = session.memory;
+  if (!resolveAt || flippedIndices.length !== 2) return false;
+  if (Date.now() < resolveAt) return false;
+
+  const cells = session.memory.cells;
+  const [a, b] = flippedIndices;
+  const cardA = cells[a]?.card;
+  const cardB = cells[b]?.card;
+  if (!cardA || !cardB) {
+    session.memory.flippedIndices = [];
+    session.memory.resolveAt = null;
+    return true;
+  }
+
+  const match = cardA.pairId === cardB.pairId;
+  if (match) {
+    cells[a].matched = true;
+    cells[b].matched = true;
+    showTableCard(session, cardA, session.activeUserId);
+  } else {
+    cells[a].faceUp = false;
+    cells[b].faceUp = false;
+    switchTurn(session);
+  }
+  session.memory.flippedIndices = [];
+  session.memory.resolveAt = null;
+  return true;
+}
+
+export async function getSessionAndResolve(coupleId: string): Promise<TeaseGameSession | null> {
+  const session = await getSession(coupleId);
+  if (!session) return null;
+  if (applyMemoryResolveIfDue(session)) {
+    await saveSession(session);
+  }
+  return session;
+}
+
 export async function gameAction(
   coupleId: string,
   userId: string,
   action: string,
   payload: Record<string, unknown> = {},
 ): Promise<TeaseGameSession> {
-  const session = await getSession(coupleId);
+  const session = await getSessionAndResolve(coupleId);
   if (!session || session.status !== "active") {
     throw new Error("No active game");
   }
@@ -367,6 +410,7 @@ export async function gameAction(
     }
     case "memory_flip": {
       if (session.mode !== "memory") throw new Error("Invalid action for this mode");
+      if (session.memory.resolveAt) throw new Error("Wait for cards to resolve");
       const index = Number(payload.index);
       if (Number.isNaN(index)) throw new Error("index required");
       const cells = session.memory.cells;
@@ -379,21 +423,7 @@ export async function gameAction(
       session.memory.flippedIndices = flipped;
 
       if (flipped.length === 2) {
-        const [a, b] = flipped;
-        const cardA = cells[a].card;
-        const cardB = cells[b].card;
-        const match = cardA.pairId === cardB.pairId;
-        if (match) {
-          cells[a].matched = true;
-          cells[b].matched = true;
-          showTableCard(session, cardA, userId);
-        } else {
-          cells[a].faceUp = false;
-          cells[b].faceUp = false;
-          switchTurn(session);
-        }
-        session.memory.flippedIndices = [];
-        session.memory.resolveAt = null;
+        session.memory.resolveAt = Date.now() + MEMORY_REVEAL_MS;
       }
       break;
     }
@@ -453,6 +483,7 @@ export async function gameAction(
       throw new Error(`Unknown action: ${action}`);
   }
 
+  applyMemoryResolveIfDue(session);
   await saveSession(session);
   return session;
 }

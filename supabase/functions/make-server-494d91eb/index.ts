@@ -9,7 +9,7 @@ import {
   getStatusNotificationCopy,
 } from "./partner_status.ts";
 import {
-  getSession as getTeaseGameSession,
+  getSessionAndResolve as getTeaseGameSession,
   createInvite as createTeaseGameInvite,
   acceptInvite as acceptTeaseGameInvite,
   declineInvite as declineTeaseGameInvite,
