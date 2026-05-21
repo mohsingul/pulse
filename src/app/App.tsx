@@ -415,7 +415,6 @@ export default function App() {
               onViewProfile={() => setCurrentScreen('profile')}
               onViewCalendar={() => setCurrentScreen('couple-calendar')}
               onViewDailyChallengeArchive={() => setCurrentScreen('daily-challenge-archive')}
-              onPlayTeaseOrPlease={() => setCurrentScreen('tease-or-please')}
             />
             <UpdatePulseSheet
               isOpen={showUpdateSheet}

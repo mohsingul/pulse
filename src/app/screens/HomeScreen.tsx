@@ -233,6 +233,7 @@ export function HomeScreen({
       {/* Header */}
       <div className="px-6 py-4 flex items-center justify-end safe-top flex-shrink-0 border-b border-border">
         <div className="flex items-center space-x-1">
+          {/* Tease or Please — hidden for now
           {onPlayTeaseOrPlease && (
             <button
               onClick={onPlayTeaseOrPlease}
@@ -246,6 +247,7 @@ export function HomeScreen({
               )}
             </button>
           )}
+          */}
           <button
             onClick={() => setShowPartnerStatusSheet(true)}
             className="p-2 hover:bg-accent rounded-full transition-colors relative"
