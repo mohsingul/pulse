@@ -1,5 +1,6 @@
 /**
  * Couple-synced Tease or Please game session (KV-backed)
+ * Full card objects are persisted — IDs alone break across server requests.
  */
 import * as kv from "./kv_store.ts";
 
@@ -20,7 +21,7 @@ export interface GameCard extends CardDef {
 }
 
 export interface MemoryCellState {
-  cardId: string;
+  card: GameCard;
   faceUp: boolean;
   matched: boolean;
 }
@@ -36,20 +37,18 @@ export interface TeaseGameSession {
   acceptedAt: string | null;
   activeUserId: string;
   phase: "playing" | "finished";
-  /** Card both partners see after a match/draw */
   tableCard: GameCard | null;
   tableCardFromUserId: string | null;
-  /** Partner must tap "Got it" before table clears */
   awaitingAckFromUserId: string | null;
-  pleasing: { deckIds: string[] };
+  pleasing: { deck: GameCard[] };
   memory: {
     cells: MemoryCellState[];
     flippedIndices: number[];
     resolveAt: number | null;
   };
   teasing: {
-    hands: Record<string, string[]>;
-    deckIds: string[];
+    hands: Record<string, GameCard[]>;
+    deck: GameCard[];
     matches: Record<string, number>;
   };
   updatedAt: string;
@@ -94,8 +93,6 @@ const CARD_LIBRARY: CardDef[] = [
   { pairId: "blank-3", kind: "blank", title: "BLANK CARD", task: "CREATE YOUR OWN TASK" },
 ];
 
-const cardById = new Map<string, GameCard>();
-
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -105,22 +102,82 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+/** Stable IDs survive KV round-trips (pairId + library index + copy) */
 function buildDeck(): GameCard[] {
   const cards: GameCard[] = [];
-  let idx = 0;
-  for (const def of CARD_LIBRARY) {
+  CARD_LIBRARY.forEach((def, libIndex) => {
     const copies = def.kind === "homerun" ? 1 : 2;
     for (let c = 0; c < copies; c++) {
-      const card: GameCard = { ...def, id: `${def.pairId}-${c}-${idx++}` };
-      cards.push(card);
-      cardById.set(card.id, card);
+      cards.push({
+        ...def,
+        id: `${def.pairId}@${libIndex}@${c}`,
+      });
     }
-  }
+  });
   return shuffle(cards);
 }
 
-function getCard(id: string): GameCard | null {
-  return cardById.get(id) ?? null;
+/** Migrate sessions saved with old deckIds-only format */
+function migrateLegacySession(raw: Record<string, unknown>): TeaseGameSession {
+  const s = raw as TeaseGameSession & {
+    pleasing?: { deckIds?: string[]; deck?: GameCard[] };
+    teasing?: { deckIds?: string[]; deck?: GameCard[]; hands?: Record<string, string[] | GameCard[]> };
+    memory?: { cells?: Array<{ cardId?: string; card?: GameCard; faceUp: boolean; matched: boolean }> };
+  };
+
+  const resolveLegacyId = (id: string): GameCard | null => {
+    for (let i = 0; i < CARD_LIBRARY.length; i++) {
+      const def = CARD_LIBRARY[i];
+      if (id.startsWith(`${def.pairId}-`) || id.startsWith(`${def.pairId}@`)) {
+        return { ...def, id };
+      }
+    }
+    return null;
+  };
+
+  if (s.pleasing && (s.pleasing as { deckIds?: string[] }).deckIds && !s.pleasing.deck) {
+    s.pleasing = {
+      deck: ((s.pleasing as { deckIds: string[] }).deckIds)
+        .map((id) => resolveLegacyId(id))
+        .filter((c): c is GameCard => c !== null),
+    };
+  }
+
+  if (s.teasing) {
+    const t = s.teasing as {
+      deckIds?: string[];
+      deck?: GameCard[];
+      hands?: Record<string, string[] | GameCard[]>;
+      matches?: Record<string, number>;
+    };
+    const deck = t.deck ?? (t.deckIds?.map((id) => resolveLegacyId(id)).filter(Boolean) as GameCard[]) ?? [];
+    const hands: Record<string, GameCard[]> = {};
+    for (const [uid, h] of Object.entries(t.hands ?? {})) {
+      hands[uid] = Array.isArray(h)
+        ? h.map((item) =>
+          typeof item === "string" ? resolveLegacyId(item) : item
+        ).filter((c): c is GameCard => c != null)
+        : [];
+    }
+    s.teasing = { deck, hands, matches: t.matches ?? {} };
+  }
+
+  if (s.memory?.cells) {
+    s.memory = {
+      cells: s.memory.cells.map((cell) => {
+        if (cell.card) return cell as MemoryCellState;
+        const legacyId = (cell as { cardId?: string }).cardId;
+        const card = legacyId ? resolveLegacyId(legacyId) : null;
+        return card
+          ? { card, faceUp: cell.faceUp, matched: cell.matched }
+          : null;
+      }).filter((c): c is MemoryCellState => c !== null),
+      flippedIndices: s.memory.flippedIndices ?? [],
+      resolveAt: s.memory.resolveAt ?? null,
+    };
+  }
+
+  return s as TeaseGameSession;
 }
 
 function sessionKey(coupleId: string) {
@@ -128,7 +185,9 @@ function sessionKey(coupleId: string) {
 }
 
 export async function getSession(coupleId: string): Promise<TeaseGameSession | null> {
-  return (await kv.get(sessionKey(coupleId))) as TeaseGameSession | null;
+  const raw = await kv.get(sessionKey(coupleId));
+  if (!raw) return null;
+  return migrateLegacySession(raw as Record<string, unknown>);
 }
 
 async function saveSession(session: TeaseGameSession) {
@@ -144,34 +203,34 @@ function initGameState(
   mode: GameMode,
   hostUserId: string,
   partnerUserId: string,
-): Omit<TeaseGameSession, "status" | "acceptedAt" | "coupleId" | "hostUserId" | "hostName" | "partnerUserId" | "partnerName" | "updatedAt"> {
+) {
   const deck = buildDeck();
   const base = {
     mode,
     activeUserId: hostUserId,
     phase: "playing" as const,
-    tableCard: null,
-    tableCardFromUserId: null,
-    awaitingAckFromUserId: null,
-    pleasing: { deckIds: [] as string[] },
+    tableCard: null as GameCard | null,
+    tableCardFromUserId: null as string | null,
+    awaitingAckFromUserId: null as string | null,
+    pleasing: { deck: [] as GameCard[] },
     memory: { cells: [] as MemoryCellState[], flippedIndices: [] as number[], resolveAt: null },
     teasing: {
-      hands: {} as Record<string, string[]>,
-      deckIds: [] as string[],
+      hands: {} as Record<string, GameCard[]>,
+      deck: [] as GameCard[],
       matches: {} as Record<string, number>,
     },
   };
 
   if (mode === "pleasing") {
-    base.pleasing.deckIds = deck.map((c) => c.id);
+    base.pleasing.deck = deck;
   } else if (mode === "memory") {
     const grid = shuffle(deck).slice(0, 24);
-    base.memory.cells = grid.map((c) => ({ cardId: c.id, faceUp: false, matched: false }));
+    base.memory.cells = grid.map((c) => ({ card: c, faceUp: false, matched: false }));
   } else {
     const shuffled = shuffle(deck);
-    base.teasing.hands[hostUserId] = shuffled.slice(0, 5).map((c) => c.id);
-    base.teasing.hands[partnerUserId] = shuffled.slice(5, 10).map((c) => c.id);
-    base.teasing.deckIds = shuffled.slice(10).map((c) => c.id);
+    base.teasing.hands[hostUserId] = shuffled.slice(0, 5);
+    base.teasing.hands[partnerUserId] = shuffled.slice(5, 10);
+    base.teasing.deck = shuffled.slice(10);
     base.teasing.matches[hostUserId] = 0;
     base.teasing.matches[partnerUserId] = 0;
   }
@@ -206,9 +265,9 @@ export async function createInvite(
     tableCard: null,
     tableCardFromUserId: null,
     awaitingAckFromUserId: null,
-    pleasing: { deckIds: [] },
+    pleasing: { deck: [] },
     memory: { cells: [], flippedIndices: [], resolveAt: null },
-    teasing: { hands: {}, deckIds: [], matches: {} },
+    teasing: { hands: {}, deck: [], matches: {} },
     updatedAt: new Date().toISOString(),
   };
 
@@ -296,14 +355,13 @@ export async function gameAction(
   switch (action) {
     case "draw": {
       if (session.mode !== "pleasing") throw new Error("Invalid action for this mode");
-      const [top, ...rest] = session.pleasing.deckIds;
-      if (!top) {
+      const deck = session.pleasing.deck;
+      if (deck.length === 0) {
         session.phase = "finished";
         break;
       }
-      const card = getCard(top);
-      if (!card) throw new Error("Card not found");
-      session.pleasing.deckIds = rest;
+      const [card, ...rest] = deck;
+      session.pleasing.deck = rest;
       showTableCard(session, card, userId);
       break;
     }
@@ -322,9 +380,8 @@ export async function gameAction(
 
       if (flipped.length === 2) {
         const [a, b] = flipped;
-        const cardA = getCard(cells[a].cardId);
-        const cardB = getCard(cells[b].cardId);
-        if (!cardA || !cardB) throw new Error("Card not found");
+        const cardA = cells[a].card;
+        const cardB = cells[b].card;
         const match = cardA.pairId === cardB.pairId;
         if (match) {
           cells[a].matched = true;
@@ -342,29 +399,25 @@ export async function gameAction(
     }
     case "teasing_draw": {
       if (session.mode !== "teasing") throw new Error("Invalid action for this mode");
-      const [top, ...rest] = session.teasing.deckIds;
-      if (!top) {
+      const pile = session.teasing.deck;
+      if (pile.length === 0) {
         session.phase = "finished";
         break;
       }
-      const hand = [...(session.teasing.hands[userId] || []), top];
-      session.teasing.deckIds = rest;
+      const [drawn, ...rest] = pile;
+      session.teasing.deck = rest;
+      const hand = [...(session.teasing.hands[userId] || []), drawn];
       const counts: Record<string, number> = {};
-      for (const id of hand) {
-        const c = getCard(id);
-        if (!c) continue;
+      for (const c of hand) {
         counts[c.pairId] = (counts[c.pairId] || 0) + 1;
       }
-      const pairId = Object.keys(counts).find((k) => counts[k] >= 2);
-      if (pairId) {
-        const matched = hand.filter((id) => getCard(id)?.pairId === pairId).slice(0, 2);
-        session.teasing.hands[userId] = hand.filter((id) => !matched.includes(id));
-        const card = getCard(matched[0]);
-        if (card) {
-          showTableCard(session, card, userId);
-          session.teasing.matches[userId] = (session.teasing.matches[userId] || 0) + 1;
-          if (session.teasing.matches[userId] >= 5) session.phase = "finished";
-        }
+      const matchedPairId = Object.keys(counts).find((k) => counts[k] >= 2);
+      if (matchedPairId) {
+        const pairCards = hand.filter((c) => c.pairId === matchedPairId);
+        session.teasing.hands[userId] = hand.filter((c) => c.pairId !== matchedPairId);
+        showTableCard(session, pairCards[0], userId);
+        session.teasing.matches[userId] = (session.teasing.matches[userId] || 0) + 1;
+        if (session.teasing.matches[userId] >= 5) session.phase = "finished";
       } else {
         session.teasing.hands[userId] = hand;
         switchTurn(session);
@@ -407,19 +460,9 @@ export async function gameAction(
 export function sessionForClient(session: TeaseGameSession, userId: string) {
   const isHost = userId === session.hostUserId;
   const partnerDisplayName = isHost ? session.partnerName : session.hostName;
-  const memoryCells = session.memory.cells.map((cell) => ({
-    ...cell,
-    card: getCard(cell.cardId),
-  }));
-  const teasingHands = (session.teasing.hands[userId] || [])
-    .map((id) => getCard(id))
-    .filter(Boolean);
 
   return {
-    session: {
-      ...session,
-      memory: { ...session.memory, cells: memoryCells },
-    },
+    session,
     isHost,
     isYourTurn:
       session.status === "active" &&
@@ -432,11 +475,11 @@ export function sessionForClient(session: TeaseGameSession, userId: string) {
       !session.awaitingAckFromUserId,
     partnerDisplayName,
     tableCard: session.tableCard,
-    teasingHandCards: teasingHands,
+    teasingHandCards: session.teasing.hands[userId] || [],
     pileCount: session.mode === "pleasing"
-      ? session.pleasing.deckIds.length
+      ? session.pleasing.deck.length
       : session.mode === "teasing"
-      ? session.teasing.deckIds.length
+      ? session.teasing.deck.length
       : 0,
   };
 }

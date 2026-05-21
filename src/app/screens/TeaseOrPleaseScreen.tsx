@@ -39,10 +39,9 @@ interface SyncCard {
 }
 
 interface MemoryCellView {
-  cardId: string;
+  card: SyncCard;
   faceUp: boolean;
   matched: boolean;
-  card: SyncCard | null;
 }
 
 interface GameSyncView {
@@ -463,7 +462,7 @@ function ActiveGameBoard({
         <div className="grid grid-cols-4 gap-2">
           {cells.map((cell, i) => (
             <button
-              key={`${cell.cardId}-${i}`}
+              key={`${cell.card.id}-${i}`}
               type="button"
               disabled={!isYourTurn || cell.matched || flipped >= 2 || actionLoading}
               onClick={() => onAction('memory_flip', { index: i })}
@@ -476,7 +475,7 @@ function ActiveGameBoard({
               }`}
             >
               {cell.faceUp || cell.matched ? (
-                <span className="line-clamp-4">{cell.card?.title ?? '?'}</span>
+                <span className="line-clamp-4">{cell.card.title}</span>
               ) : (
                 'T/P'
               )}
