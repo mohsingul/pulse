@@ -603,6 +603,8 @@ export default function App() {
       case 'tease-or-please':
         return couple ? (
           <TeaseOrPleaseScreen
+            coupleId={couple.coupleId}
+            userId={user.userId}
             userName={user.displayName}
             partnerName={couple.partner.displayName}
             onBack={() => setCurrentScreen('home')}

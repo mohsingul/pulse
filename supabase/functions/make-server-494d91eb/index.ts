@@ -8,6 +8,15 @@ import {
   validateStatusPayload,
   getStatusNotificationCopy,
 } from "./partner_status.ts";
+import {
+  getSession as getTeaseGameSession,
+  createInvite as createTeaseGameInvite,
+  acceptInvite as acceptTeaseGameInvite,
+  declineInvite as declineTeaseGameInvite,
+  cancelSession as cancelTeaseGameSession,
+  gameAction as teaseGameAction,
+  sessionForClient,
+} from "./tease_game.ts";
 
 const app = new Hono();
 
@@ -2821,6 +2830,126 @@ app.delete("/make-server-494d91eb/calendar/:coupleId/:eventId", async (c) => {
 });
 
 // ===== END PARTNER NEEDS & CALENDAR =====
+
+// Tease or Please — synced couple game
+app.get("/make-server-494d91eb/tease-game/:coupleId", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    const userId = c.req.query("userId");
+    if (!coupleId || !userId) {
+      return c.json({ error: "Couple ID and user ID are required" }, 400);
+    }
+    const session = await getTeaseGameSession(coupleId);
+    if (!session) {
+      return c.json({ session: null });
+    }
+    return c.json(sessionForClient(session, userId));
+  } catch (error: any) {
+    console.error("[Tease Game] GET failed:", error);
+    return c.json({ error: error.message || "Failed to get game" }, 500);
+  }
+});
+
+app.post("/make-server-494d91eb/tease-game/:coupleId/invite", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    const body = await c.req.json();
+    const { userId, hostName, mode } = body;
+    if (!coupleId || !userId || !mode) {
+      return c.json({ error: "coupleId, userId, and mode are required" }, 400);
+    }
+    const couple = await kv.get(`couple:${coupleId}`);
+    if (!couple) return c.json({ error: "Couple not found" }, 404);
+    const partnerId = couple.user1Id === userId ? couple.user2Id : couple.user1Id;
+    const hostUser = await kv.get(`user:${userId}`);
+    const partnerUser = await kv.get(`user:${partnerId}`);
+    const session = await createTeaseGameInvite(
+      couple,
+      userId,
+      hostName || hostUser?.displayName || "Partner",
+      partnerId,
+      partnerUser?.displayName || "Partner",
+      mode,
+    );
+    const receiver = partnerUser;
+    if (receiver?.fcmToken) {
+      try {
+        await sendFcmPush(
+          receiver.fcmToken,
+          {
+            title: `${hostName || hostUser?.displayName} invited you to play`,
+            body: `Tease or Please — open the app to accept and play together.`,
+          },
+          {
+            type: "tease-game-invite",
+            coupleId,
+            url: `${Deno.env.get("APP_URL") || "https://aimopulse.vercel.app"}/?screen=tease-or-please`,
+            tag: `tease-game-invite-${coupleId}`,
+          },
+        );
+      } catch (e) {
+        console.log("[Tease Game] FCM invite failed:", e);
+      }
+    }
+    return c.json(sessionForClient(session, userId));
+  } catch (error: any) {
+    console.error("[Tease Game] invite failed:", error);
+    return c.json({ error: error.message || "Failed to invite" }, 500);
+  }
+});
+
+app.post("/make-server-494d91eb/tease-game/:coupleId/accept", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    const { userId } = await c.req.json();
+    if (!coupleId || !userId) {
+      return c.json({ error: "coupleId and userId are required" }, 400);
+    }
+    const session = await acceptTeaseGameInvite(coupleId, userId);
+    return c.json(sessionForClient(session, userId));
+  } catch (error: any) {
+    console.error("[Tease Game] accept failed:", error);
+    return c.json({ error: error.message || "Failed to accept" }, 500);
+  }
+});
+
+app.post("/make-server-494d91eb/tease-game/:coupleId/decline", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    const { userId } = await c.req.json();
+    await declineTeaseGameInvite(coupleId, userId);
+    return c.json({ success: true });
+  } catch (error: any) {
+    return c.json({ error: error.message || "Failed to decline" }, 500);
+  }
+});
+
+app.post("/make-server-494d91eb/tease-game/:coupleId/cancel", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    const { userId } = await c.req.json();
+    await cancelTeaseGameSession(coupleId, userId);
+    return c.json({ success: true });
+  } catch (error: any) {
+    return c.json({ error: error.message || "Failed to cancel" }, 500);
+  }
+});
+
+app.post("/make-server-494d91eb/tease-game/:coupleId/action", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    const body = await c.req.json();
+    const { userId, action, payload } = body;
+    if (!coupleId || !userId || !action) {
+      return c.json({ error: "coupleId, userId, and action are required" }, 400);
+    }
+    const session = await teaseGameAction(coupleId, userId, action, payload || {});
+    return c.json(sessionForClient(session, userId));
+  } catch (error: any) {
+    console.error("[Tease Game] action failed:", error);
+    return c.json({ error: error.message || "Action failed" }, 500);
+  }
+});
 
 // 404 handler
 app.notFound((c) => {

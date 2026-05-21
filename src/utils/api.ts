@@ -398,5 +398,51 @@ export const dailyChallengeAPI = {
     apiRequest(`/daily-challenge/archive/${coupleId}`),
 };
 
+// Tease or Please — synced couple game
+export const teaseGameAPI = {
+  get: (coupleId: string, userId: string) =>
+    apiRequest(`/tease-game/${coupleId}?userId=${encodeURIComponent(userId)}`),
+
+  invite: (
+    coupleId: string,
+    userId: string,
+    hostName: string,
+    mode: 'pleasing' | 'memory' | 'teasing',
+  ) =>
+    apiRequest(`/tease-game/${coupleId}/invite`, {
+      method: 'POST',
+      body: JSON.stringify({ userId, hostName, mode }),
+    }),
+
+  accept: (coupleId: string, userId: string) =>
+    apiRequest(`/tease-game/${coupleId}/accept`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    }),
+
+  decline: (coupleId: string, userId: string) =>
+    apiRequest(`/tease-game/${coupleId}/decline`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    }),
+
+  cancel: (coupleId: string, userId: string) =>
+    apiRequest(`/tease-game/${coupleId}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    }),
+
+  action: (
+    coupleId: string,
+    userId: string,
+    action: string,
+    payload?: Record<string, unknown>,
+  ) =>
+    apiRequest(`/tease-game/${coupleId}/action`, {
+      method: 'POST',
+      body: JSON.stringify({ userId, action, payload }),
+    }),
+};
+
 // Export health check function
 export { checkServerHealth };

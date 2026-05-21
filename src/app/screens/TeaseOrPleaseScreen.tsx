@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/app/components/Button';
 import {
   ArrowLeft,
@@ -8,10 +8,10 @@ import {
   Heart,
   Shuffle,
   Info,
+  Users,
+  Loader2,
 } from 'lucide-react';
 import {
-  buildDeck,
-  shuffle,
   GAME_MODES,
   OFFICIAL_RULES,
   PDF_CARD_COUNT,
@@ -20,199 +20,168 @@ import {
   type GameMode,
   type TeasePleaseCard,
 } from '@/app/constants/teaseOrPlease';
+import { teaseGameAPI } from '@/utils/api';
 
 interface TeaseOrPleaseScreenProps {
+  coupleId: string;
+  userId: string;
   userName: string;
   partnerName: string;
   onBack: () => void;
 }
 
-type Phase = 'menu' | 'rules' | 'playing' | 'finished';
+interface SyncCard {
+  id: string;
+  pairId: string;
+  kind: string;
+  title: string;
+  task: string;
+}
 
-interface MemoryCell {
-  card: TeasePleaseCard;
+interface MemoryCellView {
+  cardId: string;
   faceUp: boolean;
   matched: boolean;
+  card: SyncCard | null;
+}
+
+interface GameSyncView {
+  session: {
+    status: string;
+    mode: GameMode;
+    hostUserId: string;
+    hostName: string;
+    partnerName: string;
+    phase: string;
+    activeUserId: string;
+    tableCard: SyncCard | null;
+    tableCardFromUserId: string | null;
+    memory: { cells: MemoryCellView[]; flippedIndices: number[] };
+    teasing: { matches: Record<string, number> };
+  } | null;
+  isHost: boolean;
+  isYourTurn: boolean;
+  needsAck: boolean;
+  showYourCard: boolean;
+  partnerDisplayName: string;
+  tableCard: SyncCard | null;
+  teasingHandCards: SyncCard[];
+  pileCount: number;
 }
 
 export function TeaseOrPleaseScreen({
+  coupleId,
+  userId,
   userName,
   partnerName,
   onBack,
 }: TeaseOrPleaseScreenProps) {
-  const [phase, setPhase] = useState<Phase>('menu');
-  const [mode, setMode] = useState<GameMode | null>(null);
-  const [activePlayer, setActivePlayer] = useState<0 | 1>(0);
-  const [deck, setDeck] = useState<TeasePleaseCard[]>([]);
-  const [drawnCard, setDrawnCard] = useState<TeasePleaseCard | null>(null);
-  const [memoryGrid, setMemoryGrid] = useState<MemoryCell[]>([]);
-  const [flippedIndices, setFlippedIndices] = useState<number[]>([]);
-  const [hand, setHand] = useState<TeasePleaseCard[]>([]);
-  const [pileCount, setPileCount] = useState(0);
-  const [matches, setMatches] = useState(0);
+  const [sync, setSync] = useState<GameSyncView | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [showRulesMode, setShowRulesMode] = useState<GameMode | null>(null);
   const [showFullRules, setShowFullRules] = useState(false);
+  const [pendingMode, setPendingMode] = useState<GameMode | null>(null);
 
-  const playerNames = useMemo(() => [userName, partnerName], [userName, partnerName]);
-  const currentPlayerName = playerNames[activePlayer];
-
-  const startGame = useCallback((selected: GameMode) => {
-    setMode(selected);
-    setActivePlayer(0);
-    setDrawnCard(null);
-    setFlippedIndices([]);
-    setMatches(0);
-    setShowRulesMode(null);
-
-    const fullDeck = buildDeck(true);
-
-    if (selected === 'pleasing') {
-      setDeck(fullDeck);
-      setHand([]);
-      setMemoryGrid([]);
-      setPileCount(fullDeck.length);
-      setPhase('playing');
-      return;
+  const refresh = useCallback(async () => {
+    try {
+      const data = await teaseGameAPI.get(coupleId, userId);
+      setSync(data?.session ? (data as GameSyncView) : null);
+    } catch (e) {
+      console.error('[Tease Game] poll failed', e);
+    } finally {
+      setLoading(false);
     }
+  }, [coupleId, userId]);
 
-    if (selected === 'memory') {
-      const gridDeck = shuffle(fullDeck).slice(0, 24);
-      setMemoryGrid(
-        gridDeck.map((card) => ({ card, faceUp: false, matched: false })),
-      );
-      setDeck([]);
-      setHand([]);
-      setPhase('playing');
-      return;
-    }
+  useEffect(() => {
+    refresh();
+    const id = setInterval(refresh, 1500);
+    return () => clearInterval(id);
+  }, [refresh]);
 
-    // teasing (go-fish style): 5 cards each, rest in pile
-    const shuffled = shuffle(fullDeck);
-    setHand(shuffled.slice(0, 5));
-    setDeck(shuffled.slice(5));
-    setPileCount(shuffled.length - 5);
-    setMemoryGrid([]);
-    setPhase('playing');
-  }, []);
-
-  const drawFromDeck = () => {
-    if (deck.length === 0) {
-      setPhase('finished');
-      return;
-    }
-    const [top, ...rest] = deck;
-    setDeck(rest);
-    setDrawnCard(top);
-    setPileCount(rest.length);
-    if (top.kind === 'homerun') {
-      setPhase('finished');
+  const runAction = async (action: string, payload?: Record<string, unknown>) => {
+    setActionLoading(true);
+    try {
+      const data = await teaseGameAPI.action(coupleId, userId, action, payload);
+      setSync(data as GameSyncView);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Action failed';
+      alert(msg);
+    } finally {
+      setActionLoading(false);
     }
   };
 
-  const completeDrawnCard = () => {
-    setDrawnCard(null);
-    if (mode !== 'memory' || phase !== 'finished') {
-      setActivePlayer((p) => (p === 0 ? 1 : 0));
+  const sendInvite = async (mode: GameMode) => {
+    setActionLoading(true);
+    try {
+      const data = await teaseGameAPI.invite(coupleId, userId, userName, mode);
+      setSync(data as GameSyncView);
+      setPendingMode(null);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Could not send invite');
+    } finally {
+      setActionLoading(false);
     }
   };
 
-  const handleMemoryFlip = (index: number) => {
-    if (flippedIndices.length >= 2 || drawnCard) return;
+  const acceptInvite = async () => {
+    setActionLoading(true);
+    try {
+      const data = await teaseGameAPI.accept(coupleId, userId);
+      setSync(data as GameSyncView);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Could not accept');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
-    const cell = memoryGrid[index];
-    if (!cell || cell.faceUp || cell.matched) return;
+  const declineInvite = async () => {
+    await teaseGameAPI.decline(coupleId, userId);
+    await refresh();
+  };
 
-    const nextGrid = memoryGrid.map((c, i) =>
-      i === index ? { ...c, faceUp: true } : c,
+  const cancelGame = async () => {
+    await teaseGameAPI.cancel(coupleId, userId);
+    await refresh();
+  };
+
+  const session = sync?.session;
+  const status = session?.status ?? 'idle';
+  const mode = session?.mode;
+  const isYourTurn = sync?.isYourTurn ?? false;
+  const needsAck = sync?.needsAck ?? false;
+  const showYourCard = sync?.showYourCard ?? false;
+  const tableCard = sync?.tableCard ?? session?.tableCard ?? null;
+
+  const toTeaseCard = (c: SyncCard | null): TeasePleaseCard | null => {
+    if (!c) return null;
+    return {
+      id: c.id,
+      pairId: c.pairId,
+      kind: c.kind as TeasePleaseCard['kind'],
+      title: c.title,
+      task: c.task,
+    };
+  };
+
+  const activeCard = toTeaseCard(tableCard);
+  const partnerLabel = sync?.partnerDisplayName || partnerName;
+
+  if (loading && !sync) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-[#FB3094]" />
+      </div>
     );
-    const newFlipped = [...flippedIndices, index];
-    setMemoryGrid(nextGrid);
-    setFlippedIndices(newFlipped);
-
-    if (newFlipped.length < 2) return;
-
-    const [a, b] = newFlipped;
-    const cardA = nextGrid[a].card;
-    const cardB = nextGrid[b].card;
-    const isMatch = cardA.pairId === cardB.pairId;
-
-    window.setTimeout(() => {
-      if (isMatch) {
-        setMemoryGrid((grid) =>
-          grid.map((c, i) =>
-            i === a || i === b ? { ...c, matched: true, faceUp: true } : c,
-          ),
-        );
-        setDrawnCard(cardA);
-        if (cardA.kind === 'homerun') {
-          setPhase('finished');
-        }
-      } else {
-        setMemoryGrid((grid) =>
-          grid.map((c, i) =>
-            i === a || i === b ? { ...c, faceUp: false } : c,
-          ),
-        );
-        setActivePlayer((p) => (p === 0 ? 1 : 0));
-      }
-      setFlippedIndices([]);
-    }, 800);
-  };
-
-  const checkHandForMatch = (cards: TeasePleaseCard[]) => {
-    const counts: Record<string, number> = {};
-    for (const c of cards) {
-      counts[c.pairId] = (counts[c.pairId] || 0) + 1;
-    }
-    const pairId = Object.keys(counts).find((k) => counts[k] >= 2);
-    if (!pairId) return null;
-    const matched = cards.filter((c) => c.pairId === pairId).slice(0, 2);
-    const rest = cards.filter((c) => !matched.some((m) => m.id === c.id));
-    return { matched: matched[0], rest };
-  };
-
-  const teasingDraw = () => {
-    if (deck.length === 0) {
-      setPhase('finished');
-      return;
-    }
-    const [top, ...rest] = deck;
-    const newHand = [...hand, top];
-    setDeck(rest);
-    setPileCount(rest.length);
-    const found = checkHandForMatch(newHand);
-    if (found) {
-      setHand(found.rest);
-      setDrawnCard(found.matched);
-      setMatches((m) => m + 1);
-      if (found.matched.kind === 'homerun' || matches + 1 >= 5) setPhase('finished');
-    } else {
-      setHand(newHand);
-      setActivePlayer((p) => (p === 0 ? 1 : 0));
-    }
-  };
-
-  const resetAll = () => {
-    setPhase('menu');
-    setMode(null);
-    setDeck([]);
-    setDrawnCard(null);
-    setMemoryGrid([]);
-    setHand([]);
-  };
-
-  const modeRules = (id: GameMode) =>
-    OFFICIAL_RULES.modes.find((m) => m.id === id)?.paragraphs ?? [];
+  }
 
   return (
     <div className="h-full w-full flex flex-col bg-background">
       <header className="px-4 py-4 flex items-center gap-3 border-b border-border safe-top flex-shrink-0 bg-gradient-to-r from-rose-950/40 via-background to-purple-950/30">
-        <button
-          type="button"
-          onClick={phase === 'menu' ? onBack : resetAll}
-          className="p-2 hover:bg-accent rounded-full transition-colors"
-          aria-label="Back"
-        >
+        <button type="button" onClick={onBack} className="p-2 hover:bg-accent rounded-full">
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="flex-1 min-w-0">
@@ -220,279 +189,330 @@ export function TeaseOrPleaseScreen({
             <Flame className="w-5 h-5 text-rose-500 fill-rose-500/30" />
             Tease or Please
           </h1>
-          {phase === 'playing' && mode && (
+          {status === 'active' && (
             <p className="text-xs text-muted-foreground truncate">
-              {GAME_MODES.find((m) => m.id === mode)?.label} · {currentPlayerName}&apos;s turn
+              {isYourTurn ? 'Your turn' : `${partnerLabel}'s turn`}
+              {needsAck ? ' · Card waiting for you' : ''}
             </p>
           )}
         </div>
-        {phase === 'playing' && (
-          <button
-            type="button"
-            onClick={resetAll}
-            className="p-2 hover:bg-accent rounded-full"
-            title="New game"
-          >
+        {(status === 'active' || status === 'invite_pending') && (
+          <button type="button" onClick={cancelGame} className="p-2 hover:bg-accent rounded-full" title="End game">
             <RotateCcw className="w-4 h-4" />
           </button>
         )}
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-6 pb-10">
-        {phase === 'menu' && (
-          <div className="space-y-6 max-w-lg mx-auto">
-            <div className="relative rounded-3xl overflow-hidden border border-rose-500/25 p-6">
-              <div className="absolute inset-0 bg-gradient-to-br from-rose-950 via-fuchsia-950 to-purple-950" />
-              <div className="relative space-y-4 text-sm text-rose-100/90 leading-relaxed">
-                <h2 className="text-xl font-bold text-white text-center">Tease or Please</h2>
-                <div>
-                  <p className="font-semibold text-purple-200 text-xs uppercase tracking-wider mb-1">
-                    {OFFICIAL_RULES.objectTitle}
-                  </p>
-                  <p>{OFFICIAL_RULES.object}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowFullRules(!showFullRules)}
-                  className="w-full py-2 rounded-xl border border-purple-400/30 text-xs font-semibold text-purple-100 hover:bg-purple-900/40"
-                >
-                  {showFullRules ? 'Hide full rules' : 'Read full rules'}
-                </button>
-                {showFullRules && (
-                  <div className="space-y-4 text-xs max-h-[40vh] overflow-y-auto pr-1">
-                    <div>
-                      <p className="font-semibold text-purple-200 mb-1">
-                        {OFFICIAL_RULES.contentsTitle}
-                      </p>
-                      <p>• {OFFICIAL_RULES.contentsLead}</p>
-                      <ul className="ml-4 list-disc text-muted-foreground">
-                        {OFFICIAL_RULES.contentsItems.map((item) => (
-                          <li key={item}>{item}</li>
-                        ))}
-                      </ul>
-                      <p className="mt-2 italic text-purple-200/80">{OFFICIAL_RULES.note}</p>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-purple-200 mb-1">
-                        {OFFICIAL_RULES.howToPlayTitle}
-                      </p>
-                      <p>{OFFICIAL_RULES.howToPlayIntro}</p>
-                    </div>
-                    {OFFICIAL_RULES.modes.map((mode) => (
-                      <div key={mode.id}>
-                        <p className="font-semibold text-foreground mb-1">{mode.name}</p>
-                        {mode.paragraphs.map((p) => (
-                          <p key={p.slice(0, 40)} className="text-muted-foreground mb-2">
-                            {p}
-                          </p>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <p className="text-[10px] text-rose-200/60 text-center uppercase tracking-widest">
-                  {OFFICIAL_RULES.attribution}
-                </p>
-              </div>
-            </div>
+        {/* Lobby — no session */}
+        {(status === 'idle' || !session) && (
+          <LobbyMenu
+            pendingMode={pendingMode}
+            setPendingMode={setPendingMode}
+            showFullRules={showFullRules}
+            setShowFullRules={setShowFullRules}
+            showRulesMode={showRulesMode}
+            setShowRulesMode={setShowRulesMode}
+            onInvite={sendInvite}
+            loading={actionLoading}
+            partnerName={partnerName}
+          />
+        )}
 
-            <div className="rounded-2xl border border-purple-500/20 bg-purple-950/20 p-4 space-y-2">
-              <p className="text-xs font-semibold text-purple-200 uppercase tracking-wider">
-                {OFFICIAL_RULES.contentsTitle}
-              </p>
-              <p className="text-xs text-muted-foreground">• {OFFICIAL_RULES.contentsLead}</p>
-              <ul className="text-xs text-muted-foreground ml-4 list-disc space-y-0.5">
-                {OFFICIAL_RULES.contentsItems.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-              <p className="text-xs italic text-purple-300/90">{OFFICIAL_RULES.note}</p>
-              <p className="text-xs text-purple-300/80 pt-1">
-                App deck: {PDF_CARD_COUNT.unique} unique · {PDF_CARD_COUNT.withDuplicates} with
-                pairs
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
-                {OFFICIAL_RULES.howToPlayIntro}
-              </p>
-              {GAME_MODES.map((m) => (
-                <div
-                  key={m.id}
-                  className="flex items-center gap-2 rounded-2xl border-2 border-rose-500/20 bg-gradient-to-r from-rose-950/50 to-purple-950/30 hover:border-rose-400/40 transition-colors overflow-hidden"
-                >
-                  <button
-                    type="button"
-                    onClick={() => startGame(m.id)}
-                    className="flex-1 flex items-center gap-4 p-4 text-left min-w-0"
-                  >
-                    <span className="text-3xl">{m.emoji}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-foreground">{m.label}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{m.subtitle}</p>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowRulesMode(showRulesMode === m.id ? null : m.id)}
-                    className="p-4 hover:bg-accent/50 flex-shrink-0"
-                    aria-label="Rules"
-                  >
-                    <Info className="w-4 h-4 text-muted-foreground" />
-                  </button>
-                </div>
-              ))}
-              {showRulesMode && (
-                <div className="px-4 py-3 rounded-xl bg-accent/50 space-y-2">
-                  <p className="text-sm font-semibold text-foreground">
-                    {OFFICIAL_RULES.modes.find((m) => m.id === showRulesMode)?.name}
-                  </p>
-                  {modeRules(showRulesMode).map((paragraph) => (
-                    <p key={paragraph.slice(0, 48)} className="text-sm text-muted-foreground leading-relaxed">
-                      {paragraph}
-                    </p>
-                  ))}
-                </div>
-              )}
-            </div>
+        {/* Waiting for partner to accept */}
+        {status === 'invite_pending' && sync?.isHost && (
+          <div className="max-w-md mx-auto text-center space-y-6 py-12">
+            <Users className="w-12 h-12 mx-auto text-purple-400" />
+            <h2 className="text-xl font-bold">Waiting for {partnerName}</h2>
+            <p className="text-muted-foreground text-sm">
+              Invite sent for <strong>{GAME_MODES.find((m) => m.id === mode)?.label}</strong>.
+              They need to open Tease or Please and accept before the game starts.
+            </p>
+            <Loader2 className="w-6 h-6 animate-spin mx-auto text-[#A83FFF]" />
           </div>
         )}
 
-        {phase === 'playing' && mode === 'pleasing' && !drawnCard && (
-          <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-8 max-w-md mx-auto">
-            <div className="relative">
-              <div className="w-40 h-56 rounded-3xl bg-[repeating-linear-gradient(0deg,#5b2d82,#5b2d82_8px,#e8e0ef_8px,#e8e0ef_16px)] shadow-2xl shadow-purple-900/50 flex flex-col items-center justify-center border-4 border-purple-800 p-4">
-                <div className="w-full h-full rounded-full bg-white border-4 border-purple-700 flex flex-col items-center justify-center text-center px-2">
-                  <p className="text-purple-800 font-bold text-xs tracking-wide leading-tight">
-                    TEASE
-                  </p>
-                  <p className="text-purple-700 text-[10px] font-semibold">OR</p>
-                  <p className="text-purple-800 font-bold text-xs tracking-wide leading-tight">
-                    PLEASE
-                  </p>
-                </div>
-              </div>
-              <p className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs text-muted-foreground whitespace-nowrap">
-                {pileCount} cards left
-              </p>
-            </div>
-            <p className="text-center text-muted-foreground text-sm px-4">
-              <span className="font-semibold text-foreground">{currentPlayerName}</span>, draw a
-              card — both perform the task. Repeat until satisfied or you draw HOME RUN.
+        {/* Partner: accept invite */}
+        {status === 'invite_pending' && !sync?.isHost && (
+          <div className="max-w-md mx-auto text-center space-y-6 py-8">
+            <div className="text-5xl">💌</div>
+            <h2 className="text-xl font-bold">{session?.hostName} invited you</h2>
+            <p className="text-muted-foreground">
+              Play <strong>{GAME_MODES.find((m) => m.id === mode)?.subtitle}</strong> together —
+              cards sync live between both phones.
             </p>
-            <Button variant="gradient" size="lg" onClick={drawFromDeck} className="min-w-[200px]">
-              <Shuffle className="w-5 h-5 mr-2 inline" />
-              Draw card
+            <Button variant="gradient" size="lg" className="w-full" onClick={acceptInvite} disabled={actionLoading}>
+              Accept & start game
+            </Button>
+            <Button variant="ghost" onClick={declineInvite}>
+              Decline
             </Button>
           </div>
         )}
 
-        {phase === 'playing' && mode === 'memory' && !drawnCard && (
-          <div className="max-w-md mx-auto">
-            <p className="text-center text-sm text-muted-foreground mb-2">
-              {currentPlayerName} — flip two cards face down in the grid
-            </p>
-            <p className="text-center text-xs text-muted-foreground/80 mb-4 px-2">
-              Match → do the task → pass to partner. No match → flip back → partner&apos;s turn.
-              Ends on HOME RUN.
-            </p>
-            <div className="grid grid-cols-4 gap-2">
-              {memoryGrid.map((cell, i) => (
-                <button
-                  key={cell.card.id + i}
-                  type="button"
-                  disabled={cell.matched || flippedIndices.length >= 2}
-                  onClick={() => handleMemoryFlip(i)}
-                  className={`aspect-[3/4] rounded-xl text-xs font-bold transition-all ${
-                    cell.matched
-                      ? 'opacity-40 scale-95 bg-rose-500/20 border border-rose-500/30'
-                      : cell.faceUp
-                        ? 'bg-gradient-to-br from-rose-800 to-fuchsia-900 text-white border-rose-400/50'
-                        : 'bg-[repeating-linear-gradient(0deg,#4a2568,#4a2568_4px,#d8d0e4_4px,#d8d0e4_8px)] border-purple-600/50 hover:border-purple-400/60 shadow-md'
-                  }`}
-                >
-                  {cell.faceUp || cell.matched ? (
-                    <span className="text-[7px] sm:text-[8px] font-bold uppercase leading-tight text-center px-0.5 line-clamp-4">
-                      {cell.card.title}
-                    </span>
-                  ) : (
-                    <span className="text-[8px] font-bold text-purple-900/70 leading-none text-center px-0.5">
-                      T/O P
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
+        {/* Active game */}
+        {status === 'active' && session && mode && !activeCard && (
+          <ActiveGameBoard
+            mode={mode}
+            session={session}
+            sync={sync!}
+            userId={userId}
+            partnerLabel={partnerLabel}
+            isYourTurn={isYourTurn}
+            actionLoading={actionLoading}
+            onAction={runAction}
+          />
         )}
 
-        {phase === 'playing' && mode === 'teasing' && !drawnCard && (
-          <div className="max-w-md mx-auto space-y-6">
-            <p className="text-center text-sm">
-              <span className="font-semibold">{currentPlayerName}</span>&apos;s hand ·{' '}
-              {matches}/5 matches
-            </p>
-            <div className="flex flex-wrap gap-2 justify-center min-h-[120px]">
-              {hand.map((card) => {
-                const meta = getKindMeta(card.kind);
-                return (
-                  <div
-                    key={card.id}
-                    className={`w-16 h-24 rounded-xl bg-gradient-to-br ${meta.gradient} border ${meta.border} flex items-center justify-center text-2xl shadow-lg`}
-                  >
-                    {meta.emoji}
-                  </div>
-                );
-              })}
-            </div>
-            <p className="text-center text-xs text-muted-foreground px-2">
-              Find pairs in your hand, or draw from the pile. No card? Say{' '}
-              <span className="font-semibold text-foreground">&quot;Quit teasing me&quot;</span>.
-              First to 5 matches wins.
-            </p>
-            <p className="text-center text-xs text-muted-foreground">{pileCount} in pile</p>
-            <Button variant="gradient" className="w-full" onClick={teasingDraw}>
-              Draw from pile
-            </Button>
-          </div>
-        )}
-
-        {drawnCard && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 safe-top safe-bottom">
-            <div className="w-full max-w-md max-h-[90vh] overflow-y-auto">
-              <CardReveal
-                card={drawnCard}
-                partnerName={partnerName}
-                onDone={completeDrawnCard}
-                onSkip={completeDrawnCard}
-                isMatch={mode === 'memory'}
-              />
-            </div>
-          </div>
-        )}
-
-        {phase === 'finished' && (
+        {status === 'finished' && (
           <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-6 max-w-md mx-auto text-center px-4">
             <div className="text-6xl">💋</div>
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-rose-400 via-fuchsia-400 to-purple-400 bg-clip-text text-transparent">
+            <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-rose-400 to-purple-400">
               HOME RUN
             </h2>
-            <p className="text-muted-foreground font-medium uppercase tracking-wide">
-              JUST DO IT ALREADY
-            </p>
-            <p className="text-sm text-muted-foreground">
-              You drew the HOME RUN card. Game over — the rest of the night is yours.
-            </p>
-            <Button variant="gradient" onClick={resetAll}>
-              Play again
-            </Button>
-            <Button variant="ghost" onClick={onBack}>
-              Back to home
+            <p className="text-sm text-muted-foreground uppercase">Just do it already</p>
+            <Button variant="gradient" onClick={cancelGame}>
+              Back to menu
             </Button>
           </div>
         )}
       </div>
+
+      {/* Card overlays — synced between partners */}
+      {activeCard && (showYourCard || needsAck) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 safe-top safe-bottom">
+          <div className="w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <CardReveal
+              card={activeCard}
+              partnerName={partnerLabel}
+              variant={needsAck ? 'partner_passed' : 'your_turn'}
+              fromName={
+                needsAck
+                  ? session?.tableCardFromUserId === session?.hostUserId
+                    ? session.hostName
+                    : session?.partnerName
+                  : undefined
+              }
+              onPrimary={async () => {
+                if (needsAck) {
+                  await runAction('ack_card');
+                } else {
+                  await runAction('pass_card');
+                }
+              }}
+              onSkip={async () => runAction('skip_card')}
+              loading={actionLoading}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LobbyMenu({
+  pendingMode,
+  setPendingMode,
+  showFullRules,
+  setShowFullRules,
+  showRulesMode,
+  setShowRulesMode,
+  onInvite,
+  loading,
+  partnerName,
+}: {
+  pendingMode: GameMode | null;
+  setPendingMode: (m: GameMode | null) => void;
+  showFullRules: boolean;
+  setShowFullRules: (v: boolean) => void;
+  showRulesMode: GameMode | null;
+  setShowRulesMode: (m: GameMode | null) => void;
+  onInvite: (mode: GameMode) => void;
+  loading: boolean;
+  partnerName: string;
+}) {
+  return (
+    <div className="space-y-6 max-w-lg mx-auto">
+      <div className="relative rounded-3xl overflow-hidden border border-rose-500/25 p-6">
+        <div className="absolute inset-0 bg-gradient-to-br from-rose-950 via-fuchsia-950 to-purple-950" />
+        <div className="relative space-y-3 text-sm text-rose-100/90">
+          <h2 className="text-xl font-bold text-white text-center">Play together</h2>
+          <p className="text-center text-rose-100/80">
+            Invite {partnerName}. They must accept before cards are dealt. Turns and tasks sync on
+            both phones.
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowFullRules(!showFullRules)}
+            className="w-full py-2 rounded-xl border border-purple-400/30 text-xs font-semibold text-purple-100"
+          >
+            {showFullRules ? 'Hide rules' : 'Read full rules'}
+          </button>
+        </div>
+      </div>
+
+      {showFullRules && (
+        <div className="text-xs text-muted-foreground space-y-3 p-4 rounded-xl bg-accent/40 max-h-48 overflow-y-auto">
+          <p>{OFFICIAL_RULES.object}</p>
+          {OFFICIAL_RULES.modes.map((m) => (
+            <p key={m.id}>
+              <strong>{m.name}</strong> {m.paragraphs[0].slice(0, 120)}…
+            </p>
+          ))}
+        </div>
+      )}
+
+      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        Pick a mode, then invite
+      </p>
+      {GAME_MODES.map((m) => (
+        <div
+          key={m.id}
+          className={`rounded-2xl border-2 overflow-hidden ${
+            pendingMode === m.id ? 'border-rose-400' : 'border-rose-500/20'
+          }`}
+        >
+          <button
+            type="button"
+            onClick={() => setPendingMode(m.id)}
+            className="w-full flex items-center gap-4 p-4 text-left"
+          >
+            <span className="text-3xl">{m.emoji}</span>
+            <div>
+              <p className="font-semibold">{m.label}</p>
+              <p className="text-xs text-muted-foreground">{m.subtitle}</p>
+            </div>
+          </button>
+        </div>
+      ))}
+
+      <Button
+        variant="gradient"
+        size="lg"
+        className="w-full"
+        disabled={!pendingMode || loading}
+        onClick={() => pendingMode && onInvite(pendingMode)}
+      >
+        <Users className="w-5 h-5 mr-2 inline" />
+        Invite {partnerName} to play
+      </Button>
+
+      <p className="text-center text-[10px] text-muted-foreground">
+        {PDF_CARD_COUNT.unique} cards · {PDF_CARD_COUNT.withDuplicates} with pairs
+      </p>
+    </div>
+  );
+}
+
+function ActiveGameBoard({
+  mode,
+  session,
+  sync,
+  userId,
+  partnerLabel,
+  isYourTurn,
+  actionLoading,
+  onAction,
+}: {
+  mode: GameMode;
+  session: NonNullable<GameSyncView['session']>;
+  sync: GameSyncView;
+  userId: string;
+  partnerLabel: string;
+  isYourTurn: boolean;
+  actionLoading: boolean;
+  onAction: (action: string, payload?: Record<string, unknown>) => void;
+}) {
+  const flipped = session.memory.flippedIndices?.length ?? 0;
+
+  if (mode === 'pleasing') {
+    return (
+      <div className="flex flex-col items-center space-y-8 max-w-md mx-auto py-8">
+        <p className="text-center text-sm text-muted-foreground">
+          {isYourTurn ? (
+            <>
+              <span className="font-semibold text-foreground">Your turn</span> — draw a card
+            </>
+          ) : (
+            <>
+              Waiting for <span className="font-semibold">{partnerLabel}</span>…
+            </>
+          )}
+        </p>
+        <p className="text-xs text-muted-foreground">{sync.pileCount} cards in pile</p>
+        <Button
+          variant="gradient"
+          size="lg"
+          disabled={!isYourTurn || actionLoading}
+          onClick={() => onAction('draw')}
+        >
+          <Shuffle className="w-5 h-5 mr-2 inline" />
+          Draw card
+        </Button>
+      </div>
+    );
+  }
+
+  if (mode === 'memory') {
+    const cells = session.memory?.cells ?? [];
+    return (
+      <div className="max-w-md mx-auto">
+        <p className="text-center text-sm text-muted-foreground mb-4">
+          {isYourTurn ? 'Your turn — flip two cards' : `Waiting for ${partnerLabel}…`}
+        </p>
+        <div className="grid grid-cols-4 gap-2">
+          {cells.map((cell, i) => (
+            <button
+              key={`${cell.cardId}-${i}`}
+              type="button"
+              disabled={!isYourTurn || cell.matched || flipped >= 2 || actionLoading}
+              onClick={() => onAction('memory_flip', { index: i })}
+              className={`aspect-[3/4] rounded-xl text-[7px] font-bold uppercase p-1 transition-all ${
+                cell.matched
+                  ? 'opacity-40 bg-purple-500/20'
+                  : cell.faceUp
+                    ? 'bg-purple-800 text-white'
+                    : 'bg-[repeating-linear-gradient(0deg,#4a2568,#4a2568_4px,#d8d0e4_4px,#d8d0e4_8px)]'
+              }`}
+            >
+              {cell.faceUp || cell.matched ? (
+                <span className="line-clamp-4">{cell.card?.title ?? '?'}</span>
+              ) : (
+                'T/P'
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const hand = sync.teasingHandCards ?? [];
+  const myMatches = session.teasing?.matches?.[userId] ?? 0;
+
+  return (
+    <div className="max-w-md mx-auto space-y-6">
+      <p className="text-center text-sm">
+        {isYourTurn ? 'Your turn' : `Waiting for ${partnerLabel}…`} · {myMatches}/5 matches
+      </p>
+      <div className="flex flex-wrap gap-2 justify-center min-h-[100px]">
+        {hand.map((card) => (
+          <div
+            key={card.id}
+            className="w-14 h-20 rounded-lg bg-purple-900/80 border border-purple-400/40 flex items-center justify-center text-[8px] uppercase p-1 text-center font-bold text-purple-100"
+          >
+            {card.title.slice(0, 12)}
+          </div>
+        ))}
+      </div>
+      <Button
+        variant="gradient"
+        className="w-full"
+        disabled={!isYourTurn || actionLoading}
+        onClick={() => onAction('teasing_draw')}
+      >
+        Draw from pile ({sync.pileCount})
+      </Button>
     </div>
   );
 }
@@ -500,66 +520,66 @@ export function TeaseOrPleaseScreen({
 function CardReveal({
   card,
   partnerName,
-  onDone,
+  variant,
+  fromName,
+  onPrimary,
   onSkip,
-  isMatch = false,
+  loading,
 }: {
   card: TeasePleaseCard;
   partnerName: string;
-  onDone: () => void;
+  variant: 'your_turn' | 'partner_passed';
+  fromName?: string;
+  onPrimary: () => void;
   onSkip: () => void;
-  isMatch?: boolean;
+  loading?: boolean;
 }) {
   const meta = getKindMeta(card.kind);
   const twoLine = cardHasInstruction(card);
 
   return (
-    <div className="max-w-md mx-auto space-y-6">
-      {isMatch && (
-        <p className="text-center text-sm font-semibold text-rose-300 uppercase tracking-wider">
-          It&apos;s a match — do the task
+    <div className="space-y-4">
+      {variant === 'partner_passed' && (
+        <p className="text-center text-sm font-semibold text-rose-300">
+          {fromName} passed this card to you
         </p>
       )}
+      {variant === 'your_turn' && (
+        <p className="text-center text-sm font-semibold text-rose-300">Do the task, then pass</p>
+      )}
       <div
-        className={`relative rounded-3xl border-4 ${meta.border} p-8 shadow-2xl ${meta.glow} overflow-hidden`}
+        className={`relative rounded-3xl border-4 ${meta.border} p-8 shadow-2xl ${meta.glow}`}
         style={{
           background:
             'repeating-linear-gradient(0deg, rgba(91,45,130,0.15) 0px, rgba(91,45,130,0.15) 6px, rgba(232,224,239,0.08) 6px, rgba(232,224,239,0.08) 12px)',
         }}
       >
-        <div className="relative rounded-full border-4 border-purple-400/60 bg-purple-950/80 px-6 py-8 text-center min-h-[220px] flex flex-col justify-center">
-          <span className="text-[10px] uppercase tracking-[0.2em] text-purple-300/80 mb-3">
-            {meta.label}
-          </span>
-          <h3 className="text-lg sm:text-xl font-bold text-white uppercase tracking-tight leading-snug">
-            {card.title}
-          </h3>
+        <div className="relative rounded-full border-4 border-purple-400/60 bg-purple-950/80 px-6 py-8 text-center">
+          <span className="text-[10px] uppercase tracking-widest text-purple-300/80">{meta.label}</span>
+          <h3 className="text-lg font-bold text-white uppercase mt-3 leading-snug">{card.title}</h3>
           {twoLine && (
             <>
               <div className="my-4 border-t border-dashed border-purple-300/50 w-3/4 mx-auto" />
-              <p className="text-sm sm:text-base text-purple-100 uppercase leading-snug font-medium">
-                {card.task}
-              </p>
+              <p className="text-sm text-purple-100 uppercase leading-snug font-medium">{card.task}</p>
             </>
           )}
           {card.kind === 'homerun' && (
-            <p className="text-xs text-rose-200/70 flex items-center justify-center gap-1 mt-4">
+            <p className="text-xs text-rose-200/70 mt-4 flex items-center justify-center gap-1">
               <Heart className="w-3 h-3 fill-current" />
               With {partnerName}
             </p>
           )}
         </div>
       </div>
-
-      <div className="flex flex-col gap-2">
-        <Button variant="gradient" size="lg" className="w-full" onClick={onDone}>
-          Done — pass to partner
-        </Button>
-        <Button variant="ghost" className="w-full text-muted-foreground" onClick={onSkip}>
+      <Button variant="gradient" size="lg" className="w-full" onClick={onPrimary} disabled={loading}>
+        {variant === 'partner_passed' ? 'Got it — my turn' : 'Done — pass to partner'}
+      </Button>
+      {variant === 'your_turn' && (
+        <Button variant="ghost" className="w-full" onClick={onSkip} disabled={loading}>
           <SkipForward className="w-4 h-4 mr-2 inline" />
-          Skip this card
+          Skip card
         </Button>
-      </div>
+      )}
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { CalendarRemindersHome } from '@/app/components/CalendarRemindersHome';
 import { SharkModeHomeCard } from '@/app/components/SharkModeHomeCard';
 import { DailyChallenge } from '@/app/components/DailyChallenge';
 import { Sparkles, History, User, Calendar, HandHeart, Bell, Flame } from 'lucide-react';
-import { todayAPI, notificationAPI, sharkModeAPI, partnerStatusAPI, calendarAPI } from '@/utils/api';
+import { todayAPI, notificationAPI, sharkModeAPI, partnerStatusAPI, calendarAPI, teaseGameAPI } from '@/utils/api';
 import { getUpcomingCalendarReminders } from '@/app/constants/calendar';
 import { formatDistanceToNow } from 'date-fns';
 import { PartnerStatusHomeCard } from '@/app/components/PartnerStatusHomeCard';
@@ -58,20 +58,34 @@ export function HomeScreen({
   const [partnerStatusRecord, setPartnerStatusRecord] = useState<any>(null);
   const [showPartnerStatusSheet, setShowPartnerStatusSheet] = useState(false);
   const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
+  const [teaseGameInvitePending, setTeaseGameInvitePending] = useState(false);
 
   useEffect(() => {
     fetchTodayCard();
     fetchSharkMode();
     fetchPartnerStatus();
     fetchCalendarEvents();
+    fetchTeaseGameInvite();
     const interval = setInterval(() => {
       fetchTodayCard();
       fetchSharkMode();
       fetchPartnerStatus();
       fetchCalendarEvents();
+      fetchTeaseGameInvite();
     }, 1000); // Refresh every 1s for near-instant updates
     return () => clearInterval(interval);
-  }, [coupleId]);
+  }, [coupleId, userId]);
+
+  const fetchTeaseGameInvite = async () => {
+    try {
+      const data = await teaseGameAPI.get(coupleId, userId);
+      setTeaseGameInvitePending(
+        data?.session?.status === 'invite_pending' && data.isHost === false,
+      );
+    } catch {
+      setTeaseGameInvitePending(false);
+    }
+  };
 
   const fetchTodayCard = async () => {
     try {
@@ -222,11 +236,14 @@ export function HomeScreen({
           {onPlayTeaseOrPlease && (
             <button
               onClick={onPlayTeaseOrPlease}
-              className="p-2 hover:bg-rose-500/10 rounded-full transition-colors"
+              className="p-2 hover:bg-rose-500/10 rounded-full transition-colors relative"
               aria-label="Tease or Please"
-              title="Tease or Please"
+              title={teaseGameInvitePending ? 'Game invite — tap to accept' : 'Tease or Please'}
             >
               <Flame className="w-5 h-5 text-[#FB3094] fill-[#FB3094]/25" />
+              {teaseGameInvitePending && (
+                <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-[#FB3094] rounded-full ring-2 ring-background animate-pulse" />
+              )}
             </button>
           )}
           <button
