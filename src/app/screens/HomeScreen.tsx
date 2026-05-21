@@ -6,7 +6,7 @@ import { InstallPrompt } from '@/app/components/InstallPrompt';
 import { CalendarRemindersHome } from '@/app/components/CalendarRemindersHome';
 import { SharkModeHomeCard } from '@/app/components/SharkModeHomeCard';
 import { DailyChallenge } from '@/app/components/DailyChallenge';
-import { Sparkles, History, User, Calendar, HandHeart, Bell, Flame } from 'lucide-react';
+import { Sparkles, History, User, Calendar, HandHeart, Bell, Clock } from 'lucide-react';
 import { todayAPI, notificationAPI, sharkModeAPI, partnerStatusAPI, calendarAPI, teaseGameAPI } from '@/utils/api';
 import { getUpcomingCalendarReminders } from '@/app/constants/calendar';
 import { formatDistanceToNow } from 'date-fns';
