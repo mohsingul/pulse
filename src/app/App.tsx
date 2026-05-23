@@ -35,6 +35,7 @@ import { NotificationPermissionPrompt } from '@/app/components/NotificationPermi
 // Hooks
 import { useFirebaseNotifications } from '@/hooks/useFirebaseNotifications';
 import { useReminderNotifications, syncReminderPreferencesToServer } from '@/hooks/useReminderNotifications';
+import { useSessionLifecycle } from '@/hooks/useSessionLifecycle';
 import { calendarAPI } from '@/utils/api';
 import {
   parseAppDeepLink,
@@ -85,6 +86,13 @@ export default function App() {
   // Pulse reminder notifications (local fallback + server sync for push)
   useReminderNotifications(!!user?.userId && notificationPermission === 'granted');
 
+  // Log out when the app is closed (sessionStorage session ends)
+  useSessionLifecycle(() => {
+    setUser(null);
+    setCouple(null);
+    setCurrentScreen('welcome');
+  });
+
   const openCalendarEvent = (eventId: string) => {
     setHighlightCalendarEventId(eventId);
     setCurrentScreen('couple-calendar');
@@ -110,10 +118,13 @@ export default function App() {
     const savedTheme = storage.getTheme();
     document.documentElement.classList.toggle('dark', savedTheme === 'dark');
 
+    // Drop legacy persistent login from older builds
+    localStorage.removeItem('pulse_user');
+
     // Test backend connection
     testBackendConnection();
 
-    // Check for existing user
+    // Restore user only if this browser session is still active
     const savedUser = storage.getUser();
     if (savedUser) {
       setUser(savedUser);
@@ -133,6 +144,24 @@ export default function App() {
       applyDeepLinkNavigation();
     }
   }, [couple]);
+
+  // If session ended while backgrounded, return to login
+  useEffect(() => {
+    const syncSession = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (!storage.getUser() && user) {
+        setUser(null);
+        setCouple(null);
+        setCurrentScreen('welcome');
+      }
+    };
+    document.addEventListener('visibilitychange', syncSession);
+    window.addEventListener('pageshow', syncSession);
+    return () => {
+      document.removeEventListener('visibilitychange', syncSession);
+      window.removeEventListener('pageshow', syncSession);
+    };
+  }, [user]);
 
   useEffect(() => {
     if (typeof navigator === 'undefined' || !navigator.serviceWorker) return;
@@ -333,6 +362,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    storage.clearSession();
     setUser(null);
     setCouple(null);
     setCurrentScreen('welcome');

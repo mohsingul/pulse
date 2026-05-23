@@ -6,24 +6,58 @@ interface UserData {
   displayName: string;
 }
 
+const USER_KEY = 'pulse_user';
+const BOOT_KEY = 'pulse_current_boot';
+const USER_BOOT_KEY = 'pulse_user_boot';
+
+/** New id every time the app bundle loads (home-screen open or browser refresh). */
+if (typeof window !== 'undefined') {
+  sessionStorage.setItem(
+    BOOT_KEY,
+    `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+  );
+}
+
+function currentBootId(): string {
+  return sessionStorage.getItem(BOOT_KEY) ?? '';
+}
+
 export const storage = {
-  // User
+  /**
+   * Logged-in user for this app launch only.
+   * Cleared on close (pagehide) or when the app is opened again (new boot id).
+   */
   getUser: (): UserData | null => {
-    const user = localStorage.getItem('pulse_user');
+    if (typeof window === 'undefined') return null;
+    if (sessionStorage.getItem(USER_BOOT_KEY) !== currentBootId()) return null;
+    const user = sessionStorage.getItem(USER_KEY);
     return user ? JSON.parse(user) : null;
   },
 
   setUser: (user: UserData) => {
-    localStorage.setItem('pulse_user', JSON.stringify(user));
+    sessionStorage.setItem(USER_KEY, JSON.stringify(user));
+    sessionStorage.setItem(USER_BOOT_KEY, currentBootId());
+  },
+
+  /** End login session (logout or app closed). Keeps theme & saved password on device. */
+  clearSession: () => {
+    sessionStorage.removeItem(USER_KEY);
+    sessionStorage.removeItem(USER_BOOT_KEY);
+    localStorage.removeItem(USER_KEY);
   },
 
   clearUser: () => {
-    localStorage.removeItem('pulse_user');
-    localStorage.removeItem('pulse_theme');
-    localStorage.removeItem('pulse_notifications');
+    storage.clearSession();
   },
 
-  // Theme
+  clearAllLocalData: () => {
+    storage.clearSession();
+    localStorage.removeItem('pulse_theme');
+    localStorage.removeItem('pulse_notifications');
+    localStorage.removeItem('pulse_notification_prompt_state');
+    localStorage.removeItem('pulse_device_login');
+  },
+
   getTheme: (): 'light' | 'dark' => {
     return (localStorage.getItem('pulse_theme') as 'light' | 'dark') || 'light';
   },
@@ -32,7 +66,6 @@ export const storage = {
     localStorage.setItem('pulse_theme', theme);
   },
 
-  // Notifications
   getNotifications: () => {
     const defaults = {
       morning: { enabled: true, time: '09:00' },
@@ -47,7 +80,6 @@ export const storage = {
     localStorage.setItem('pulse_notifications', JSON.stringify(notifications));
   },
 
-  // Notification Permission Prompt Tracking
   getNotificationPromptState: () => {
     const stored = localStorage.getItem('pulse_notification_prompt_state');
     return stored ? JSON.parse(stored) : { lastPromptTime: 0, promptCount: 0 };

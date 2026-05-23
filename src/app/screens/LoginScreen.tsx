@@ -16,6 +16,7 @@ interface LoginScreenProps {
 export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [saveOnDevice, setSaveOnDevice] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -96,7 +97,7 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
       const trimmedUsername = username.trim();
       const response = await userAPI.login(trimmedUsername, password);
       storage.setUser(response.user);
-      await storeLoginCredential(trimmedUsername, password);
+      await storeLoginCredential(trimmedUsername, password, { saveOnDevice });
       onSuccess(response.user);
     } catch (error: any) {
       setErrors({ general: getLoginErrorMessage(error.message || 'An unknown error occurred') });
@@ -106,7 +107,7 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
   };
 
   const handleReset = () => {
-    storage.clearUser();
+    storage.clearAllLocalData();
     setShowResetConfirm(false);
     setUsername('');
     setPassword('');
@@ -222,9 +223,17 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
               </div>
             )}
 
-            <p className="text-xs text-muted-foreground">
-              After you sign in, your iPhone or browser can offer to save this password in Passwords.
-            </p>
+            <label className="flex items-center space-x-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={saveOnDevice}
+                onChange={(e) => setSaveOnDevice(e.target.checked)}
+                className="w-5 h-5 rounded border-border text-[#A83FFF] focus:ring-[#A83FFF] focus:ring-offset-0"
+              />
+              <span className="text-sm text-muted-foreground">
+                Save password on this device (works in home-screen app)
+              </span>
+            </label>
 
             {/* Forgot Password Link */}
             <div className="flex justify-end">

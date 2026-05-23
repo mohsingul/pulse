@@ -175,7 +175,7 @@ export function ProfileScreen({
   };
 
   const handleLogout = () => {
-    storage.clearUser();
+    storage.clearSession();
     onLogout();
   };
 
