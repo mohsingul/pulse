@@ -25,7 +25,8 @@ import { NotificationSettingsScreen } from '@/app/screens/NotificationSettingsSc
 import { NotificationCenterScreen } from '@/app/screens/NotificationCenterScreen';
 import { CoupleCalendarScreen } from '@/app/screens/CoupleCalendarScreen';
 import { TeaseOrPleaseScreen } from '@/app/screens/TeaseOrPleaseScreen';
-import { SexyDiceScreen } from '@/app/screens/SexyDiceScreen';
+// Sexy Dice — hidden for now (re-enable to launch)
+// import { SexyDiceScreen } from '@/app/screens/SexyDiceScreen';
 
 // Components
 import { UpdatePulseSheet } from '@/app/components/UpdatePulseSheet';
@@ -66,8 +67,8 @@ type Screen =
   | 'shark-mode-archive'
   | 'daily-challenge-archive'
   | 'couple-calendar'
-  | 'tease-or-please'
-  | 'sexy-dice';
+  | 'tease-or-please';
+  // | 'sexy-dice';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
@@ -455,7 +456,7 @@ export default function App() {
               onViewProfile={() => setCurrentScreen('profile')}
               onViewCalendar={() => setCurrentScreen('couple-calendar')}
               onViewDailyChallengeArchive={() => setCurrentScreen('daily-challenge-archive')}
-              onPlaySexyDice={() => setCurrentScreen('sexy-dice')}
+              // onPlaySexyDice={() => setCurrentScreen('sexy-dice')}
             />
             <UpdatePulseSheet
               isOpen={showUpdateSheet}
@@ -659,16 +660,16 @@ export default function App() {
           />
         ) : null;
 
-      case 'sexy-dice':
-        return couple ? (
-          <SexyDiceScreen
-            coupleId={couple.coupleId}
-            userId={user.userId}
-            userName={user.displayName}
-            partnerName={couple.partner.displayName}
-            onBack={() => setCurrentScreen('home')}
-          />
-        ) : null;
+      // case 'sexy-dice':
+      //   return couple ? (
+      //     <SexyDiceScreen
+      //       coupleId={couple.coupleId}
+      //       userId={user.userId}
+      //       userName={user.displayName}
+      //       partnerName={couple.partner.displayName}
+      //       onBack={() => setCurrentScreen('home')}
+      //     />
+      //   ) : null;
 
       default:
         return <WelcomeScreen onGetStarted={() => setCurrentScreen('create-profile')} onLogin={() => setCurrentScreen('login')} />;

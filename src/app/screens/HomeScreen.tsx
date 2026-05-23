@@ -6,8 +6,10 @@ import { InstallPrompt } from '@/app/components/InstallPrompt';
 import { CalendarRemindersHome } from '@/app/components/CalendarRemindersHome';
 import { SharkModeHomeCard } from '@/app/components/SharkModeHomeCard';
 import { DailyChallenge } from '@/app/components/DailyChallenge';
-import { Sparkles, History, User, Calendar, HandHeart, Bell, Clock, Dices } from 'lucide-react';
-import { todayAPI, notificationAPI, sharkModeAPI, partnerStatusAPI, calendarAPI, sexyDiceGameAPI } from '@/utils/api';
+import { Sparkles, History, User, Calendar, HandHeart, Bell, Clock } from 'lucide-react';
+// import { Dices } from 'lucide-react';
+import { todayAPI, notificationAPI, sharkModeAPI, partnerStatusAPI, calendarAPI } from '@/utils/api';
+// import { sexyDiceGameAPI } from '@/utils/api';
 import { storage, NUDGE_DAILY_LIMIT } from '@/utils/storage';
 import { getUpcomingCalendarReminders } from '@/app/constants/calendar';
 import { formatDistanceToNow } from 'date-fns';
@@ -32,7 +34,7 @@ interface HomeScreenProps {
   onViewCalendar: () => void;
   onViewDailyChallengeArchive?: () => void;
   onPlayTeaseOrPlease?: () => void;
-  onPlaySexyDice?: () => void;
+  // onPlaySexyDice?: () => void;
 }
 
 const REACTIONS = ['❤️', '🫶', '😘', '😄', '🥺'];
@@ -50,7 +52,7 @@ export function HomeScreen({
   onViewCalendar,
   onViewDailyChallengeArchive,
   onPlayTeaseOrPlease,
-  onPlaySexyDice,
+  // onPlaySexyDice,
 }: HomeScreenProps) {
   const [todayCard, setTodayCard] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -61,20 +63,20 @@ export function HomeScreen({
   const [partnerStatusRecord, setPartnerStatusRecord] = useState<any>(null);
   const [showPartnerStatusSheet, setShowPartnerStatusSheet] = useState(false);
   const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
-  const [sexyDiceInvitePending, setSexyDiceInvitePending] = useState(false);
+  // const [sexyDiceInvitePending, setSexyDiceInvitePending] = useState(false);
 
   useEffect(() => {
     fetchTodayCard();
     fetchSharkMode();
     fetchPartnerStatus();
     fetchCalendarEvents();
-    fetchSexyDiceInvite();
+    // fetchSexyDiceInvite();
     const interval = setInterval(() => {
       fetchTodayCard();
       fetchSharkMode();
       fetchPartnerStatus();
       fetchCalendarEvents();
-      fetchSexyDiceInvite();
+      // fetchSexyDiceInvite();
     }, 1000); // Refresh every 1s for near-instant updates
     return () => clearInterval(interval);
   }, [coupleId, userId]);
@@ -83,16 +85,16 @@ export function HomeScreen({
     setNudgeCount(storage.getDailyNudgeCount(coupleId));
   }, [coupleId]);
 
-  const fetchSexyDiceInvite = async () => {
-    try {
-      const data = await sexyDiceGameAPI.get(coupleId, userId);
-      setSexyDiceInvitePending(
-        data?.session?.status === 'invite_pending' && data.isHost === false,
-      );
-    } catch {
-      setSexyDiceInvitePending(false);
-    }
-  };
+  // const fetchSexyDiceInvite = async () => {
+  //   try {
+  //     const data = await sexyDiceGameAPI.get(coupleId, userId);
+  //     setSexyDiceInvitePending(
+  //       data?.session?.status === 'invite_pending' && data.isHost === false,
+  //     );
+  //   } catch {
+  //     setSexyDiceInvitePending(false);
+  //   }
+  // };
 
   const fetchTodayCard = async () => {
     try {
@@ -241,6 +243,7 @@ export function HomeScreen({
       {/* Header */}
       <div className="px-6 py-4 flex items-center justify-end safe-top flex-shrink-0 border-b border-border">
         <div className="flex items-center space-x-1">
+          {/* Sexy Dice — hidden for now
           {onPlaySexyDice && (
             <button
               onClick={onPlaySexyDice}
@@ -254,6 +257,7 @@ export function HomeScreen({
               )}
             </button>
           )}
+          */}
           <button
             onClick={() => setShowPartnerStatusSheet(true)}
             className="p-2 hover:bg-accent rounded-full transition-colors relative"
