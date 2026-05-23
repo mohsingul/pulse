@@ -4,15 +4,17 @@ import { Input } from '@/app/components/Input';
 import { X, Trash2, Pencil } from 'lucide-react';
 import {
   CALENDAR_EVENT_TYPES,
-  CALENDAR_OWNER_COLORS,
   getCalendarTypeMeta,
-  getEventOwnerKey,
   daysUntilEvent,
   getReminderLabel,
+  formatEventTime,
+  getUserCalendarHex,
+  parseDateKey,
+  type CalendarColorMap,
   type CalendarEventType,
   type CalendarEventItem,
 } from '@/app/constants/calendar';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 
 export type CalendarSheetMode = 'add' | 'view' | 'edit';
 
@@ -24,12 +26,14 @@ interface CalendarEventFormSheetProps {
   currentUserId: string;
   userName: string;
   partnerName: string;
+  colorMap: CalendarColorMap;
   saving: boolean;
   onClose: () => void;
   onSave: (data: {
     type: CalendarEventType;
     title: string;
     date: string;
+    time?: string;
     notes?: string;
   }) => void;
   onDelete: () => void;
@@ -44,6 +48,7 @@ export function CalendarEventFormSheet({
   currentUserId,
   userName,
   partnerName,
+  colorMap,
   saving,
   onClose,
   onSave,
@@ -53,6 +58,7 @@ export function CalendarEventFormSheet({
   const [type, setType] = useState<CalendarEventType>('important');
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(initialDate);
+  const [time, setTime] = useState('');
   const [notes, setNotes] = useState('');
 
   useEffect(() => {
@@ -61,11 +67,13 @@ export function CalendarEventFormSheet({
       setType('important');
       setTitle('');
       setDate(initialDate);
+      setTime('');
       setNotes('');
     } else if (event) {
       setType(event.type);
       setTitle(event.title);
       setDate(event.date);
+      setTime(event.time ?? '');
       setNotes(event.notes ?? '');
     }
   }, [open, mode, event, initialDate]);
@@ -73,9 +81,10 @@ export function CalendarEventFormSheet({
   if (!open) return null;
 
   const isForm = mode === 'add' || mode === 'edit';
-  const ownerKey = event ? getEventOwnerKey(event.createdBy, currentUserId) : 'self';
-  const ownerLabel = ownerKey === 'self' ? userName : partnerName;
-  const ownerColors = CALENDAR_OWNER_COLORS[ownerKey];
+  const isSelf = !event?.createdBy || event.createdBy === currentUserId;
+  const ownerLabel = isSelf ? userName : partnerName;
+  const ownerHex = getUserCalendarHex(event?.createdBy, colorMap, currentUserId);
+  const timeLabel = event ? formatEventTime(event.time) : null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,6 +93,7 @@ export function CalendarEventFormSheet({
       type,
       title: title.trim(),
       date,
+      time: time.trim() || undefined,
       notes: notes.trim() || undefined,
     });
   };
@@ -118,8 +128,11 @@ export function CalendarEventFormSheet({
         <div className="px-5 pb-8 pt-4 space-y-4">
           {mode === 'view' && event && (
             <>
-              <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold ${ownerColors.soft} ${ownerColors.text}`}>
-                <span className={`w-2 h-2 rounded-full ${ownerColors.dot}`} />
+              <div
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold"
+                style={{ backgroundColor: `${ownerHex}20`, color: ownerHex }}
+              >
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: ownerHex }} />
                 {ownerLabel}
               </div>
               <div className="flex items-start gap-3">
@@ -132,8 +145,14 @@ export function CalendarEventFormSheet({
               <dl className="space-y-2 text-sm">
                 <div>
                   <dt className="text-muted-foreground">Date</dt>
-                  <dd className="font-medium">{format(parseISO(event.date), 'EEEE, MMMM d, yyyy')}</dd>
+                  <dd className="font-medium">{format(parseDateKey(event.date), 'EEEE, MMMM d, yyyy')}</dd>
                 </div>
+                {timeLabel && (
+                  <div>
+                    <dt className="text-muted-foreground">Time</dt>
+                    <dd className="font-medium">{timeLabel}</dd>
+                  </div>
+                )}
                 <div>
                   <dt className="text-muted-foreground">Countdown</dt>
                   <dd className="font-medium">
@@ -191,13 +210,21 @@ export function CalendarEventFormSheet({
                 onChange={(e) => setTitle(e.target.value)}
                 required
               />
-              <Input
-                label="Date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                required
-              />
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="Date"
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  required
+                />
+                <Input
+                  label="Time (optional)"
+                  type="time"
+                  value={time}
+                  onChange={(e) => setTime(e.target.value)}
+                />
+              </div>
               <Input
                 label="Notes"
                 placeholder="Optional notes"

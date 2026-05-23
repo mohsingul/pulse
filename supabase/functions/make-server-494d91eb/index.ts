@@ -2690,6 +2690,30 @@ app.post("/make-server-494d91eb/partner-needs/:coupleId", async (c) => {
 
 type CalendarEventType = "anniversary" | "birthday" | "trip" | "important";
 
+const CALENDAR_COLOR_IDS = ["rose", "blue", "purple", "teal", "orange", "gold", "green", "coral"];
+
+function calendarPrefsKey(coupleId: string) {
+  return `calendar_prefs:${coupleId}`;
+}
+
+function defaultCalendarColors(couple: { user1Id: string; user2Id: string }) {
+  return { [couple.user1Id]: "rose", [couple.user2Id]: "blue" };
+}
+
+async function getCalendarColors(coupleId: string, couple: { user1Id: string; user2Id: string }) {
+  const prefs = await kv.get(calendarPrefsKey(coupleId));
+  const defaults = defaultCalendarColors(couple);
+  const stored = prefs?.colors ?? {};
+  return {
+    [couple.user1Id]: CALENDAR_COLOR_IDS.includes(stored[couple.user1Id])
+      ? stored[couple.user1Id]
+      : defaults[couple.user1Id],
+    [couple.user2Id]: CALENDAR_COLOR_IDS.includes(stored[couple.user2Id])
+      ? stored[couple.user2Id]
+      : defaults[couple.user2Id],
+  };
+}
+
 app.get("/make-server-494d91eb/calendar/:coupleId", async (c) => {
   try {
     const coupleId = c.req.param("coupleId");
@@ -2697,22 +2721,63 @@ app.get("/make-server-494d91eb/calendar/:coupleId", async (c) => {
       return c.json({ error: "Couple ID is required" }, 400);
     }
 
+    const couple = await kv.get(`couple:${coupleId}`);
+    if (!couple) {
+      return c.json({ error: "Couple not found" }, 404);
+    }
+
     const events = await kv.getByPrefix(`calendar_event:${coupleId}:`);
     const sorted = events.sort((a: any, b: any) => {
       return new Date(a.date).getTime() - new Date(b.date).getTime();
     });
 
-    return c.json({ events: sorted });
+    const colors = await getCalendarColors(coupleId, couple);
+
+    return c.json({ events: sorted, colors });
   } catch (error: any) {
     console.error(`[Calendar] Error getting events:`, error);
     return c.json({ error: error.message || "Failed to get calendar events" }, 500);
   }
 });
 
+app.put("/make-server-494d91eb/calendar/:coupleId/colors", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    const { userId, colorId } = await c.req.json();
+
+    if (!coupleId || !userId || !colorId) {
+      return c.json({ error: "Couple ID, user ID, and colorId are required" }, 400);
+    }
+
+    if (!CALENDAR_COLOR_IDS.includes(colorId)) {
+      return c.json({ error: "Invalid color" }, 400);
+    }
+
+    const couple = await kv.get(`couple:${coupleId}`);
+    if (!couple) {
+      return c.json({ error: "Couple not found" }, 404);
+    }
+
+    if (userId !== couple.user1Id && userId !== couple.user2Id) {
+      return c.json({ error: "User is not part of this couple" }, 403);
+    }
+
+    const existing = (await kv.get(calendarPrefsKey(coupleId))) ?? { colors: {} };
+    const colors = { ...(existing.colors ?? {}), [userId]: colorId };
+    await kv.set(calendarPrefsKey(coupleId), { colors, updatedAt: new Date().toISOString() });
+
+    const merged = await getCalendarColors(coupleId, couple);
+    return c.json({ success: true, colors: merged });
+  } catch (error: any) {
+    console.error(`[Calendar] Error saving color:`, error);
+    return c.json({ error: error.message || "Failed to save calendar color" }, 500);
+  }
+});
+
 app.post("/make-server-494d91eb/calendar/:coupleId", async (c) => {
   try {
     const coupleId = c.req.param("coupleId");
-    const { userId, type, title, date, notes } = await c.req.json();
+    const { userId, type, title, date, time, notes } = await c.req.json();
 
     if (!coupleId || !userId || !type || !title || !date) {
       return c.json({ error: "Couple ID, user ID, type, title, and date are required" }, 400);
@@ -2740,6 +2805,7 @@ app.post("/make-server-494d91eb/calendar/:coupleId", async (c) => {
       type,
       title: String(title).trim(),
       date,
+      time: time ? String(time).trim() : "",
       notes: notes ? String(notes).trim() : "",
       createdBy: userId,
       createdByName: user?.displayName || "Partner",
@@ -2800,7 +2866,7 @@ app.put("/make-server-494d91eb/calendar/:coupleId/:eventId", async (c) => {
   try {
     const coupleId = c.req.param("coupleId");
     const eventId = c.req.param("eventId");
-    const { userId, type, title, date, notes } = await c.req.json();
+    const { userId, type, title, date, time, notes } = await c.req.json();
 
     if (!coupleId || !eventId || !userId || !type || !title || !date) {
       return c.json({ error: "Couple ID, event ID, user ID, type, title, and date are required" }, 400);
@@ -2830,6 +2896,7 @@ app.put("/make-server-494d91eb/calendar/:coupleId/:eventId", async (c) => {
       type,
       title: String(title).trim(),
       date,
+      time: time ? String(time).trim() : "",
       notes: notes ? String(notes).trim() : "",
       updatedAt: new Date().toISOString(),
       updatedBy: userId,

@@ -589,6 +589,8 @@ export default function App() {
           <CoupleCalendarScreen
             coupleId={couple.coupleId}
             userId={user.userId}
+            user1Id={couple.user1Id}
+            user2Id={couple.user2Id}
             userName={user.displayName}
             partnerName={couple.partner.displayName}
             highlightEventId={highlightCalendarEventId}

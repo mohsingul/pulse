@@ -362,6 +362,12 @@ export const calendarAPI = {
   get: (coupleId: string) =>
     apiRequest(`/calendar/${coupleId}`),
 
+  setColor: (coupleId: string, userId: string, colorId: string) =>
+    apiRequest(`/calendar/${coupleId}/colors`, {
+      method: 'PUT',
+      body: JSON.stringify({ userId, colorId }),
+    }),
+
   create: (
     coupleId: string,
     userId: string,
@@ -369,6 +375,7 @@ export const calendarAPI = {
       type: 'anniversary' | 'birthday' | 'trip' | 'important';
       title: string;
       date: string;
+      time?: string;
       notes?: string;
     },
   ) =>
@@ -390,6 +397,7 @@ export const calendarAPI = {
       type: 'anniversary' | 'birthday' | 'trip' | 'important';
       title: string;
       date: string;
+      time?: string;
       notes?: string;
     },
   ) =>

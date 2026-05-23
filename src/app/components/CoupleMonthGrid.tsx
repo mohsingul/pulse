@@ -13,10 +13,10 @@ import {
   isToday,
 } from 'date-fns';
 import {
-  CALENDAR_OWNER_COLORS,
-  getEventOwnerKey,
   getEventsOnDate,
+  getUserCalendarHex,
   toDateKey,
+  type CalendarColorMap,
   type CalendarEventItem,
 } from '@/app/constants/calendar';
 
@@ -27,6 +27,7 @@ interface CoupleMonthGridProps {
   onViewMonthChange: (month: Date) => void;
   events: CalendarEventItem[];
   currentUserId: string;
+  colorMap: CalendarColorMap;
   selectedDateKey: string | null;
   onSelectDate: (dateKey: string) => void;
 }
@@ -36,6 +37,7 @@ export function CoupleMonthGrid({
   onViewMonthChange,
   events,
   currentUserId,
+  colorMap,
   selectedDateKey,
   onSelectDate,
 }: CoupleMonthGridProps) {
@@ -123,11 +125,12 @@ export function CoupleMonthGrid({
               {dayEvents.length > 0 && (
                 <div className="flex flex-wrap justify-center gap-0.5 mt-0.5 px-0.5 w-full max-w-[40px]">
                   {dayEvents.slice(0, 4).map((ev) => {
-                    const owner = getEventOwnerKey(ev.createdBy, currentUserId);
+                    const hex = getUserCalendarHex(ev.createdBy, colorMap, currentUserId);
                     return (
                       <span
                         key={ev.id}
-                        className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${CALENDAR_OWNER_COLORS[owner].dot}`}
+                        className="h-1.5 w-1.5 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: hex }}
                         title={ev.title}
                       />
                     );

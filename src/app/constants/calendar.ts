@@ -53,37 +53,85 @@ export interface CalendarEventItem {
   type: CalendarEventType;
   title: string;
   date: string;
+  time?: string;
   notes?: string;
   createdBy?: string;
   createdByName?: string;
 }
 
-/** Partner colors on the month grid — rose = you, blue = partner */
-export const CALENDAR_OWNER_COLORS = {
-  self: {
-    dot: 'bg-[#FB3094]',
-    ring: 'ring-[#FB3094]',
-    bar: 'bg-[#FB3094]',
-    soft: 'bg-[#FB3094]/20',
-    text: 'text-[#FB3094]',
-  },
-  partner: {
-    dot: 'bg-[#2571FF]',
-    ring: 'ring-[#2571FF]',
-    bar: 'bg-[#2571FF]',
-    soft: 'bg-[#2571FF]/20',
-    text: 'text-[#2571FF]',
-  },
-} as const;
+export type CalendarColorId =
+  | 'rose'
+  | 'blue'
+  | 'purple'
+  | 'teal'
+  | 'orange'
+  | 'gold'
+  | 'green'
+  | 'coral';
 
-export type CalendarOwnerKey = keyof typeof CALENDAR_OWNER_COLORS;
+export const CALENDAR_COLOR_PALETTE: { id: CalendarColorId; label: string; hex: string }[] = [
+  { id: 'rose', label: 'Rose', hex: '#FB3094' },
+  { id: 'blue', label: 'Blue', hex: '#2571FF' },
+  { id: 'purple', label: 'Purple', hex: '#A83FFF' },
+  { id: 'teal', label: 'Teal', hex: '#14B8A6' },
+  { id: 'orange', label: 'Orange', hex: '#F97316' },
+  { id: 'gold', label: 'Gold', hex: '#EAB308' },
+  { id: 'green', label: 'Green', hex: '#22C55E' },
+  { id: 'coral', label: 'Coral', hex: '#F43F5E' },
+];
 
-export function getEventOwnerKey(
-  createdBy: string | undefined,
-  currentUserId: string,
-): CalendarOwnerKey {
-  if (!createdBy || createdBy === currentUserId) return 'self';
-  return 'partner';
+export const DEFAULT_CALENDAR_COLORS: Record<'user1' | 'user2', CalendarColorId> = {
+  user1: 'rose',
+  user2: 'blue',
+};
+
+export type CalendarColorMap = Record<string, CalendarColorId>;
+
+export function getPaletteColor(colorId: string | undefined): string {
+  const found = CALENDAR_COLOR_PALETTE.find((c) => c.id === colorId);
+  return found?.hex ?? CALENDAR_COLOR_PALETTE[0].hex;
+}
+
+export function defaultColorMap(
+  user1Id: string,
+  user2Id: string,
+): CalendarColorMap {
+  return {
+    [user1Id]: DEFAULT_CALENDAR_COLORS.user1,
+    [user2Id]: DEFAULT_CALENDAR_COLORS.user2,
+  };
+}
+
+export function mergeColorMap(
+  user1Id: string,
+  user2Id: string,
+  stored?: CalendarColorMap | null,
+): CalendarColorMap {
+  const base = defaultColorMap(user1Id, user2Id);
+  if (!stored) return base;
+  return {
+    [user1Id]: stored[user1Id] && CALENDAR_COLOR_PALETTE.some((c) => c.id === stored[user1Id])
+      ? stored[user1Id]
+      : base[user1Id],
+    [user2Id]: stored[user2Id] && CALENDAR_COLOR_PALETTE.some((c) => c.id === stored[user2Id])
+      ? stored[user2Id]
+      : base[user2Id],
+  };
+}
+
+export function getUserCalendarHex(
+  ownerUserId: string | undefined,
+  colorMap: CalendarColorMap,
+  fallbackUserId: string,
+): string {
+  const id = ownerUserId || fallbackUserId;
+  return getPaletteColor(colorMap[id]);
+}
+
+/** Parse YYYY-MM-DD in local timezone (avoids UTC shift from parseISO). */
+export function parseDateKey(dateKey: string): Date {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  return new Date(y, m - 1, d);
 }
 
 export function toDateKey(date: Date): string {
@@ -91,6 +139,15 @@ export function toDateKey(date: Date): string {
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
+}
+
+export function formatEventTime(time?: string): string | null {
+  if (!time) return null;
+  const [h, min] = time.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(min)) return null;
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 || 12;
+  return `${hour12}:${String(min).padStart(2, '0')} ${period}`;
 }
 
 /** Whether an event appears on a calendar day (annual types repeat yearly). */
