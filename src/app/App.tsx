@@ -589,6 +589,7 @@ export default function App() {
           <CoupleCalendarScreen
             coupleId={couple.coupleId}
             userId={user.userId}
+            userName={user.displayName}
             partnerName={couple.partner.displayName}
             highlightEventId={highlightCalendarEventId}
             onBack={() => {

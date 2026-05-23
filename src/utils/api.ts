@@ -381,6 +381,22 @@ export const calendarAPI = {
     apiRequest(`/calendar/${coupleId}/${eventId}?userId=${encodeURIComponent(userId)}`, {
       method: 'DELETE',
     }),
+
+  update: (
+    coupleId: string,
+    eventId: string,
+    userId: string,
+    data: {
+      type: 'anniversary' | 'birthday' | 'trip' | 'important';
+      title: string;
+      date: string;
+      notes?: string;
+    },
+  ) =>
+    apiRequest(`/calendar/${coupleId}/${eventId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ userId, ...data }),
+    }),
 };
 
 // Daily Challenge API

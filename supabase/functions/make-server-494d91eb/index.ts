@@ -2796,6 +2796,58 @@ app.post("/make-server-494d91eb/calendar/process-reminders", async (c) => {
   }
 });
 
+app.put("/make-server-494d91eb/calendar/:coupleId/:eventId", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    const eventId = c.req.param("eventId");
+    const { userId, type, title, date, notes } = await c.req.json();
+
+    if (!coupleId || !eventId || !userId || !type || !title || !date) {
+      return c.json({ error: "Couple ID, event ID, user ID, type, title, and date are required" }, 400);
+    }
+
+    const validTypes: CalendarEventType[] = ["anniversary", "birthday", "trip", "important"];
+    if (!validTypes.includes(type)) {
+      return c.json({ error: "Invalid event type" }, 400);
+    }
+
+    const couple = await kv.get(`couple:${coupleId}`);
+    if (!couple) {
+      return c.json({ error: "Couple not found" }, 404);
+    }
+
+    if (userId !== couple.user1Id && userId !== couple.user2Id) {
+      return c.json({ error: "User is not part of this couple" }, 403);
+    }
+
+    const existing = await kv.get(`calendar_event:${coupleId}:${eventId}`);
+    if (!existing) {
+      return c.json({ error: "Event not found" }, 404);
+    }
+
+    const event = {
+      ...existing,
+      type,
+      title: String(title).trim(),
+      date,
+      notes: notes ? String(notes).trim() : "",
+      updatedAt: new Date().toISOString(),
+      updatedBy: userId,
+    };
+
+    await kv.set(`calendar_event:${coupleId}:${eventId}`, event);
+
+    processCalendarReminders(sendFcmPush, coupleId).catch((err) => {
+      console.error(`[Calendar] Post-update reminder check failed:`, err);
+    });
+
+    return c.json({ success: true, event });
+  } catch (error: any) {
+    console.error(`[Calendar] Error updating event:`, error);
+    return c.json({ error: error.message || "Failed to update calendar event" }, 500);
+  }
+});
+
 app.delete("/make-server-494d91eb/calendar/:coupleId/:eventId", async (c) => {
   try {
     const coupleId = c.req.param("coupleId");

@@ -54,6 +54,65 @@ export interface CalendarEventItem {
   title: string;
   date: string;
   notes?: string;
+  createdBy?: string;
+  createdByName?: string;
+}
+
+/** Partner colors on the month grid — rose = you, blue = partner */
+export const CALENDAR_OWNER_COLORS = {
+  self: {
+    dot: 'bg-[#FB3094]',
+    ring: 'ring-[#FB3094]',
+    bar: 'bg-[#FB3094]',
+    soft: 'bg-[#FB3094]/20',
+    text: 'text-[#FB3094]',
+  },
+  partner: {
+    dot: 'bg-[#2571FF]',
+    ring: 'ring-[#2571FF]',
+    bar: 'bg-[#2571FF]',
+    soft: 'bg-[#2571FF]/20',
+    text: 'text-[#2571FF]',
+  },
+} as const;
+
+export type CalendarOwnerKey = keyof typeof CALENDAR_OWNER_COLORS;
+
+export function getEventOwnerKey(
+  createdBy: string | undefined,
+  currentUserId: string,
+): CalendarOwnerKey {
+  if (!createdBy || createdBy === currentUserId) return 'self';
+  return 'partner';
+}
+
+export function toDateKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/** Whether an event appears on a calendar day (annual types repeat yearly). */
+export function eventOccursOnDate(
+  event: { date: string; type?: CalendarEventType },
+  day: Date,
+): boolean {
+  const parts = event.date.split('-').map(Number);
+  if (parts.length < 3) return false;
+  const [, m, d] = parts;
+  const isAnnual = event.type === 'anniversary' || event.type === 'birthday';
+  if (isAnnual) {
+    return day.getMonth() === m - 1 && day.getDate() === d;
+  }
+  return toDateKey(day) === event.date;
+}
+
+export function getEventsOnDate<T extends { date: string; type?: CalendarEventType }>(
+  events: T[],
+  day: Date,
+): T[] {
+  return events.filter((e) => eventOccursOnDate(e, day));
 }
 
 export function getUpcomingCalendarReminders(
