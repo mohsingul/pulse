@@ -1,4 +1,9 @@
-export type CalendarEventType = 'anniversary' | 'birthday' | 'trip' | 'important';
+export type CalendarEventType =
+  | 'anniversary'
+  | 'birthday'
+  | 'trip'
+  | 'holiday'
+  | 'important';
 
 export const CALENDAR_EVENT_TYPES: {
   id: CalendarEventType;
@@ -8,6 +13,7 @@ export const CALENDAR_EVENT_TYPES: {
   { id: 'anniversary', label: 'Anniversary', emoji: '💍' },
   { id: 'birthday', label: 'Birthday', emoji: '🎂' },
   { id: 'trip', label: 'Trip', emoji: '✈️' },
+  { id: 'holiday', label: 'Holiday', emoji: '🏖️' },
   { id: 'important', label: 'Important event', emoji: '⭐' },
 ];
 
@@ -15,13 +21,14 @@ export function getCalendarTypeMeta(type: CalendarEventType) {
   return CALENDAR_EVENT_TYPES.find((t) => t.id === type) ?? CALENDAR_EVENT_TYPES[3];
 }
 
-/** Days until the next occurrence (annual for anniversary/birthday; exact date for trip/important). */
+/** Days until the next occurrence (annual for anniversary/birthday/holiday; exact date for trip/important). */
 export function daysUntilEvent(dateStr: string, type?: CalendarEventType): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const [y, m, d] = dateStr.split('-').map(Number);
 
-  const isAnnual = type === 'anniversary' || type === 'birthday';
+  const isAnnual =
+    type === 'anniversary' || type === 'birthday' || type === 'holiday';
 
   if (isAnnual) {
     let next = new Date(today.getFullYear(), m - 1, d);
@@ -158,7 +165,8 @@ export function eventOccursOnDate(
   const parts = event.date.split('-').map(Number);
   if (parts.length < 3) return false;
   const [, m, d] = parts;
-  const isAnnual = event.type === 'anniversary' || event.type === 'birthday';
+  const isAnnual =
+    event.type === 'anniversary' || event.type === 'birthday' || event.type === 'holiday';
   if (isAnnual) {
     return day.getMonth() === m - 1 && day.getDate() === d;
   }
@@ -170,6 +178,44 @@ export function getEventsOnDate<T extends { date: string; type?: CalendarEventTy
   day: Date,
 ): T[] {
   return events.filter((e) => eventOccursOnDate(e, day));
+}
+
+export interface ShiftPattern {
+  startDate: string;
+  daysOn: number;
+  daysOff: number;
+}
+
+export type ShiftPatternMap = Record<string, ShiftPattern>;
+
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+/** True when this day falls in an "on" portion of the repeating shift cycle. */
+export function isShiftWorkDay(pattern: ShiftPattern, day: Date): boolean {
+  const start = parseDateKey(pattern.startDate);
+  start.setHours(0, 0, 0, 0);
+  const d = new Date(day);
+  d.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((d.getTime() - start.getTime()) / MS_PER_DAY);
+  const cycle = pattern.daysOn + pattern.daysOff;
+  if (cycle <= 0) return false;
+  const mod = ((diffDays % cycle) + cycle) % cycle;
+  return mod < pattern.daysOn;
+}
+
+/** Shift display window: from start date through one year ahead. */
+export function isShiftPatternActive(pattern: ShiftPattern, day: Date): boolean {
+  const start = parseDateKey(pattern.startDate);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setFullYear(end.getFullYear() + 1);
+  const d = new Date(day);
+  d.setHours(0, 0, 0, 0);
+  return d >= start && d <= end;
+}
+
+export function isShiftOnDay(pattern: ShiftPattern, day: Date): boolean {
+  return isShiftPatternActive(pattern, day) && isShiftWorkDay(pattern, day);
 }
 
 export function getUpcomingCalendarReminders(

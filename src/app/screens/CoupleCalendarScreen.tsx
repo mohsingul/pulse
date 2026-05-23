@@ -3,7 +3,6 @@ import { Card } from '@/app/components/Card';
 import { Button } from '@/app/components/Button';
 import { CoupleMonthGrid } from '@/app/components/CoupleMonthGrid';
 import { CalendarDaySheet } from '@/app/components/CalendarDaySheet';
-import { CalendarColorPicker } from '@/app/components/CalendarColorPicker';
 import {
   CalendarEventFormSheet,
   type CalendarSheetMode,
@@ -14,16 +13,17 @@ import {
   CALENDAR_EVENT_TYPES,
   getCalendarTypeMeta,
   getEventsOnDate,
+  getPaletteColor,
   getUserCalendarHex,
   daysUntilEvent,
   mergeColorMap,
   parseDateKey,
   formatEventTime,
   toDateKey,
-  type CalendarColorId,
   type CalendarColorMap,
   type CalendarEventType,
   type CalendarEventItem,
+  type ShiftPatternMap,
 } from '@/app/constants/calendar';
 import { format } from 'date-fns';
 
@@ -58,6 +58,7 @@ export function CoupleCalendarScreen({
   const [colorMap, setColorMap] = useState<CalendarColorMap>(() =>
     mergeColorMap(user1Id, user2Id, null),
   );
+  const [shiftPatterns, setShiftPatterns] = useState<ShiftPatternMap>({});
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<CalendarTab>('month');
   const [viewMonth, setViewMonth] = useState(() => new Date());
@@ -68,7 +69,6 @@ export function CoupleCalendarScreen({
   const [sheetMode, setSheetMode] = useState<CalendarSheetMode>('add');
   const [sheetEvent, setSheetEvent] = useState<CalendarEventItem | null>(null);
   const [saving, setSaving] = useState(false);
-  const [colorSaving, setColorSaving] = useState(false);
   const eventRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const fetchEvents = useCallback(async () => {
@@ -77,6 +77,9 @@ export function CoupleCalendarScreen({
       setEvents(response.events || []);
       if (response.colors) {
         setColorMap(mergeColorMap(user1Id, user2Id, response.colors));
+      }
+      if (response.shiftPatterns) {
+        setShiftPatterns(response.shiftPatterns);
       }
     } catch (error) {
       console.error('Error fetching calendar:', error);
@@ -193,20 +196,6 @@ export function CoupleCalendarScreen({
     }
   };
 
-  const handleColorSelect = async (colorId: CalendarColorId) => {
-    setColorSaving(true);
-    try {
-      const res = await calendarAPI.setColor(coupleId, userId, colorId);
-      if (res.colors) {
-        setColorMap(mergeColorMap(user1Id, user2Id, res.colors));
-      }
-    } catch (error: unknown) {
-      alert(error instanceof Error ? error.message : 'Failed to save color');
-    } finally {
-      setColorSaving(false);
-    }
-  };
-
   return (
     <div className="h-full w-full flex flex-col bg-background">
       <div className="px-4 sm:px-6 py-4 flex items-center justify-between border-b border-border safe-top flex-shrink-0 gap-2">
@@ -249,15 +238,23 @@ export function CoupleCalendarScreen({
         </button>
       </div>
 
-      <CalendarColorPicker
-        currentUserId={userId}
-        partnerUserId={partnerUserId}
-        userName={userName}
-        partnerName={partnerName}
-        colorMap={colorMap}
-        saving={colorSaving}
-        onSelectColor={handleColorSelect}
-      />
+      <div className="flex items-center justify-center gap-4 py-2 text-xs font-medium flex-shrink-0 px-4">
+        <span className="flex items-center gap-1.5">
+          <span
+            className="w-2.5 h-2.5 rounded-full"
+            style={{ backgroundColor: getPaletteColor(colorMap[userId]) }}
+          />
+          You
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span
+            className="w-2.5 h-2.5 rounded-full"
+            style={{ backgroundColor: getPaletteColor(colorMap[partnerUserId]) }}
+          />
+          {partnerName.split(' ')[0]}
+        </span>
+        <span className="text-muted-foreground">· bar = on shift</span>
+      </div>
 
       <div className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-4 space-y-4">
         {tab === 'month' && (
@@ -272,6 +269,9 @@ export function CoupleCalendarScreen({
                   events={events}
                   currentUserId={userId}
                   colorMap={colorMap}
+                  shiftPatterns={shiftPatterns}
+                  user1Id={user1Id}
+                  user2Id={user2Id}
                   selectedDateKey={selectedDateKey}
                   onSelectDate={handleDateTap}
                 />
@@ -409,6 +409,9 @@ export function CoupleCalendarScreen({
           userName={userName}
           partnerName={partnerName}
           colorMap={colorMap}
+          shiftPatterns={shiftPatterns}
+          user1Id={user1Id}
+          user2Id={user2Id}
           onClose={() => setDaySheetOpen(false)}
           onAdd={() => openAdd(selectedDateKey)}
           onEventClick={openView}

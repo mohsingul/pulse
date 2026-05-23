@@ -439,6 +439,8 @@ export default function App() {
             userName={user.displayName}
             partnerName={couple?.partner?.displayName}
             coupleId={couple?.coupleId}
+            user1Id={couple?.user1Id}
+            user2Id={couple?.user2Id}
             onBack={() => setCurrentScreen('home')}
             onSettings={() => setCurrentScreen('settings')}
             onUnpair={handleUnpair}
@@ -458,6 +460,10 @@ export default function App() {
             userId={user!.userId}
             userName={user!.displayName}
             pushNotifications={notifications}
+            coupleId={couple?.coupleId}
+            user1Id={couple?.user1Id}
+            user2Id={couple?.user2Id}
+            partnerName={couple?.partner?.displayName}
             onBack={() => setCurrentScreen('profile')}
             onNotificationSettings={() => setCurrentScreen('notification-settings')}
           />

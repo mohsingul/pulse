@@ -3,7 +3,7 @@ import * as kv from "./kv_store.ts";
 const REMINDER_DAYS = [5, 3, 1, 0] as const;
 const APP_URL = Deno.env.get("APP_URL") || "https://aimopulse.vercel.app";
 
-type CalendarEventType = "anniversary" | "birthday" | "trip" | "important";
+type CalendarEventType = "anniversary" | "birthday" | "trip" | "holiday" | "important";
 
 type CalendarEvent = {
   id: string;
@@ -25,7 +25,7 @@ export function daysUntilCalendarEvent(dateStr: string, type: CalendarEventType)
   today.setHours(0, 0, 0, 0);
   const [y, m, d] = dateStr.split("-").map(Number);
 
-  if (type === "anniversary" || type === "birthday") {
+  if (type === "anniversary" || type === "birthday" || type === "holiday") {
     let next = new Date(today.getFullYear(), m - 1, d);
     if (next < today) {
       next = new Date(today.getFullYear() + 1, m - 1, d);
@@ -43,7 +43,7 @@ export function getNextOccurrenceDate(dateStr: string, type: CalendarEventType):
   today.setHours(0, 0, 0, 0);
   const [y, m, d] = dateStr.split("-").map(Number);
 
-  if (type === "anniversary" || type === "birthday") {
+  if (type === "anniversary" || type === "birthday" || type === "holiday") {
     let next = new Date(today.getFullYear(), m - 1, d);
     if (next < today) {
       next = new Date(today.getFullYear() + 1, m - 1, d);
@@ -67,6 +67,8 @@ function displayNameForEvent(event: CalendarEvent): string {
       return "Birthday";
     case "trip":
       return "Trip";
+    case "holiday":
+      return "Holiday";
     default:
       return "Important event";
   }
@@ -102,6 +104,9 @@ export function getCalendarReminderMessage(
   }
   if (event.type === "birthday") {
     return { title: "Aimo Pulse", body: `❤️ Happy Birthday — ${name}!` };
+  }
+  if (event.type === "holiday") {
+    return { title: "Aimo Pulse", body: `❤️ Happy Holiday — ${name}!` };
   }
   return { title: "Aimo Pulse", body: `❤️ Today is ${name}!` };
 }

@@ -2688,7 +2688,7 @@ app.post("/make-server-494d91eb/partner-needs/:coupleId", async (c) => {
 
 // ===== COUPLE CALENDAR =====
 
-type CalendarEventType = "anniversary" | "birthday" | "trip" | "important";
+type CalendarEventType = "anniversary" | "birthday" | "trip" | "holiday" | "important";
 
 const CALENDAR_COLOR_IDS = ["rose", "blue", "purple", "teal", "orange", "gold", "green", "coral"];
 
@@ -2714,6 +2714,29 @@ async function getCalendarColors(coupleId: string, couple: { user1Id: string; us
   };
 }
 
+async function getCalendarPrefsPayload(coupleId: string, couple: { user1Id: string; user2Id: string }) {
+  const prefs = (await kv.get(calendarPrefsKey(coupleId))) ?? {};
+  const colors = await getCalendarColors(coupleId, couple);
+  const shiftPatterns = prefs.shiftPatterns ?? {};
+  return { colors, shiftPatterns };
+}
+
+async function saveCalendarColor(
+  coupleId: string,
+  couple: { user1Id: string; user2Id: string },
+  userId: string,
+  colorId: string,
+) {
+  const existing = (await kv.get(calendarPrefsKey(coupleId))) ?? {};
+  const colors = { ...(existing.colors ?? {}), [userId]: colorId };
+  await kv.set(calendarPrefsKey(coupleId), {
+    ...existing,
+    colors,
+    updatedAt: new Date().toISOString(),
+  });
+  return getCalendarColors(coupleId, couple);
+}
+
 app.get("/make-server-494d91eb/calendar/:coupleId", async (c) => {
   try {
     const coupleId = c.req.param("coupleId");
@@ -2731,46 +2754,128 @@ app.get("/make-server-494d91eb/calendar/:coupleId", async (c) => {
       return new Date(a.date).getTime() - new Date(b.date).getTime();
     });
 
-    const colors = await getCalendarColors(coupleId, couple);
+    const { colors, shiftPatterns } = await getCalendarPrefsPayload(coupleId, couple);
 
-    return c.json({ events: sorted, colors });
+    return c.json({ events: sorted, colors, shiftPatterns });
   } catch (error: any) {
     console.error(`[Calendar] Error getting events:`, error);
     return c.json({ error: error.message || "Failed to get calendar events" }, 500);
   }
 });
 
+async function handleCalendarColorSave(c: any) {
+  const coupleId = c.req.param("coupleId");
+  const { userId, colorId } = await c.req.json();
+
+  if (!coupleId || !userId || !colorId) {
+    return c.json({ error: "Couple ID, user ID, and colorId are required" }, 400);
+  }
+
+  if (!CALENDAR_COLOR_IDS.includes(colorId)) {
+    return c.json({ error: "Invalid color" }, 400);
+  }
+
+  const couple = await kv.get(`couple:${coupleId}`);
+  if (!couple) {
+    return c.json({ error: "Couple not found" }, 404);
+  }
+
+  if (userId !== couple.user1Id && userId !== couple.user2Id) {
+    return c.json({ error: "User is not part of this couple" }, 403);
+  }
+
+  const merged = await saveCalendarColor(coupleId, couple, userId, colorId);
+  const prefs = await getCalendarPrefsPayload(coupleId, couple);
+  return c.json({ success: true, colors: merged, shiftPatterns: prefs.shiftPatterns });
+}
+
 app.put("/make-server-494d91eb/calendar/:coupleId/colors", async (c) => {
   try {
-    const coupleId = c.req.param("coupleId");
-    const { userId, colorId } = await c.req.json();
+    return await handleCalendarColorSave(c);
+  } catch (error: any) {
+    console.error(`[Calendar] Error saving color:`, error);
+    return c.json({ error: error.message || "Failed to save calendar color" }, 500);
+  }
+});
 
-    if (!coupleId || !userId || !colorId) {
-      return c.json({ error: "Couple ID, user ID, and colorId are required" }, 400);
+app.post("/make-server-494d91eb/calendar/:coupleId/colors", async (c) => {
+  try {
+    return await handleCalendarColorSave(c);
+  } catch (error: any) {
+    console.error(`[Calendar] Error saving color:`, error);
+    return c.json({ error: error.message || "Failed to save calendar color" }, 500);
+  }
+});
+
+app.put("/make-server-494d91eb/calendar/:coupleId/shift", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    const { userId, startDate, daysOn, daysOff } = await c.req.json();
+
+    if (!coupleId || !userId || !startDate) {
+      return c.json({ error: "Couple ID, user ID, and startDate are required" }, 400);
     }
 
-    if (!CALENDAR_COLOR_IDS.includes(colorId)) {
-      return c.json({ error: "Invalid color" }, 400);
+    const on = Number(daysOn) || 4;
+    const off = Number(daysOff) || 4;
+    if (on < 1 || on > 14 || off < 1 || off > 14) {
+      return c.json({ error: "daysOn and daysOff must be between 1 and 14" }, 400);
     }
 
     const couple = await kv.get(`couple:${coupleId}`);
-    if (!couple) {
-      return c.json({ error: "Couple not found" }, 404);
-    }
-
+    if (!couple) return c.json({ error: "Couple not found" }, 404);
     if (userId !== couple.user1Id && userId !== couple.user2Id) {
       return c.json({ error: "User is not part of this couple" }, 403);
     }
 
-    const existing = (await kv.get(calendarPrefsKey(coupleId))) ?? { colors: {} };
-    const colors = { ...(existing.colors ?? {}), [userId]: colorId };
-    await kv.set(calendarPrefsKey(coupleId), { colors, updatedAt: new Date().toISOString() });
+    const existing = (await kv.get(calendarPrefsKey(coupleId))) ?? {};
+    const shiftPatterns = {
+      ...(existing.shiftPatterns ?? {}),
+      [userId]: { startDate, daysOn: on, daysOff: off },
+    };
+    await kv.set(calendarPrefsKey(coupleId), {
+      ...existing,
+      shiftPatterns,
+      updatedAt: new Date().toISOString(),
+    });
 
-    const merged = await getCalendarColors(coupleId, couple);
-    return c.json({ success: true, colors: merged });
+    const prefs = await getCalendarPrefsPayload(coupleId, couple);
+    return c.json({ success: true, ...prefs });
   } catch (error: any) {
-    console.error(`[Calendar] Error saving color:`, error);
-    return c.json({ error: error.message || "Failed to save calendar color" }, 500);
+    console.error(`[Calendar] Error saving shift:`, error);
+    return c.json({ error: error.message || "Failed to save shift pattern" }, 500);
+  }
+});
+
+app.delete("/make-server-494d91eb/calendar/:coupleId/shift", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    const userId = c.req.query("userId");
+
+    if (!coupleId || !userId) {
+      return c.json({ error: "Couple ID and user ID are required" }, 400);
+    }
+
+    const couple = await kv.get(`couple:${coupleId}`);
+    if (!couple) return c.json({ error: "Couple not found" }, 404);
+    if (userId !== couple.user1Id && userId !== couple.user2Id) {
+      return c.json({ error: "User is not part of this couple" }, 403);
+    }
+
+    const existing = (await kv.get(calendarPrefsKey(coupleId))) ?? {};
+    const shiftPatterns = { ...(existing.shiftPatterns ?? {}) };
+    delete shiftPatterns[userId];
+    await kv.set(calendarPrefsKey(coupleId), {
+      ...existing,
+      shiftPatterns,
+      updatedAt: new Date().toISOString(),
+    });
+
+    const prefs = await getCalendarPrefsPayload(coupleId, couple);
+    return c.json({ success: true, ...prefs });
+  } catch (error: any) {
+    console.error(`[Calendar] Error clearing shift:`, error);
+    return c.json({ error: error.message || "Failed to clear shift pattern" }, 500);
   }
 });
 
@@ -2783,7 +2888,13 @@ app.post("/make-server-494d91eb/calendar/:coupleId", async (c) => {
       return c.json({ error: "Couple ID, user ID, type, title, and date are required" }, 400);
     }
 
-    const validTypes: CalendarEventType[] = ["anniversary", "birthday", "trip", "important"];
+    const validTypes: CalendarEventType[] = [
+      "anniversary",
+      "birthday",
+      "trip",
+      "holiday",
+      "important",
+    ];
     if (!validTypes.includes(type)) {
       return c.json({ error: "Invalid event type" }, 400);
     }
@@ -2872,7 +2983,13 @@ app.put("/make-server-494d91eb/calendar/:coupleId/:eventId", async (c) => {
       return c.json({ error: "Couple ID, event ID, user ID, type, title, and date are required" }, 400);
     }
 
-    const validTypes: CalendarEventType[] = ["anniversary", "birthday", "trip", "important"];
+    const validTypes: CalendarEventType[] = [
+      "anniversary",
+      "birthday",
+      "trip",
+      "holiday",
+      "important",
+    ];
     if (!validTypes.includes(type)) {
       return c.json({ error: "Invalid event type" }, 400);
     }

@@ -364,15 +364,30 @@ export const calendarAPI = {
 
   setColor: (coupleId: string, userId: string, colorId: string) =>
     apiRequest(`/calendar/${coupleId}/colors`, {
-      method: 'PUT',
+      method: 'POST',
       body: JSON.stringify({ userId, colorId }),
+    }),
+
+  setShift: (
+    coupleId: string,
+    userId: string,
+    data: { startDate: string; daysOn: number; daysOff: number },
+  ) =>
+    apiRequest(`/calendar/${coupleId}/shift`, {
+      method: 'PUT',
+      body: JSON.stringify({ userId, ...data }),
+    }),
+
+  clearShift: (coupleId: string, userId: string) =>
+    apiRequest(`/calendar/${coupleId}/shift?userId=${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
     }),
 
   create: (
     coupleId: string,
     userId: string,
     data: {
-      type: 'anniversary' | 'birthday' | 'trip' | 'important';
+      type: 'anniversary' | 'birthday' | 'trip' | 'holiday' | 'important';
       title: string;
       date: string;
       time?: string;
@@ -394,7 +409,7 @@ export const calendarAPI = {
     eventId: string,
     userId: string,
     data: {
-      type: 'anniversary' | 'birthday' | 'trip' | 'important';
+      type: 'anniversary' | 'birthday' | 'trip' | 'holiday' | 'important';
       title: string;
       date: string;
       time?: string;

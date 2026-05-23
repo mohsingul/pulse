@@ -15,9 +15,11 @@ import {
 import {
   getEventsOnDate,
   getUserCalendarHex,
+  isShiftOnDay,
   toDateKey,
   type CalendarColorMap,
   type CalendarEventItem,
+  type ShiftPatternMap,
 } from '@/app/constants/calendar';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -28,6 +30,9 @@ interface CoupleMonthGridProps {
   events: CalendarEventItem[];
   currentUserId: string;
   colorMap: CalendarColorMap;
+  shiftPatterns: ShiftPatternMap;
+  user1Id: string;
+  user2Id: string;
   selectedDateKey: string | null;
   onSelectDate: (dateKey: string) => void;
 }
@@ -38,6 +43,9 @@ export function CoupleMonthGrid({
   events,
   currentUserId,
   colorMap,
+  shiftPatterns,
+  user1Id,
+  user2Id,
   selectedDateKey,
   onSelectDate,
 }: CoupleMonthGridProps) {
@@ -100,6 +108,13 @@ export function CoupleMonthGrid({
           const dayEvents = getEventsOnDate(events, date);
           const selected = selectedDateKey === key;
           const today = isToday(date);
+          const shiftBars: { hex: string }[] = [];
+          for (const uid of [user1Id, user2Id]) {
+            const pat = shiftPatterns[uid];
+            if (pat && isShiftOnDay(pat, date)) {
+              shiftBars.push({ hex: getUserCalendarHex(uid, colorMap, uid) });
+            }
+          }
 
           return (
             <button
@@ -108,7 +123,7 @@ export function CoupleMonthGrid({
               onClick={() => onSelectDate(key)}
               className={`
                 relative flex flex-col items-center justify-start min-h-[52px] sm:min-h-[58px]
-                rounded-xl p-0.5 transition-all duration-150 active:scale-[0.97]
+                rounded-xl p-0.5 transition-all duration-150 active:scale-[0.97] overflow-hidden
                 ${!inMonth ? 'opacity-35' : ''}
                 ${selected ? 'ring-2 ring-[#A83FFF] bg-[#A83FFF]/10 scale-[1.02]' : 'hover:bg-accent/60'}
                 ${today && !selected ? 'bg-accent/40' : ''}
@@ -122,6 +137,13 @@ export function CoupleMonthGrid({
               >
                 {format(date, 'd')}
               </span>
+              {shiftBars.length > 0 && (
+                <div className="absolute bottom-0 left-0.5 right-0.5 flex gap-px h-1 rounded-full overflow-hidden">
+                  {shiftBars.map((b, i) => (
+                    <span key={i} className="flex-1 rounded-full opacity-90" style={{ backgroundColor: b.hex }} />
+                  ))}
+                </div>
+              )}
               {dayEvents.length > 0 && (
                 <div className="flex flex-wrap justify-center gap-0.5 mt-0.5 px-0.5 w-full max-w-[40px]">
                   {dayEvents.slice(0, 4).map((ev) => {

@@ -55,6 +55,7 @@ export function CalendarEventFormSheet({
   onDelete,
   onStartEdit,
 }: CalendarEventFormSheetProps) {
+  const [formKey, setFormKey] = useState(0);
   const [type, setType] = useState<CalendarEventType>('important');
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(initialDate);
@@ -62,8 +63,14 @@ export function CalendarEventFormSheet({
   const [notes, setNotes] = useState('');
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setTime('');
+      setTitle('');
+      setNotes('');
+      return;
+    }
     if (mode === 'add') {
+      setFormKey((k) => k + 1);
       setType('important');
       setTitle('');
       setDate(initialDate);
@@ -76,7 +83,7 @@ export function CalendarEventFormSheet({
       setTime(event.time ?? '');
       setNotes(event.notes ?? '');
     }
-  }, [open, mode, event, initialDate]);
+  }, [open, mode, event?.id, initialDate]);
 
   if (!open) return null;
 
@@ -188,7 +195,7 @@ export function CalendarEventFormSheet({
           )}
 
           {isForm && (
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form key={`form-${formKey}-${mode}-${event?.id ?? 'new'}`} onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-2">
                 {CALENDAR_EVENT_TYPES.map((t) => (
                   <button
@@ -219,6 +226,7 @@ export function CalendarEventFormSheet({
                   required
                 />
                 <Input
+                  key={`time-${formKey}-${mode}-${event?.id ?? 'new'}`}
                   label="Time (optional)"
                   type="time"
                   value={time}

@@ -5,6 +5,7 @@ import { ArrowLeft, Sun, Moon, Bell, BellOff, Smartphone, AlertCircle, ChevronRi
 import { storage } from '@/utils/storage';
 import { type FirebaseNotificationControls } from '@/hooks/useFirebaseNotifications';
 import { dispatchReminderPreferenceUpdate } from '@/hooks/useReminderNotifications';
+import { CalendarSettingsPanel } from '@/app/components/CalendarSettingsPanel';
 
 interface SettingsScreenProps {
   onBack: () => void;
@@ -12,9 +13,23 @@ interface SettingsScreenProps {
   userName: string;
   pushNotifications: FirebaseNotificationControls;
   onNotificationSettings?: () => void;
+  coupleId?: string;
+  user1Id?: string;
+  user2Id?: string;
+  partnerName?: string;
 }
 
-export function SettingsScreen({ onBack, userId, userName, pushNotifications, onNotificationSettings }: SettingsScreenProps) {
+export function SettingsScreen({
+  onBack,
+  userId,
+  userName,
+  pushNotifications,
+  onNotificationSettings,
+  coupleId,
+  user1Id,
+  user2Id,
+  partnerName,
+}: SettingsScreenProps) {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [notifications, setNotifications] = useState({
     morning: { enabled: true, time: '09:00' },
@@ -197,6 +212,17 @@ export function SettingsScreen({ onBack, userId, userName, pushNotifications, on
             </div>
           </Card>
         </div>
+
+        {coupleId && user1Id && user2Id && partnerName && (
+          <CalendarSettingsPanel
+            coupleId={coupleId}
+            userId={userId}
+            user1Id={user1Id}
+            user2Id={user2Id}
+            userName={userName}
+            partnerName={partnerName}
+          />
+        )}
 
         {/* Reminder Notifications */}
         <div className="space-y-3">
