@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Input } from '@/app/components/Input';
 import { Button } from '@/app/components/Button';
 import { GradientBlob } from '@/app/components/GradientBlob';
 import { ArrowLeft, AlertTriangle, Info } from 'lucide-react';
 import { userAPI } from '@/utils/api';
 import { storage } from '@/utils/storage';
+import { loadSavedLoginCredential, storeLoginCredential } from '@/utils/credentials';
 import { projectId, publicAnonKey } from '/utils/supabase/info';
 
 interface LoginScreenProps {
@@ -15,7 +16,6 @@ interface LoginScreenProps {
 export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -29,28 +29,14 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
   const [debugInfo, setDebugInfo] = useState<any>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
-  const savePasswordCredential = async (username: string, password: string) => {
-    if (!('credentials' in navigator)) {
-      return;
-    }
-
-    const PasswordCredential = (window as any).PasswordCredential || (window as any).webkitPasswordCredential;
-    if (!PasswordCredential) {
-      return;
-    }
-
-    try {
-      const credential = new PasswordCredential({
-        id: username,
-        password,
-        name: username,
-      });
-      await (navigator as any).credentials.store(credential);
-      console.log('[Login] Saved credential to password manager');
-    } catch (error) {
-      console.warn('[Login] Password manager save failed:', error);
-    }
-  };
+  useEffect(() => {
+    loadSavedLoginCredential().then((saved) => {
+      if (saved) {
+        setUsername(saved.username);
+        setPassword(saved.password);
+      }
+    });
+  }, []);
 
   const loadDebugInfo = async () => {
     try {
@@ -107,11 +93,10 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
 
     setLoading(true);
     try {
-      const response = await userAPI.login(username.trim(), password);
+      const trimmedUsername = username.trim();
+      const response = await userAPI.login(trimmedUsername, password);
       storage.setUser(response.user);
-      if (rememberMe) {
-        await savePasswordCredential(username.trim(), password);
-      }
+      await storeLoginCredential(trimmedUsername, password);
       onSuccess(response.user);
     } catch (error: any) {
       setErrors({ general: getLoginErrorMessage(error.message || 'An unknown error occurred') });
@@ -193,14 +178,27 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form
+            onSubmit={handleSubmit}
+            method="post"
+            action="."
+            autoComplete="on"
+            className="space-y-5"
+          >
             <Input
               label="Username"
               name="username"
+              type="text"
+              inputMode="text"
               placeholder="Enter your username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="next"
+              required
             />
 
             <Input
@@ -211,6 +209,11 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="go"
+              required
             />
 
             {errors.general && (
@@ -219,18 +222,9 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
               </div>
             )}
 
-            {/* Remember Me */}
-            <label className="flex items-center space-x-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="w-5 h-5 rounded border-border text-[#A83FFF] focus:ring-[#A83FFF] focus:ring-offset-0"
-              />
-              <span className="text-sm text-muted-foreground">
-                Remember me on this device
-              </span>
-            </label>
+            <p className="text-xs text-muted-foreground">
+              After you sign in, your iPhone or browser can offer to save this password in Passwords.
+            </p>
 
             {/* Forgot Password Link */}
             <div className="flex justify-end">
@@ -326,31 +320,51 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
                 </p>
               </div>
             </div>
-            <form onSubmit={handleResetPassword} className="space-y-5">
+            <form
+              onSubmit={handleResetPassword}
+              method="post"
+              action="."
+              autoComplete="on"
+              className="space-y-5"
+            >
               <Input
                 label="Username"
+                name="username"
+                type="text"
                 placeholder="Enter your username"
                 value={resetUsername}
                 onChange={(e) => setResetUsername(e.target.value)}
                 autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                required
               />
 
               <Input
                 label="New Password"
+                name="new-password"
                 type="password"
                 placeholder="Enter your new password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 autoComplete="new-password"
+                autoCapitalize="none"
+                autoCorrect="off"
+                passwordRules="minlength: 6;"
+                required
               />
 
               <Input
                 label="Confirm Password"
+                name="confirm-password"
                 type="password"
                 placeholder="Confirm your new password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 autoComplete="new-password"
+                autoCapitalize="none"
+                autoCorrect="off"
+                required
               />
 
               {resetErrors.username && (

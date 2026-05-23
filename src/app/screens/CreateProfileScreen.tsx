@@ -4,6 +4,7 @@ import { Input } from '@/app/components/Input';
 import { ArrowLeft } from 'lucide-react';
 import { userAPI } from '@/utils/api';
 import { storage } from '@/utils/storage';
+import { storeLoginCredential } from '@/utils/credentials';
 
 interface CreateProfileScreenProps {
   onBack: () => void;
@@ -34,8 +35,10 @@ export function CreateProfileScreen({ onBack, onSuccess }: CreateProfileScreenPr
 
     setLoading(true);
     try {
-      const response = await userAPI.create(username.trim(), password, displayName.trim());
+      const trimmedUsername = username.trim();
+      const response = await userAPI.create(trimmedUsername, password, displayName.trim());
       storage.setUser(response.user);
+      await storeLoginCredential(trimmedUsername, password);
       onSuccess(response.user);
     } catch (error: any) {
       setErrors({ general: error.message });
@@ -66,33 +69,56 @@ export function CreateProfileScreen({ onBack, onSuccess }: CreateProfileScreenPr
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form
+            onSubmit={handleSubmit}
+            method="post"
+            action="."
+            autoComplete="on"
+            className="space-y-5"
+          >
             <Input
               label="Display Name"
+              name="name"
+              type="text"
               placeholder="How should we call you?"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               error={errors.displayName}
               autoComplete="name"
+              enterKeyHint="next"
+              required
             />
 
             <Input
               label="Username"
+              name="username"
+              type="text"
               placeholder="Choose a username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               error={errors.username}
               autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="next"
+              required
             />
 
             <Input
               label="Password"
+              name="new-password"
               type="password"
               placeholder="At least 6 characters"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               error={errors.password}
               autoComplete="new-password"
+              autoCapitalize="none"
+              autoCorrect="off"
+              passwordRules="minlength: 6;"
+              enterKeyHint="go"
+              required
             />
 
             {errors.general && (
