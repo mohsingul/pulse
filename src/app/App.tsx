@@ -145,24 +145,6 @@ export default function App() {
     }
   }, [couple]);
 
-  // If session ended while backgrounded, return to login
-  useEffect(() => {
-    const syncSession = () => {
-      if (document.visibilityState !== 'visible') return;
-      if (!storage.getUser() && user) {
-        setUser(null);
-        setCouple(null);
-        setCurrentScreen('welcome');
-      }
-    };
-    document.addEventListener('visibilitychange', syncSession);
-    window.addEventListener('pageshow', syncSession);
-    return () => {
-      document.removeEventListener('visibilitychange', syncSession);
-      window.removeEventListener('pageshow', syncSession);
-    };
-  }, [user]);
-
   useEffect(() => {
     if (typeof navigator === 'undefined' || !navigator.serviceWorker) return;
 

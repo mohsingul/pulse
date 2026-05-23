@@ -4,11 +4,7 @@ import { Button } from '@/app/components/Button';
 import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import { userAPI } from '@/utils/api';
 import { storage } from '@/utils/storage';
-import {
-  loadSavedLoginCredential,
-  requestConditionalPasswordAutofill,
-  storeLoginCredential,
-} from '@/utils/credentials';
+import { requestConditionalPasswordAutofill, storeLoginCredential } from '@/utils/credentials';
 interface LoginScreenProps {
   onBack: () => void;
   onSuccess: (user: any) => void;
@@ -41,12 +37,6 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
   };
 
   useEffect(() => {
-    loadSavedLoginCredential().then((saved) => {
-      if (saved) applyLoginToFields(saved.username, saved.password);
-    });
-
-    requestConditionalPasswordAutofill(applyLoginToFields);
-
     const unlockTimer = window.setTimeout(() => {
       enableAutofillOnField(usernameRef.current);
       enableAutofillOnField(passwordRef.current);
@@ -228,8 +218,8 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
             )}
 
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Tap the username or password field to see your saved login from iPhone Passwords
-              (key icon above the keyboard), then tap Fill Password.
+              Tap username or password to use iPhone Passwords (key above the keyboard → Fill
+              Password). Passwords are not filled automatically.
             </p>
 
             <div className="flex justify-end">

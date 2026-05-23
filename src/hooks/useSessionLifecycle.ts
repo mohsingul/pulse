@@ -2,7 +2,8 @@ import { useEffect } from 'react';
 import { storage } from '@/utils/storage';
 
 /**
- * Ends the login session when the app/page is closed (not when cached for back-navigation).
+ * Ends login only when the page is actually unloaded (not bfcache / quick resume).
+ * Home-screen app resume keeps the session; swiping the app away clears it.
  */
 export function useSessionLifecycle(onSessionEnd?: () => void) {
   useEffect(() => {
@@ -12,6 +13,7 @@ export function useSessionLifecycle(onSessionEnd?: () => void) {
     };
 
     const handlePageHide = (event: PageTransitionEvent) => {
+      // persisted = page may return from back-forward cache (stay logged in)
       if (event.persisted) return;
       endSession();
     };

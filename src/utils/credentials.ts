@@ -97,7 +97,7 @@ export async function storeLoginCredential(username: string, password: string): 
   }
 }
 
-/** Pre-fill from device fallback, then offer conditional system autofill. */
+/** Do not auto-fill on login screen mount — use focus + conditional UI only. */
 export async function loadSavedLoginCredential(): Promise<SavedDeviceLogin | null> {
-  return loadDeviceLogin();
+  return null;
 }

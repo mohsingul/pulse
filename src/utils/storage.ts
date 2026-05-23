@@ -7,42 +7,29 @@ interface UserData {
 }
 
 const USER_KEY = 'pulse_user';
-const BOOT_KEY = 'pulse_current_boot';
-const USER_BOOT_KEY = 'pulse_user_boot';
-
-/** New id every time the app bundle loads (home-screen open or browser refresh). */
-if (typeof window !== 'undefined') {
-  sessionStorage.setItem(
-    BOOT_KEY,
-    `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
-  );
-}
-
-function currentBootId(): string {
-  return sessionStorage.getItem(BOOT_KEY) ?? '';
-}
+const SESSION_ACTIVE_KEY = 'pulse_session_active';
 
 export const storage = {
   /**
-   * Logged-in user for this app launch only.
-   * Cleared on close (pagehide) or when the app is opened again (new boot id).
+   * Logged-in user for the current app session.
+   * Cleared on app close (pagehide) or explicit logout — not on home-screen resume.
    */
   getUser: (): UserData | null => {
     if (typeof window === 'undefined') return null;
-    if (sessionStorage.getItem(USER_BOOT_KEY) !== currentBootId()) return null;
+    if (sessionStorage.getItem(SESSION_ACTIVE_KEY) !== 'true') return null;
     const user = sessionStorage.getItem(USER_KEY);
     return user ? JSON.parse(user) : null;
   },
 
   setUser: (user: UserData) => {
+    sessionStorage.setItem(SESSION_ACTIVE_KEY, 'true');
     sessionStorage.setItem(USER_KEY, JSON.stringify(user));
-    sessionStorage.setItem(USER_BOOT_KEY, currentBootId());
   },
 
-  /** End login session (logout or app closed). Keeps theme & saved password on device. */
+  /** End login session (logout or app fully closed). */
   clearSession: () => {
+    sessionStorage.removeItem(SESSION_ACTIVE_KEY);
     sessionStorage.removeItem(USER_KEY);
-    sessionStorage.removeItem(USER_BOOT_KEY);
     localStorage.removeItem(USER_KEY);
   },
 
