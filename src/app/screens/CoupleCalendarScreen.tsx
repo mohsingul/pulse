@@ -7,7 +7,7 @@ import {
   CalendarEventFormSheet,
   type CalendarSheetMode,
 } from '@/app/components/CalendarEventFormSheet';
-import { ArrowLeft, Plus, Trash2, CalendarDays, List } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, CalendarDays, List, CheckSquare, Square } from 'lucide-react';
 import { calendarAPI } from '@/utils/api';
 import {
   CALENDAR_EVENT_TYPES,
@@ -16,6 +16,9 @@ import {
   getPaletteColor,
   getUserCalendarHex,
   daysUntilEvent,
+  dateRangeFromKeys,
+  isMultiDayEvent,
+  isOvertimeDay,
   mergeColorMap,
   parseDateKey,
   formatEventTime,
@@ -23,6 +26,7 @@ import {
   type CalendarColorMap,
   type CalendarEventType,
   type CalendarEventItem,
+  type OvertimeMap,
   type ShiftPatternMap,
 } from '@/app/constants/calendar';
 import { format } from 'date-fns';
@@ -59,11 +63,16 @@ export function CoupleCalendarScreen({
     mergeColorMap(user1Id, user2Id, null),
   );
   const [shiftPatterns, setShiftPatterns] = useState<ShiftPatternMap>({});
+  const [overtimeDays, setOvertimeDays] = useState<OvertimeMap>({});
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<CalendarTab>('month');
   const [viewMonth, setViewMonth] = useState(() => new Date());
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(toDateKey(new Date()));
+  const [multiSelectMode, setMultiSelectMode] = useState(false);
+  const [multiSelectedKeys, setMultiSelectedKeys] = useState<string[]>([]);
+  const [formEndDate, setFormEndDate] = useState<string | undefined>();
   const [daySheetOpen, setDaySheetOpen] = useState(false);
+  const [overtimeSaving, setOvertimeSaving] = useState(false);
   const [filter, setFilter] = useState<CalendarEventType | 'all'>('all');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMode, setSheetMode] = useState<CalendarSheetMode>('add');
@@ -78,9 +87,8 @@ export function CoupleCalendarScreen({
       if (response.colors) {
         setColorMap(mergeColorMap(user1Id, user2Id, response.colors));
       }
-      if (response.shiftPatterns) {
-        setShiftPatterns(response.shiftPatterns);
-      }
+      if (response.shiftPatterns) setShiftPatterns(response.shiftPatterns);
+      if (response.overtimeDays) setOvertimeDays(response.overtimeDays);
     } catch (error) {
       console.error('Error fetching calendar:', error);
     } finally {
@@ -118,17 +126,51 @@ export function CoupleCalendarScreen({
     return getEventsOnDate(events, parseDateKey(selectedDateKey));
   }, [events, selectedDateKey]);
 
-  const handleDateTap = (dateKey: string) => {
+  const handleDayPress = (dateKey: string) => {
+    if (multiSelectMode) {
+      setMultiSelectedKeys((prev) => {
+        const set = new Set(prev);
+        if (set.has(dateKey)) set.delete(dateKey);
+        else set.add(dateKey);
+        return [...set].sort();
+      });
+      return;
+    }
     setSelectedDateKey(dateKey);
     setDaySheetOpen(true);
   };
 
-  const openAdd = (dateKey?: string) => {
+  const openAdd = (dateKey?: string, endDate?: string) => {
     setDaySheetOpen(false);
     setSheetEvent(null);
     setSheetMode('add');
     setSheetOpen(true);
     if (dateKey) setSelectedDateKey(dateKey);
+    setFormEndDate(endDate);
+  };
+
+  const openAddFromMultiSelect = () => {
+    const range = dateRangeFromKeys(multiSelectedKeys);
+    if (!range) return;
+    openAdd(range.start, range.end !== range.start ? range.end : undefined);
+  };
+
+  const exitMultiSelect = () => {
+    setMultiSelectMode(false);
+    setMultiSelectedKeys([]);
+  };
+
+  const handleToggleOvertime = async () => {
+    if (!selectedDateKey) return;
+    setOvertimeSaving(true);
+    try {
+      const res = await calendarAPI.toggleOvertime(coupleId, userId, selectedDateKey);
+      if (res.overtimeDays) setOvertimeDays(res.overtimeDays);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Failed to update overtime');
+    } finally {
+      setOvertimeSaving(false);
+    }
   };
 
   const openView = (event: CalendarEventItem) => {
@@ -148,6 +190,7 @@ export function CoupleCalendarScreen({
     type: CalendarEventType;
     title: string;
     date: string;
+    endDate?: string;
     time?: string;
     notes?: string;
   }) => {
@@ -162,6 +205,7 @@ export function CoupleCalendarScreen({
       setSelectedDateKey(data.date);
       const [y, m] = data.date.split('-').map(Number);
       setViewMonth(new Date(y, m - 1, 1));
+      exitMultiSelect();
       closeSheet();
     } catch (error: unknown) {
       alert(error instanceof Error ? error.message : 'Failed to save event');
@@ -253,7 +297,6 @@ export function CoupleCalendarScreen({
           />
           {partnerName.split(' ')[0]}
         </span>
-        <span className="text-muted-foreground">· bar = on shift</span>
       </div>
 
       <div className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-4 space-y-4">
@@ -262,7 +305,39 @@ export function CoupleCalendarScreen({
             {loading ? (
               <p className="text-center text-muted-foreground py-8">Loading calendar…</p>
             ) : (
+              <>
               <Card className="p-3 sm:p-4">
+                <div className="flex gap-2 mb-3">
+                  <Button
+                    variant={multiSelectMode ? 'gradient' : 'secondary'}
+                    size="sm"
+                    className="flex-1 text-xs"
+                    onClick={() => {
+                      if (multiSelectMode) exitMultiSelect();
+                      else {
+                        setMultiSelectMode(true);
+                        setDaySheetOpen(false);
+                      }
+                    }}
+                  >
+                    {multiSelectMode ? (
+                      <>
+                        <CheckSquare className="w-3.5 h-3.5 mr-1 inline" />
+                        Done selecting
+                      </>
+                    ) : (
+                      <>
+                        <Square className="w-3.5 h-3.5 mr-1 inline" />
+                        Select multiple days
+                      </>
+                    )}
+                  </Button>
+                </div>
+                {multiSelectMode && (
+                  <p className="text-xs text-center text-muted-foreground mb-2">
+                    Tap days to select, then add one event across all selected dates
+                  </p>
+                )}
                 <CoupleMonthGrid
                   viewMonth={viewMonth}
                   onViewMonthChange={setViewMonth}
@@ -270,10 +345,13 @@ export function CoupleCalendarScreen({
                   currentUserId={userId}
                   colorMap={colorMap}
                   shiftPatterns={shiftPatterns}
+                  overtimeDays={overtimeDays}
                   user1Id={user1Id}
                   user2Id={user2Id}
+                  multiSelectMode={multiSelectMode}
                   selectedDateKey={selectedDateKey}
-                  onSelectDate={handleDateTap}
+                  selectedDateKeys={multiSelectedKeys}
+                  onDayPress={handleDayPress}
                 />
                 <div className="mt-3 pt-3 border-t border-border flex gap-2">
                   <Button
@@ -284,21 +362,41 @@ export function CoupleCalendarScreen({
                       const today = toDateKey(new Date());
                       setSelectedDateKey(today);
                       setViewMonth(new Date());
-                      handleDateTap(today);
+                      if (multiSelectMode) {
+                        setMultiSelectedKeys([today]);
+                      } else {
+                        handleDayPress(today);
+                      }
                     }}
                   >
                     Today
                   </Button>
-                  <Button
-                    variant="gradient"
-                    size="sm"
-                    className="flex-1 text-xs"
-                    onClick={() => openAdd(selectedDateKey ?? toDateKey(new Date()))}
-                  >
-                    Add event
-                  </Button>
+                  {!multiSelectMode && (
+                    <Button
+                      variant="gradient"
+                      size="sm"
+                      className="flex-1 text-xs"
+                      onClick={() => openAdd(selectedDateKey ?? toDateKey(new Date()))}
+                    >
+                      Add event
+                    </Button>
+                  )}
                 </div>
               </Card>
+              {multiSelectMode && multiSelectedKeys.length > 0 && (
+                <Card className="p-3 flex flex-col gap-2 sticky bottom-2 z-10 shadow-lg border-[#A83FFF]/30">
+                  <p className="text-sm font-semibold text-center">
+                    {multiSelectedKeys.length} day{multiSelectedKeys.length === 1 ? '' : 's'} selected
+                  </p>
+                  <Button variant="gradient" size="sm" onClick={openAddFromMultiSelect}>
+                    Add event for selected days
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setMultiSelectedKeys([])}>
+                    Clear selection
+                  </Button>
+                </Card>
+              )}
+              </>
             )}
           </>
         )}
@@ -370,7 +468,9 @@ export function CoupleCalendarScreen({
                             <div className="min-w-0">
                               <p className="font-semibold truncate">{event.title}</p>
                               <p className="text-sm text-muted-foreground">
-                                {format(parseDateKey(event.date), 'MMM d, yyyy')}
+                                {isMultiDayEvent(event)
+                                  ? `${format(parseDateKey(event.date), 'MMM d')} – ${format(parseDateKey(event.endDate!), 'MMM d, yyyy')}`
+                                  : format(parseDateKey(event.date), 'MMM d, yyyy')}
                                 {timeLabel ? ` · ${timeLabel}` : ''} · {daysLabel}
                               </p>
                               <p className="text-xs font-medium mt-0.5" style={{ color: hex }}>
@@ -410,11 +510,15 @@ export function CoupleCalendarScreen({
           partnerName={partnerName}
           colorMap={colorMap}
           shiftPatterns={shiftPatterns}
+          overtimeDays={overtimeDays}
           user1Id={user1Id}
           user2Id={user2Id}
+          isMyOvertime={Boolean(selectedDateKey && isOvertimeDay(overtimeDays, userId, parseDateKey(selectedDateKey)))}
           onClose={() => setDaySheetOpen(false)}
           onAdd={() => openAdd(selectedDateKey)}
           onEventClick={openView}
+          onToggleOvertime={handleToggleOvertime}
+          overtimeSaving={overtimeSaving}
         />
       )}
 
@@ -423,6 +527,7 @@ export function CoupleCalendarScreen({
         mode={sheetMode}
         event={sheetEvent}
         initialDate={selectedDateKey ?? toDateKey(new Date())}
+        initialEndDate={formEndDate}
         currentUserId={userId}
         userName={userName}
         partnerName={partnerName}

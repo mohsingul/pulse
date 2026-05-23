@@ -15,10 +15,12 @@ import {
 import {
   getEventsOnDate,
   getUserCalendarHex,
+  isOvertimeDay,
   isShiftOnDay,
   toDateKey,
   type CalendarColorMap,
   type CalendarEventItem,
+  type OvertimeMap,
   type ShiftPatternMap,
 } from '@/app/constants/calendar';
 
@@ -31,10 +33,13 @@ interface CoupleMonthGridProps {
   currentUserId: string;
   colorMap: CalendarColorMap;
   shiftPatterns: ShiftPatternMap;
+  overtimeDays: OvertimeMap;
   user1Id: string;
   user2Id: string;
+  multiSelectMode: boolean;
   selectedDateKey: string | null;
-  onSelectDate: (dateKey: string) => void;
+  selectedDateKeys: string[];
+  onDayPress: (dateKey: string) => void;
 }
 
 export function CoupleMonthGrid({
@@ -44,11 +49,16 @@ export function CoupleMonthGrid({
   currentUserId,
   colorMap,
   shiftPatterns,
+  overtimeDays,
   user1Id,
   user2Id,
+  multiSelectMode,
   selectedDateKey,
-  onSelectDate,
+  selectedDateKeys,
+  onDayPress,
 }: CoupleMonthGridProps) {
+  const selectedSet = useMemo(() => new Set(selectedDateKeys), [selectedDateKeys]);
+
   const days = useMemo(() => {
     const monthStart = startOfMonth(viewMonth);
     const monthEnd = endOfMonth(viewMonth);
@@ -106,7 +116,8 @@ export function CoupleMonthGrid({
       >
         {days.map(({ date, inMonth, key }) => {
           const dayEvents = getEventsOnDate(events, date);
-          const selected = selectedDateKey === key;
+          const inMulti = selectedSet.has(key);
+          const selected = multiSelectMode ? inMulti : selectedDateKey === key;
           const today = isToday(date);
           const shiftBars: { hex: string }[] = [];
           for (const uid of [user1Id, user2Id]) {
@@ -115,20 +126,48 @@ export function CoupleMonthGrid({
               shiftBars.push({ hex: getUserCalendarHex(uid, colorMap, uid) });
             }
           }
+          const myOt = isOvertimeDay(overtimeDays, currentUserId, date);
+          const partnerOt = isOvertimeDay(overtimeDays, user1Id === currentUserId ? user2Id : user1Id, date);
 
           return (
             <button
               key={key}
               type="button"
-              onClick={() => onSelectDate(key)}
+              onClick={() => onDayPress(key)}
               className={`
                 relative flex flex-col items-center justify-start min-h-[52px] sm:min-h-[58px]
                 rounded-xl p-0.5 transition-all duration-150 active:scale-[0.97] overflow-hidden
                 ${!inMonth ? 'opacity-35' : ''}
-                ${selected ? 'ring-2 ring-[#A83FFF] bg-[#A83FFF]/10 scale-[1.02]' : 'hover:bg-accent/60'}
+                ${
+                  selected
+                    ? multiSelectMode
+                      ? 'ring-2 ring-[#A83FFF] bg-[#A83FFF]/25'
+                      : 'ring-2 ring-[#A83FFF] bg-[#A83FFF]/10 scale-[1.02]'
+                    : 'hover:bg-accent/60'
+                }
                 ${today && !selected ? 'bg-accent/40' : ''}
               `}
             >
+              {(myOt || partnerOt) && (
+                <div className="absolute top-0.5 right-0.5 flex flex-col gap-px">
+                  {myOt && (
+                    <span
+                      className="text-[7px] font-bold leading-none px-0.5 rounded bg-amber-500 text-white"
+                      title="Your overtime"
+                    >
+                      OT
+                    </span>
+                  )}
+                  {partnerOt && (
+                    <span
+                      className="text-[7px] font-bold leading-none px-0.5 rounded bg-amber-500/70 text-white"
+                      title="Partner overtime"
+                    >
+                      OT
+                    </span>
+                  )}
+                </div>
+              )}
               <span
                 className={`
                   text-xs font-semibold w-7 h-7 flex items-center justify-center rounded-full

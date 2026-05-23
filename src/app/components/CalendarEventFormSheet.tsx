@@ -23,6 +23,7 @@ interface CalendarEventFormSheetProps {
   mode: CalendarSheetMode;
   event: CalendarEventItem | null;
   initialDate: string;
+  initialEndDate?: string;
   currentUserId: string;
   userName: string;
   partnerName: string;
@@ -33,6 +34,7 @@ interface CalendarEventFormSheetProps {
     type: CalendarEventType;
     title: string;
     date: string;
+    endDate?: string;
     time?: string;
     notes?: string;
   }) => void;
@@ -45,6 +47,7 @@ export function CalendarEventFormSheet({
   mode,
   event,
   initialDate,
+  initialEndDate,
   currentUserId,
   userName,
   partnerName,
@@ -59,6 +62,7 @@ export function CalendarEventFormSheet({
   const [type, setType] = useState<CalendarEventType>('important');
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(initialDate);
+  const [endDate, setEndDate] = useState(initialEndDate ?? '');
   const [time, setTime] = useState('');
   const [notes, setNotes] = useState('');
 
@@ -67,6 +71,7 @@ export function CalendarEventFormSheet({
       setTime('');
       setTitle('');
       setNotes('');
+      setEndDate('');
       return;
     }
     if (mode === 'add') {
@@ -74,16 +79,18 @@ export function CalendarEventFormSheet({
       setType('important');
       setTitle('');
       setDate(initialDate);
+      setEndDate(initialEndDate && initialEndDate > initialDate ? initialEndDate : '');
       setTime('');
       setNotes('');
     } else if (event) {
       setType(event.type);
       setTitle(event.title);
       setDate(event.date);
+      setEndDate(event.endDate && event.endDate > event.date ? event.endDate : '');
       setTime(event.time ?? '');
       setNotes(event.notes ?? '');
     }
-  }, [open, mode, event?.id, initialDate]);
+  }, [open, mode, event?.id, initialDate, initialEndDate]);
 
   if (!open) return null;
 
@@ -100,6 +107,7 @@ export function CalendarEventFormSheet({
       type,
       title: title.trim(),
       date,
+      endDate: endDate && endDate >= date ? endDate : undefined,
       time: time.trim() || undefined,
       notes: notes.trim() || undefined,
     });
@@ -152,7 +160,11 @@ export function CalendarEventFormSheet({
               <dl className="space-y-2 text-sm">
                 <div>
                   <dt className="text-muted-foreground">Date</dt>
-                  <dd className="font-medium">{format(parseDateKey(event.date), 'EEEE, MMMM d, yyyy')}</dd>
+                  <dd className="font-medium">
+                    {event.endDate && event.endDate > event.date
+                      ? `${format(parseDateKey(event.date), 'MMM d')} – ${format(parseDateKey(event.endDate), 'MMM d, yyyy')}`
+                      : format(parseDateKey(event.date), 'EEEE, MMMM d, yyyy')}
+                  </dd>
                 </div>
                 {timeLabel && (
                   <div>
@@ -219,20 +231,30 @@ export function CalendarEventFormSheet({
               />
               <div className="grid grid-cols-2 gap-3">
                 <Input
-                  label="Date"
+                  label="Start date"
                   type="date"
                   value={date}
-                  onChange={(e) => setDate(e.target.value)}
+                  onChange={(e) => {
+                    setDate(e.target.value);
+                    if (endDate && endDate < e.target.value) setEndDate(e.target.value);
+                  }}
                   required
                 />
                 <Input
-                  key={`time-${formKey}-${mode}-${event?.id ?? 'new'}`}
-                  label="Time (optional)"
-                  type="time"
-                  value={time}
-                  onChange={(e) => setTime(e.target.value)}
+                  label="End date (optional)"
+                  type="date"
+                  value={endDate}
+                  min={date}
+                  onChange={(e) => setEndDate(e.target.value)}
                 />
               </div>
+              <Input
+                key={`time-${formKey}-${mode}-${event?.id ?? 'new'}`}
+                label="Time (optional)"
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+              />
               <Input
                 label="Notes"
                 placeholder="Optional notes"

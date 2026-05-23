@@ -60,11 +60,14 @@ export interface CalendarEventItem {
   type: CalendarEventType;
   title: string;
   date: string;
+  endDate?: string;
   time?: string;
   notes?: string;
   createdBy?: string;
   createdByName?: string;
 }
+
+export type OvertimeMap = Record<string, string[]>;
 
 export type CalendarColorId =
   | 'rose'
@@ -157,20 +160,44 @@ export function formatEventTime(time?: string): string | null {
   return `${hour12}:${String(min).padStart(2, '0')} ${period}`;
 }
 
-/** Whether an event appears on a calendar day (annual types repeat yearly). */
+function isAnnualType(type?: CalendarEventType): boolean {
+  return type === 'anniversary' || type === 'birthday' || type === 'holiday';
+}
+
+/** Whether an event appears on a calendar day (annual types repeat yearly; ranges use endDate). */
 export function eventOccursOnDate(
-  event: { date: string; type?: CalendarEventType },
+  event: { date: string; endDate?: string; type?: CalendarEventType },
   day: Date,
 ): boolean {
   const parts = event.date.split('-').map(Number);
   if (parts.length < 3) return false;
   const [, m, d] = parts;
-  const isAnnual =
-    event.type === 'anniversary' || event.type === 'birthday' || event.type === 'holiday';
-  if (isAnnual) {
+
+  if (isAnnualType(event.type)) {
     return day.getMonth() === m - 1 && day.getDate() === d;
   }
-  return toDateKey(day) === event.date;
+
+  const key = toDateKey(day);
+  const end = event.endDate && event.endDate >= event.date ? event.endDate : event.date;
+  return key >= event.date && key <= end;
+}
+
+export function isMultiDayEvent(event: { date: string; endDate?: string }): boolean {
+  return Boolean(event.endDate && event.endDate > event.date);
+}
+
+export function isOvertimeDay(overtime: OvertimeMap, userId: string, day: Date): boolean {
+  return (overtime[userId] ?? []).includes(toDateKey(day));
+}
+
+export function sortDateKeys(keys: string[]): string[] {
+  return [...keys].sort();
+}
+
+export function dateRangeFromKeys(keys: string[]): { start: string; end: string } | null {
+  if (keys.length === 0) return null;
+  const sorted = sortDateKeys(keys);
+  return { start: sorted[0], end: sorted[sorted.length - 1] };
 }
 
 export function getEventsOnDate<T extends { date: string; type?: CalendarEventType }>(

@@ -383,6 +383,12 @@ export const calendarAPI = {
       method: 'DELETE',
     }),
 
+  toggleOvertime: (coupleId: string, userId: string, date: string, enabled?: boolean) =>
+    apiRequest(`/calendar/${coupleId}/overtime`, {
+      method: 'POST',
+      body: JSON.stringify({ userId, date, enabled }),
+    }),
+
   create: (
     coupleId: string,
     userId: string,
@@ -390,6 +396,7 @@ export const calendarAPI = {
       type: 'anniversary' | 'birthday' | 'trip' | 'holiday' | 'important';
       title: string;
       date: string;
+      endDate?: string;
       time?: string;
       notes?: string;
     },
@@ -412,6 +419,7 @@ export const calendarAPI = {
       type: 'anniversary' | 'birthday' | 'trip' | 'holiday' | 'important';
       title: string;
       date: string;
+      endDate?: string;
       time?: string;
       notes?: string;
     },

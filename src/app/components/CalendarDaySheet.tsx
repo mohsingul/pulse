@@ -1,14 +1,17 @@
 import React from 'react';
 import { Button } from '@/app/components/Button';
-import { X, Plus } from 'lucide-react';
+import { X, Plus, Clock } from 'lucide-react';
 import {
   formatEventTime,
   getCalendarTypeMeta,
   getUserCalendarHex,
+  isMultiDayEvent,
+  isOvertimeDay,
   isShiftOnDay,
   parseDateKey,
   type CalendarColorMap,
   type CalendarEventItem,
+  type OvertimeMap,
   type ShiftPatternMap,
 } from '@/app/constants/calendar';
 import { format } from 'date-fns';
@@ -22,11 +25,15 @@ interface CalendarDaySheetProps {
   partnerName: string;
   colorMap: CalendarColorMap;
   shiftPatterns: ShiftPatternMap;
+  overtimeDays: OvertimeMap;
   user1Id: string;
   user2Id: string;
+  isMyOvertime: boolean;
   onClose: () => void;
   onAdd: () => void;
   onEventClick: (event: CalendarEventItem) => void;
+  onToggleOvertime: () => void;
+  overtimeSaving?: boolean;
 }
 
 export function CalendarDaySheet({
@@ -34,15 +41,18 @@ export function CalendarDaySheet({
   dateKey,
   events,
   currentUserId,
-  userName,
   partnerName,
   colorMap,
   shiftPatterns,
+  overtimeDays,
   user1Id,
   user2Id,
+  isMyOvertime,
   onClose,
   onAdd,
   onEventClick,
+  onToggleOvertime,
+  overtimeSaving,
 }: CalendarDaySheetProps) {
   if (!open) return null;
 
@@ -57,6 +67,8 @@ export function CalendarDaySheet({
   if (shiftPatterns[user2Id] && isShiftOnDay(shiftPatterns[user2Id], day)) {
     shiftNotes.push(`${labelFor(user2Id)} — on shift`);
   }
+  const partnerId = user1Id === currentUserId ? user2Id : user1Id;
+  const partnerOt = isOvertimeDay(overtimeDays, partnerId, day);
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col justify-end">
@@ -90,6 +102,21 @@ export function CalendarDaySheet({
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+          <Button
+            variant={isMyOvertime ? 'gradient' : 'secondary'}
+            className="w-full"
+            onClick={onToggleOvertime}
+            disabled={overtimeSaving}
+          >
+            <Clock className="w-4 h-4 mr-2 inline" />
+            {overtimeSaving ? 'Saving…' : isMyOvertime ? 'Remove overtime' : 'Mark overtime'}
+          </Button>
+          {partnerOt && (
+            <p className="text-xs text-center text-muted-foreground">
+              {partnerName.split(' ')[0]} is on overtime this day
+            </p>
+          )}
+
           {shiftNotes.length > 0 && (
             <div className="rounded-xl bg-accent/60 px-3 py-2 space-y-1">
               {shiftNotes.map((note) => (
@@ -100,10 +127,10 @@ export function CalendarDaySheet({
             </div>
           )}
           {events.length === 0 ? (
-            <div className="text-center py-8 space-y-3">
+            <div className="text-center py-6 space-y-3">
               <div className="text-4xl">📅</div>
               <p className="text-muted-foreground text-sm">
-                {shiftNotes.length > 0 ? 'No events — shift only' : 'Nothing planned for this day'}
+                {shiftNotes.length > 0 || isMyOvertime ? 'No events on this day' : 'Nothing planned for this day'}
               </p>
               <Button variant="gradient" onClick={onAdd}>
                 <Plus className="w-4 h-4 mr-2 inline" />
@@ -116,6 +143,9 @@ export function CalendarDaySheet({
               const hex = getUserCalendarHex(event.createdBy, colorMap, currentUserId);
               const isSelf = !event.createdBy || event.createdBy === currentUserId;
               const timeLabel = formatEventTime(event.time);
+              const dateLabel = isMultiDayEvent(event)
+                ? `${format(parseDateKey(event.date), 'MMM d')} – ${format(parseDateKey(event.endDate!), 'MMM d, yyyy')}`
+                : null;
 
               return (
                 <button
@@ -137,6 +167,7 @@ export function CalendarDaySheet({
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
                     {meta.label}
+                    {dateLabel ? ` · ${dateLabel}` : ''}
                     {timeLabel ? ` · ${timeLabel}` : ''}
                   </p>
                   {event.notes && (
