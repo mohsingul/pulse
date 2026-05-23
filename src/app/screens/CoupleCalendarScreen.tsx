@@ -8,7 +8,7 @@ import {
   CalendarEventFormSheet,
   type CalendarSheetMode,
 } from '@/app/components/CalendarEventFormSheet';
-import { ArrowLeft, Plus, Trash2, CalendarDays, List, CheckSquare, Square } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Pencil, CalendarDays, List, CheckSquare, Square } from 'lucide-react';
 import { calendarAPI } from '@/utils/api';
 import {
   CALENDAR_EVENT_TYPES,
@@ -252,6 +252,13 @@ export function CoupleCalendarScreen({
     setDaySheetOpen(false);
     setSheetEvent(event);
     setSheetMode('view');
+    setSheetOpen(true);
+  };
+
+  const openEdit = (event: CalendarEventItem) => {
+    setDaySheetOpen(false);
+    setSheetEvent(event);
+    setSheetMode('edit');
     setSheetOpen(true);
   };
 
@@ -554,17 +561,30 @@ export function CoupleCalendarScreen({
                               </p>
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleAgendaDelete(event.id);
-                            }}
-                            className="p-2 text-muted-foreground hover:text-destructive rounded-full hover:bg-destructive/10 flex-shrink-0"
-                            aria-label="Delete event"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEdit(event);
+                              }}
+                              className="p-2 text-muted-foreground hover:text-[#A83FFF] rounded-full hover:bg-[#A83FFF]/10"
+                              aria-label="Edit event"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAgendaDelete(event.id);
+                              }}
+                              className="p-2 text-muted-foreground hover:text-destructive rounded-full hover:bg-destructive/10"
+                              aria-label="Delete event"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       </Card>
                     </div>
