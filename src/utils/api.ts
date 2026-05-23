@@ -476,6 +476,53 @@ export const dailyChallengeAPI = {
     apiRequest(`/daily-challenge/archive/${coupleId}`),
 };
 
+// Sexy Dice — synced couple dice game
+export const sexyDiceGameAPI = {
+  get: (coupleId: string, userId: string) =>
+    apiRequest(`/sexy-dice-game/${coupleId}?userId=${encodeURIComponent(userId)}`),
+
+  invite: (
+    coupleId: string,
+    userId: string,
+    hostName: string,
+    enabledDice: string[],
+  ) =>
+    apiRequest(`/sexy-dice-game/${coupleId}/invite`, {
+      method: 'POST',
+      body: JSON.stringify({ userId, hostName, enabledDice }),
+    }),
+
+  accept: (coupleId: string, userId: string) =>
+    apiRequest(`/sexy-dice-game/${coupleId}/accept`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    }),
+
+  decline: (coupleId: string, userId: string) =>
+    apiRequest(`/sexy-dice-game/${coupleId}/decline`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    }),
+
+  cancel: (coupleId: string, userId: string) =>
+    apiRequest(`/sexy-dice-game/${coupleId}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    }),
+
+  roll: (coupleId: string, userId: string) =>
+    apiRequest(`/sexy-dice-game/${coupleId}/roll`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    }),
+
+  end: (coupleId: string, userId: string) =>
+    apiRequest(`/sexy-dice-game/${coupleId}/end`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    }),
+};
+
 // Tease or Please — synced couple game
 export const teaseGameAPI = {
   get: (coupleId: string, userId: string) =>

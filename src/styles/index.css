@@ -37,3 +37,23 @@
 .animate-slide-up {
   animation: slide-up 0.3s ease-out;
 }
+
+@keyframes dice-wobble {
+  0%,
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+  25% {
+    transform: rotate(-8deg) scale(1.05);
+  }
+  50% {
+    transform: rotate(6deg) scale(0.98);
+  }
+  75% {
+    transform: rotate(-4deg) scale(1.02);
+  }
+}
+
+.animate-dice-wobble {
+  animation: dice-wobble 0.12s ease-in-out infinite;
+}

@@ -22,6 +22,16 @@ import {
   gameAction as teaseGameAction,
   sessionForClient,
 } from "./tease_game.ts";
+import {
+  getSession as getSexyDiceSession,
+  createInvite as createSexyDiceInvite,
+  acceptInvite as acceptSexyDiceInvite,
+  declineInvite as declineSexyDiceInvite,
+  cancelSession as cancelSexyDiceSession,
+  rollDice as sexyDiceRoll,
+  endGame as endSexyDiceGame,
+  sessionForClient as sexyDiceSessionForClient,
+} from "./sexy_dice_game.ts";
 
 const app = new Hono();
 
@@ -3360,6 +3370,139 @@ app.post("/make-server-494d91eb/tease-game/:coupleId/action", async (c) => {
   } catch (error: any) {
     console.error("[Tease Game] action failed:", error);
     return c.json({ error: error.message || "Action failed" }, 500);
+  }
+});
+
+// Sexy Dice — synced couple dice game
+app.get("/make-server-494d91eb/sexy-dice-game/:coupleId", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    const userId = c.req.query("userId");
+    if (!coupleId || !userId) {
+      return c.json({ error: "Couple ID and user ID are required" }, 400);
+    }
+    const session = await getSexyDiceSession(coupleId);
+    if (!session) {
+      return c.json({ session: null });
+    }
+    return c.json(sexyDiceSessionForClient(session, userId));
+  } catch (error: any) {
+    console.error("[Sexy Dice] GET failed:", error);
+    return c.json({ error: error.message || "Failed to get game" }, 500);
+  }
+});
+
+app.post("/make-server-494d91eb/sexy-dice-game/:coupleId/invite", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    const body = await c.req.json();
+    const { userId, hostName, enabledDice } = body;
+    if (!coupleId || !userId || !enabledDice) {
+      return c.json({ error: "coupleId, userId, and enabledDice are required" }, 400);
+    }
+    const couple = await kv.get(`couple:${coupleId}`);
+    if (!couple) return c.json({ error: "Couple not found" }, 404);
+    const partnerId = couple.user1Id === userId ? couple.user2Id : couple.user1Id;
+    const hostUser = await kv.get(`user:${userId}`);
+    const partnerUser = await kv.get(`user:${partnerId}`);
+    const session = await createSexyDiceInvite(
+      couple,
+      userId,
+      hostName || hostUser?.displayName || "Partner",
+      partnerId,
+      partnerUser?.displayName || "Partner",
+      enabledDice,
+    );
+    const receiver = partnerUser;
+    if (receiver?.fcmToken) {
+      try {
+        await sendFcmPush(
+          receiver.fcmToken,
+          {
+            title: `${hostName || hostUser?.displayName} invited you to play`,
+            body: `Sexy Dice — open the app to accept and roll together.`,
+          },
+          {
+            type: "sexy-dice-game-invite",
+            coupleId,
+            url: `${Deno.env.get("APP_URL") || "https://aimopulse.vercel.app"}/?screen=sexy-dice`,
+            tag: `sexy-dice-game-invite-${coupleId}`,
+          },
+        );
+      } catch (e) {
+        console.log("[Sexy Dice] FCM invite failed:", e);
+      }
+    }
+    return c.json(sexyDiceSessionForClient(session, userId));
+  } catch (error: any) {
+    console.error("[Sexy Dice] invite failed:", error);
+    return c.json({ error: error.message || "Failed to invite" }, 500);
+  }
+});
+
+app.post("/make-server-494d91eb/sexy-dice-game/:coupleId/accept", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    const { userId } = await c.req.json();
+    if (!coupleId || !userId) {
+      return c.json({ error: "coupleId and userId are required" }, 400);
+    }
+    const session = await acceptSexyDiceInvite(coupleId, userId);
+    return c.json(sexyDiceSessionForClient(session, userId));
+  } catch (error: any) {
+    console.error("[Sexy Dice] accept failed:", error);
+    return c.json({ error: error.message || "Failed to accept" }, 500);
+  }
+});
+
+app.post("/make-server-494d91eb/sexy-dice-game/:coupleId/decline", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    const { userId } = await c.req.json();
+    await declineSexyDiceInvite(coupleId, userId);
+    return c.json({ success: true });
+  } catch (error: any) {
+    return c.json({ error: error.message || "Failed to decline" }, 500);
+  }
+});
+
+app.post("/make-server-494d91eb/sexy-dice-game/:coupleId/cancel", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    const { userId } = await c.req.json();
+    await cancelSexyDiceSession(coupleId, userId);
+    return c.json({ success: true });
+  } catch (error: any) {
+    return c.json({ error: error.message || "Failed to cancel" }, 500);
+  }
+});
+
+app.post("/make-server-494d91eb/sexy-dice-game/:coupleId/roll", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    const { userId } = await c.req.json();
+    if (!coupleId || !userId) {
+      return c.json({ error: "coupleId and userId are required" }, 400);
+    }
+    const session = await sexyDiceRoll(coupleId, userId);
+    return c.json(sexyDiceSessionForClient(session, userId));
+  } catch (error: any) {
+    console.error("[Sexy Dice] roll failed:", error);
+    return c.json({ error: error.message || "Failed to roll" }, 500);
+  }
+});
+
+app.post("/make-server-494d91eb/sexy-dice-game/:coupleId/end", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    const { userId } = await c.req.json();
+    if (!coupleId || !userId) {
+      return c.json({ error: "coupleId and userId are required" }, 400);
+    }
+    const session = await endSexyDiceGame(coupleId, userId);
+    return c.json(sexyDiceSessionForClient(session, userId));
+  } catch (error: any) {
+    return c.json({ error: error.message || "Failed to end game" }, 500);
   }
 });
 

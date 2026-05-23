@@ -6,8 +6,8 @@ import { InstallPrompt } from '@/app/components/InstallPrompt';
 import { CalendarRemindersHome } from '@/app/components/CalendarRemindersHome';
 import { SharkModeHomeCard } from '@/app/components/SharkModeHomeCard';
 import { DailyChallenge } from '@/app/components/DailyChallenge';
-import { Sparkles, History, User, Calendar, HandHeart, Bell, Clock } from 'lucide-react';
-import { todayAPI, notificationAPI, sharkModeAPI, partnerStatusAPI, calendarAPI, teaseGameAPI } from '@/utils/api';
+import { Sparkles, History, User, Calendar, HandHeart, Bell, Clock, Dices } from 'lucide-react';
+import { todayAPI, notificationAPI, sharkModeAPI, partnerStatusAPI, calendarAPI, sexyDiceGameAPI } from '@/utils/api';
 import { storage, NUDGE_DAILY_LIMIT } from '@/utils/storage';
 import { getUpcomingCalendarReminders } from '@/app/constants/calendar';
 import { formatDistanceToNow } from 'date-fns';
@@ -32,6 +32,7 @@ interface HomeScreenProps {
   onViewCalendar: () => void;
   onViewDailyChallengeArchive?: () => void;
   onPlayTeaseOrPlease?: () => void;
+  onPlaySexyDice?: () => void;
 }
 
 const REACTIONS = ['❤️', '🫶', '😘', '😄', '🥺'];
@@ -49,6 +50,7 @@ export function HomeScreen({
   onViewCalendar,
   onViewDailyChallengeArchive,
   onPlayTeaseOrPlease,
+  onPlaySexyDice,
 }: HomeScreenProps) {
   const [todayCard, setTodayCard] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -59,20 +61,20 @@ export function HomeScreen({
   const [partnerStatusRecord, setPartnerStatusRecord] = useState<any>(null);
   const [showPartnerStatusSheet, setShowPartnerStatusSheet] = useState(false);
   const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
-  const [teaseGameInvitePending, setTeaseGameInvitePending] = useState(false);
+  const [sexyDiceInvitePending, setSexyDiceInvitePending] = useState(false);
 
   useEffect(() => {
     fetchTodayCard();
     fetchSharkMode();
     fetchPartnerStatus();
     fetchCalendarEvents();
-    fetchTeaseGameInvite();
+    fetchSexyDiceInvite();
     const interval = setInterval(() => {
       fetchTodayCard();
       fetchSharkMode();
       fetchPartnerStatus();
       fetchCalendarEvents();
-      fetchTeaseGameInvite();
+      fetchSexyDiceInvite();
     }, 1000); // Refresh every 1s for near-instant updates
     return () => clearInterval(interval);
   }, [coupleId, userId]);
@@ -81,14 +83,14 @@ export function HomeScreen({
     setNudgeCount(storage.getDailyNudgeCount(coupleId));
   }, [coupleId]);
 
-  const fetchTeaseGameInvite = async () => {
+  const fetchSexyDiceInvite = async () => {
     try {
-      const data = await teaseGameAPI.get(coupleId, userId);
-      setTeaseGameInvitePending(
+      const data = await sexyDiceGameAPI.get(coupleId, userId);
+      setSexyDiceInvitePending(
         data?.session?.status === 'invite_pending' && data.isHost === false,
       );
     } catch {
-      setTeaseGameInvitePending(false);
+      setSexyDiceInvitePending(false);
     }
   };
 
@@ -239,21 +241,19 @@ export function HomeScreen({
       {/* Header */}
       <div className="px-6 py-4 flex items-center justify-end safe-top flex-shrink-0 border-b border-border">
         <div className="flex items-center space-x-1">
-          {/* Tease or Please — hidden for now
-          {onPlayTeaseOrPlease && (
+          {onPlaySexyDice && (
             <button
-              onClick={onPlayTeaseOrPlease}
-              className="p-2 hover:bg-rose-500/10 rounded-full transition-colors relative"
-              aria-label="Tease or Please"
-              title={teaseGameInvitePending ? 'Game invite — tap to accept' : 'Tease or Please'}
+              onClick={onPlaySexyDice}
+              className="p-2 hover:bg-fuchsia-500/10 rounded-full transition-colors relative"
+              aria-label="Sexy Dice"
+              title={sexyDiceInvitePending ? 'Dice game invite — tap to accept' : 'Sexy Dice'}
             >
-              <Flame className="w-5 h-5 text-[#FB3094] fill-[#FB3094]/25" />
-              {teaseGameInvitePending && (
-                <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-[#FB3094] rounded-full ring-2 ring-background animate-pulse" />
+              <Dices className="w-5 h-5 text-fuchsia-400" />
+              {sexyDiceInvitePending && (
+                <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-fuchsia-500 rounded-full ring-2 ring-background animate-pulse" />
               )}
             </button>
           )}
-          */}
           <button
             onClick={() => setShowPartnerStatusSheet(true)}
             className="p-2 hover:bg-accent rounded-full transition-colors relative"
