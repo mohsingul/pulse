@@ -1,5 +1,7 @@
 // Local storage utilities for user data
 
+export const NUDGE_DAILY_LIMIT = 100;
+
 interface UserData {
   userId: string;
   username: string;
@@ -74,5 +76,21 @@ export const storage = {
 
   setNotificationPromptState: (state: any) => {
     localStorage.setItem('pulse_notification_prompt_state', JSON.stringify(state));
+  },
+
+  getDailyNudgeCount: (coupleId: string): number => {
+    const dateKey = new Date().toISOString().slice(0, 10);
+    const key = `pulse_nudge_count:${coupleId}:${dateKey}`;
+    const raw = localStorage.getItem(key);
+    const n = raw ? parseInt(raw, 10) : 0;
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  },
+
+  incrementDailyNudgeCount: (coupleId: string): number => {
+    const dateKey = new Date().toISOString().slice(0, 10);
+    const key = `pulse_nudge_count:${coupleId}:${dateKey}`;
+    const next = storage.getDailyNudgeCount(coupleId) + 1;
+    localStorage.setItem(key, String(next));
+    return next;
   },
 };

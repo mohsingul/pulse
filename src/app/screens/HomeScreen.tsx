@@ -8,6 +8,7 @@ import { SharkModeHomeCard } from '@/app/components/SharkModeHomeCard';
 import { DailyChallenge } from '@/app/components/DailyChallenge';
 import { Sparkles, History, User, Calendar, HandHeart, Bell, Clock } from 'lucide-react';
 import { todayAPI, notificationAPI, sharkModeAPI, partnerStatusAPI, calendarAPI, teaseGameAPI } from '@/utils/api';
+import { storage, NUDGE_DAILY_LIMIT } from '@/utils/storage';
 import { getUpcomingCalendarReminders } from '@/app/constants/calendar';
 import { formatDistanceToNow } from 'date-fns';
 import { PartnerStatusHomeCard } from '@/app/components/PartnerStatusHomeCard';
@@ -52,7 +53,7 @@ export function HomeScreen({
   const [todayCard, setTodayCard] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
-  const [nudgeCount, setNudgeCount] = useState(0);
+  const [nudgeCount, setNudgeCount] = useState(() => storage.getDailyNudgeCount(coupleId));
   const [showNudgeTooltip, setShowNudgeTooltip] = useState(false);
   const [sharkMode, setSharkMode] = useState<any>(null);
   const [partnerStatusRecord, setPartnerStatusRecord] = useState<any>(null);
@@ -75,6 +76,10 @@ export function HomeScreen({
     }, 1000); // Refresh every 1s for near-instant updates
     return () => clearInterval(interval);
   }, [coupleId, userId]);
+
+  useEffect(() => {
+    setNudgeCount(storage.getDailyNudgeCount(coupleId));
+  }, [coupleId]);
 
   const fetchTeaseGameInvite = async () => {
     try {
@@ -153,15 +158,16 @@ export function HomeScreen({
   };
 
   const handleNudge = async () => {
-    if (nudgeCount >= 3) {
+    if (nudgeCount >= NUDGE_DAILY_LIMIT) {
       setShowNudgeTooltip(true);
       setTimeout(() => setShowNudgeTooltip(false), 2000);
       return;
     }
-    
+
     try {
       await notificationAPI.sendNudge(coupleId, userId);
-      setNudgeCount(nudgeCount + 1);
+      const next = storage.incrementDailyNudgeCount(coupleId);
+      setNudgeCount(next);
       alert(`Nudge sent to ${partnerName}! 💗`);
     } catch (error) {
       console.error('Error sending nudge:', error);
@@ -481,7 +487,7 @@ export function HomeScreen({
             </Button>
             {showNudgeTooltip && (
               <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-foreground text-background px-4 py-2 rounded-lg text-sm whitespace-nowrap">
-                Max 3 nudges per day
+                Max {NUDGE_DAILY_LIMIT} nudges per day
               </div>
             )}
           </div>
