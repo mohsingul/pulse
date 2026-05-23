@@ -406,6 +406,12 @@ export const calendarAPI = {
       body: JSON.stringify({ userId, date, enabled }),
     }),
 
+  excludeShiftDay: (coupleId: string, userId: string, date: string, excluded = true) =>
+    apiRequest(`/calendar/${coupleId}/shift-exclusion`, {
+      method: 'POST',
+      body: JSON.stringify({ userId, date, excluded }),
+    }),
+
   create: (
     coupleId: string,
     userId: string,

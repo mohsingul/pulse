@@ -3,6 +3,7 @@ import { Card } from '@/app/components/Card';
 import { Button } from '@/app/components/Button';
 import { CoupleMonthGrid } from '@/app/components/CoupleMonthGrid';
 import { CalendarDaySheet } from '@/app/components/CalendarDaySheet';
+import { ShiftRemovePrompt } from '@/app/components/ShiftRemovePrompt';
 import {
   CalendarEventFormSheet,
   type CalendarSheetMode,
@@ -19,6 +20,7 @@ import {
   dateRangeFromKeys,
   isMultiDayEvent,
   isOvertimeDay,
+  isShiftOnDay,
   mergeColorMap,
   parseDateKey,
   formatEventTime,
@@ -27,6 +29,7 @@ import {
   type CalendarEventType,
   type CalendarEventItem,
   type OvertimeMap,
+  type ShiftExcludedMap,
   type ShiftPatternMap,
 } from '@/app/constants/calendar';
 import { format } from 'date-fns';
@@ -64,6 +67,7 @@ export function CoupleCalendarScreen({
   );
   const [shiftPatterns, setShiftPatterns] = useState<ShiftPatternMap>({});
   const [overtimeDays, setOvertimeDays] = useState<OvertimeMap>({});
+  const [shiftExcludedDays, setShiftExcludedDays] = useState<ShiftExcludedMap>({});
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<CalendarTab>('month');
   const [viewMonth, setViewMonth] = useState(() => new Date());
@@ -72,7 +76,10 @@ export function CoupleCalendarScreen({
   const [multiSelectedKeys, setMultiSelectedKeys] = useState<string[]>([]);
   const [formEndDate, setFormEndDate] = useState<string | undefined>();
   const [daySheetOpen, setDaySheetOpen] = useState(false);
-  const [overtimeSaving, setOvertimeSaving] = useState(false);
+  const [shiftActionSaving, setShiftActionSaving] = useState(false);
+  const [shiftRemovePromptOpen, setShiftRemovePromptOpen] = useState(false);
+  const [formInitialType, setFormInitialType] = useState<CalendarEventType | undefined>();
+  const [formInitialTitle, setFormInitialTitle] = useState<string | undefined>();
   const [filter, setFilter] = useState<CalendarEventType | 'all'>('all');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMode, setSheetMode] = useState<CalendarSheetMode>('add');
@@ -89,6 +96,7 @@ export function CoupleCalendarScreen({
       }
       if (response.shiftPatterns) setShiftPatterns(response.shiftPatterns);
       if (response.overtimeDays) setOvertimeDays(response.overtimeDays);
+      if (response.shiftExcludedDays) setShiftExcludedDays(response.shiftExcludedDays);
     } catch (error) {
       console.error('Error fetching calendar:', error);
     } finally {
@@ -140,10 +148,17 @@ export function CoupleCalendarScreen({
     setDaySheetOpen(true);
   };
 
-  const openAdd = (dateKey?: string, endDate?: string) => {
+  const openAdd = (
+    dateKey?: string,
+    endDate?: string,
+    initialType?: CalendarEventType,
+    initialTitle?: string,
+  ) => {
     setDaySheetOpen(false);
     setSheetEvent(null);
     setSheetMode('add');
+    setFormInitialType(initialType);
+    setFormInitialTitle(initialTitle);
     setSheetOpen(true);
     if (dateKey) setSelectedDateKey(dateKey);
     setFormEndDate(endDate);
@@ -160,16 +175,76 @@ export function CoupleCalendarScreen({
     setMultiSelectedKeys([]);
   };
 
-  const handleToggleOvertime = async () => {
+  const applyCalendarPrefs = (res: {
+    overtimeDays?: OvertimeMap;
+    shiftExcludedDays?: ShiftExcludedMap;
+  }) => {
+    if (res.overtimeDays) setOvertimeDays(res.overtimeDays);
+    if (res.shiftExcludedDays) setShiftExcludedDays(res.shiftExcludedDays);
+  };
+
+  const handleMarkOnShift = async () => {
     if (!selectedDateKey) return;
-    setOvertimeSaving(true);
+    setShiftActionSaving(true);
     try {
-      const res = await calendarAPI.toggleOvertime(coupleId, userId, selectedDateKey);
-      if (res.overtimeDays) setOvertimeDays(res.overtimeDays);
+      const res = await calendarAPI.toggleOvertime(coupleId, userId, selectedDateKey, true);
+      applyCalendarPrefs(res);
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : 'Failed to update shift');
     } finally {
-      setOvertimeSaving(false);
+      setShiftActionSaving(false);
+    }
+  };
+
+  const clearShiftForDay = async (dateKey: string) => {
+    const day = parseDateKey(dateKey);
+    const onScheduled = Boolean(
+      shiftPatterns[userId] && isShiftOnDay(shiftPatterns[userId], day),
+    );
+    if (onScheduled) {
+      const res = await calendarAPI.excludeShiftDay(coupleId, userId, dateKey, true);
+      applyCalendarPrefs(res);
+    }
+    if (isOvertimeDay(overtimeDays, userId, day)) {
+      const res = await calendarAPI.toggleOvertime(coupleId, userId, dateKey, false);
+      applyCalendarPrefs(res);
+    }
+  };
+
+  const handleRemoveShiftCompletely = async () => {
+    if (!selectedDateKey) return;
+    setShiftActionSaving(true);
+    try {
+      await clearShiftForDay(selectedDateKey);
+      setShiftRemovePromptOpen(false);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Failed to remove shift');
+    } finally {
+      setShiftActionSaving(false);
+    }
+  };
+
+  const handleLabelShiftAsHoliday = async () => {
+    if (!selectedDateKey) return;
+    setShiftActionSaving(true);
+    try {
+      await clearShiftForDay(selectedDateKey);
+      const hasHoliday = events.some(
+        (e) => e.type === 'holiday' && e.date === selectedDateKey,
+      );
+      if (!hasHoliday) {
+        await calendarAPI.create(coupleId, userId, {
+          type: 'holiday',
+          title: 'Holiday',
+          date: selectedDateKey,
+        });
+        await fetchEvents();
+      }
+      setShiftRemovePromptOpen(false);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Failed to label as holiday');
+    } finally {
+      setShiftActionSaving(false);
     }
   };
 
@@ -346,6 +421,7 @@ export function CoupleCalendarScreen({
                   colorMap={colorMap}
                   shiftPatterns={shiftPatterns}
                   overtimeDays={overtimeDays}
+                  shiftExcludedDays={shiftExcludedDays}
                   user1Id={user1Id}
                   user2Id={user2Id}
                   multiSelectMode={multiSelectMode}
@@ -511,16 +587,30 @@ export function CoupleCalendarScreen({
           colorMap={colorMap}
           shiftPatterns={shiftPatterns}
           overtimeDays={overtimeDays}
+          shiftExcludedDays={shiftExcludedDays}
           user1Id={user1Id}
           user2Id={user2Id}
-          isMyOvertime={Boolean(selectedDateKey && isOvertimeDay(overtimeDays, userId, parseDateKey(selectedDateKey)))}
           onClose={() => setDaySheetOpen(false)}
           onAdd={() => openAdd(selectedDateKey)}
           onEventClick={openView}
-          onToggleOvertime={handleToggleOvertime}
-          overtimeSaving={overtimeSaving}
+          onMarkOnShift={handleMarkOnShift}
+          onRemoveShift={() => setShiftRemovePromptOpen(true)}
+          shiftActionSaving={shiftActionSaving}
         />
       )}
+
+      <ShiftRemovePrompt
+        open={shiftRemovePromptOpen}
+        dateLabel={
+          selectedDateKey
+            ? format(parseDateKey(selectedDateKey), 'EEEE, MMMM d, yyyy')
+            : ''
+        }
+        saving={shiftActionSaving}
+        onClose={() => setShiftRemovePromptOpen(false)}
+        onLabelHoliday={handleLabelShiftAsHoliday}
+        onRemoveCompletely={handleRemoveShiftCompletely}
+      />
 
       <CalendarEventFormSheet
         open={sheetOpen}
@@ -528,6 +618,8 @@ export function CoupleCalendarScreen({
         event={sheetEvent}
         initialDate={selectedDateKey ?? toDateKey(new Date())}
         initialEndDate={formEndDate}
+        initialType={formInitialType}
+        initialTitle={formInitialTitle}
         currentUserId={userId}
         userName={userName}
         partnerName={partnerName}

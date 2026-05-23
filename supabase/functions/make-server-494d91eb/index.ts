@@ -2761,7 +2761,8 @@ async function getCalendarPrefsPayload(coupleId: string, couple: { user1Id: stri
   const colors = await getCalendarColors(coupleId, couple);
   const shiftPatterns = prefs.shiftPatterns ?? {};
   const overtimeDays = prefs.overtimeDays ?? {};
-  return { colors, shiftPatterns, overtimeDays };
+  const shiftExcludedDays = prefs.shiftExcludedDays ?? {};
+  return { colors, shiftPatterns, overtimeDays, shiftExcludedDays };
 }
 
 async function saveCalendarColor(
@@ -2797,9 +2798,10 @@ app.get("/make-server-494d91eb/calendar/:coupleId", async (c) => {
       return new Date(a.date).getTime() - new Date(b.date).getTime();
     });
 
-    const { colors, shiftPatterns, overtimeDays } = await getCalendarPrefsPayload(coupleId, couple);
+    const { colors, shiftPatterns, overtimeDays, shiftExcludedDays } =
+      await getCalendarPrefsPayload(coupleId, couple);
 
-    return c.json({ events: sorted, colors, shiftPatterns, overtimeDays });
+    return c.json({ events: sorted, colors, shiftPatterns, overtimeDays, shiftExcludedDays });
   } catch (error: any) {
     console.error(`[Calendar] Error getting events:`, error);
     return c.json({ error: error.message || "Failed to get calendar events" }, 500);
@@ -2829,8 +2831,56 @@ async function handleCalendarColorSave(c: any) {
 
   const merged = await saveCalendarColor(coupleId, couple, userId, colorId);
   const prefs = await getCalendarPrefsPayload(coupleId, couple);
-  return c.json({ success: true, colors: merged, shiftPatterns: prefs.shiftPatterns, overtimeDays: prefs.overtimeDays });
+  return c.json({
+    success: true,
+    colors: merged,
+    shiftPatterns: prefs.shiftPatterns,
+    overtimeDays: prefs.overtimeDays,
+    shiftExcludedDays: prefs.shiftExcludedDays,
+  });
 }
+
+app.post("/make-server-494d91eb/calendar/:coupleId/shift-exclusion", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    const { userId, date, excluded } = await c.req.json();
+
+    if (!coupleId || !userId || !date) {
+      return c.json({ error: "Couple ID, user ID, and date are required" }, 400);
+    }
+
+    const couple = await kv.get(`couple:${coupleId}`);
+    if (!couple) return c.json({ error: "Couple not found" }, 404);
+    if (userId !== couple.user1Id && userId !== couple.user2Id) {
+      return c.json({ error: "User is not part of this couple" }, 403);
+    }
+
+    const existing = (await kv.get(calendarPrefsKey(coupleId))) ?? {};
+    const list: string[] = [...(existing.shiftExcludedDays?.[userId] ?? [])];
+    const idx = list.indexOf(date);
+    const shouldExclude = excluded !== undefined ? Boolean(excluded) : idx < 0;
+
+    let next: string[];
+    if (shouldExclude) {
+      next = idx < 0 ? [...list, date].sort() : list;
+    } else {
+      next = list.filter((d) => d !== date);
+    }
+
+    const shiftExcludedDays = { ...(existing.shiftExcludedDays ?? {}), [userId]: next };
+    await kv.set(calendarPrefsKey(coupleId), {
+      ...existing,
+      shiftExcludedDays,
+      updatedAt: new Date().toISOString(),
+    });
+
+    const prefs = await getCalendarPrefsPayload(coupleId, couple);
+    return c.json({ success: true, ...prefs });
+  } catch (error: any) {
+    console.error(`[Calendar] Error updating shift exclusion:`, error);
+    return c.json({ error: error.message || "Failed to update shift exclusion" }, 500);
+  }
+});
 
 app.post("/make-server-494d91eb/calendar/:coupleId/overtime", async (c) => {
   try {

@@ -20,6 +20,7 @@ import {
   type CalendarColorMap,
   type CalendarEventItem,
   type OvertimeMap,
+  type ShiftExcludedMap,
   type ShiftPatternMap,
 } from '@/app/constants/calendar';
 
@@ -33,6 +34,7 @@ interface CoupleMonthGridProps {
   colorMap: CalendarColorMap;
   shiftPatterns: ShiftPatternMap;
   overtimeDays: OvertimeMap;
+  shiftExcludedDays: ShiftExcludedMap;
   user1Id: string;
   user2Id: string;
   multiSelectMode: boolean;
@@ -49,6 +51,7 @@ export function CoupleMonthGrid({
   colorMap,
   shiftPatterns,
   overtimeDays,
+  shiftExcludedDays,
   user1Id,
   user2Id,
   multiSelectMode,
@@ -120,7 +123,7 @@ export function CoupleMonthGrid({
           const today = isToday(date);
           const shiftBars: { hex: string }[] = [];
           for (const uid of [user1Id, user2Id]) {
-            if (isUserOnShiftForDay(uid, shiftPatterns, overtimeDays, date)) {
+            if (isUserOnShiftForDay(uid, shiftPatterns, overtimeDays, shiftExcludedDays, date)) {
               shiftBars.push({ hex: getUserCalendarHex(uid, colorMap, uid) });
             }
           }

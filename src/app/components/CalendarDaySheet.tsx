@@ -6,12 +6,12 @@ import {
   getCalendarTypeMeta,
   getUserCalendarHex,
   isMultiDayEvent,
-  isShiftOnDay,
   isUserOnShiftForDay,
   parseDateKey,
   type CalendarColorMap,
   type CalendarEventItem,
   type OvertimeMap,
+  type ShiftExcludedMap,
   type ShiftPatternMap,
 } from '@/app/constants/calendar';
 import { format } from 'date-fns';
@@ -26,14 +26,15 @@ interface CalendarDaySheetProps {
   colorMap: CalendarColorMap;
   shiftPatterns: ShiftPatternMap;
   overtimeDays: OvertimeMap;
+  shiftExcludedDays: ShiftExcludedMap;
   user1Id: string;
   user2Id: string;
-  isMyOvertime: boolean;
   onClose: () => void;
   onAdd: () => void;
   onEventClick: (event: CalendarEventItem) => void;
-  onToggleOvertime: () => void;
-  overtimeSaving?: boolean;
+  onMarkOnShift: () => void;
+  onRemoveShift: () => void;
+  shiftActionSaving?: boolean;
 }
 
 export function CalendarDaySheet({
@@ -45,14 +46,15 @@ export function CalendarDaySheet({
   colorMap,
   shiftPatterns,
   overtimeDays,
+  shiftExcludedDays,
   user1Id,
   user2Id,
-  isMyOvertime,
   onClose,
   onAdd,
   onEventClick,
-  onToggleOvertime,
-  overtimeSaving,
+  onMarkOnShift,
+  onRemoveShift,
+  shiftActionSaving,
 }: CalendarDaySheetProps) {
   if (!open) return null;
 
@@ -61,16 +63,19 @@ export function CalendarDaySheet({
   const labelFor = (uid: string) =>
     uid === currentUserId ? 'You' : partnerName.split(' ')[0];
   const shiftNotes: string[] = [];
-  if (isUserOnShiftForDay(user1Id, shiftPatterns, overtimeDays, day)) {
+  if (isUserOnShiftForDay(user1Id, shiftPatterns, overtimeDays, shiftExcludedDays, day)) {
     shiftNotes.push(`${labelFor(user1Id)} — on shift`);
   }
-  if (isUserOnShiftForDay(user2Id, shiftPatterns, overtimeDays, day)) {
+  if (isUserOnShiftForDay(user2Id, shiftPatterns, overtimeDays, shiftExcludedDays, day)) {
     shiftNotes.push(`${labelFor(user2Id)} — on shift`);
   }
-  const onScheduledShift = Boolean(
-    shiftPatterns[currentUserId] && isShiftOnDay(shiftPatterns[currentUserId], day),
+  const isMyOnShift = isUserOnShiftForDay(
+    currentUserId,
+    shiftPatterns,
+    overtimeDays,
+    shiftExcludedDays,
+    day,
   );
-  const showExtraShiftToggle = !onScheduledShift || isMyOvertime;
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col justify-end">
@@ -104,19 +109,25 @@ export function CalendarDaySheet({
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
-          {showExtraShiftToggle && (
+          {isMyOnShift ? (
             <Button
-              variant={isMyOvertime ? 'gradient' : 'secondary'}
+              variant="secondary"
               className="w-full"
-              onClick={onToggleOvertime}
-              disabled={overtimeSaving}
+              onClick={onRemoveShift}
+              disabled={shiftActionSaving}
             >
               <Clock className="w-4 h-4 mr-2 inline" />
-              {overtimeSaving
-                ? 'Saving…'
-                : isMyOvertime
-                  ? 'Remove shift'
-                  : 'Mark as on shift'}
+              {shiftActionSaving ? 'Saving…' : 'Remove shift'}
+            </Button>
+          ) : (
+            <Button
+              variant="secondary"
+              className="w-full"
+              onClick={onMarkOnShift}
+              disabled={shiftActionSaving}
+            >
+              <Clock className="w-4 h-4 mr-2 inline" />
+              {shiftActionSaving ? 'Saving…' : 'Mark as on shift'}
             </Button>
           )}
 
@@ -133,7 +144,7 @@ export function CalendarDaySheet({
             <div className="text-center py-6 space-y-3">
               <div className="text-4xl">📅</div>
               <p className="text-muted-foreground text-sm">
-                {shiftNotes.length > 0 || isMyOvertime ? 'No events on this day' : 'Nothing planned for this day'}
+                {shiftNotes.length > 0 ? 'No events on this day' : 'Nothing planned for this day'}
               </p>
               <Button variant="gradient" onClick={onAdd}>
                 <Plus className="w-4 h-4 mr-2 inline" />

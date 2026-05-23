@@ -476,7 +476,6 @@ export default function App() {
             onMoodArchive={() => setCurrentScreen('mood-archive')}
             onSharkModeArchive={() => setCurrentScreen('shark-mode-archive')}
             onDailyChallengeArchive={() => setCurrentScreen('daily-challenge-archive')}
-            onCoupleCalendar={() => setCurrentScreen('couple-calendar')}
           />
         );
 

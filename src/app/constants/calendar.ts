@@ -71,6 +71,9 @@ export interface CalendarEventItem {
 
 export type OvertimeMap = Record<string, string[]>;
 
+/** Dates excluded from the repeating shift pattern (day off / holiday override). */
+export type ShiftExcludedMap = Record<string, string[]>;
+
 export type CalendarColorId =
   | 'rose'
   | 'blue'
@@ -192,13 +195,23 @@ export function isOvertimeDay(overtime: OvertimeMap, userId: string, day: Date):
   return (overtime[userId] ?? []).includes(toDateKey(day));
 }
 
+export function isShiftExcluded(
+  excluded: ShiftExcludedMap,
+  userId: string,
+  day: Date,
+): boolean {
+  return (excluded[userId] ?? []).includes(toDateKey(day));
+}
+
 /** Scheduled shift or manually marked extra shift day (stored as overtime). */
 export function isUserOnShiftForDay(
   userId: string,
   shiftPatterns: ShiftPatternMap,
   overtimeDays: OvertimeMap,
+  shiftExcludedDays: ShiftExcludedMap,
   day: Date,
 ): boolean {
+  if (isShiftExcluded(shiftExcludedDays, userId, day)) return false;
   const pattern = shiftPatterns[userId];
   if (pattern && isShiftOnDay(pattern, day)) return true;
   return isOvertimeDay(overtimeDays, userId, day);

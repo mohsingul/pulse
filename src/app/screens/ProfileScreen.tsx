@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/app/components/Button';
 import { Card } from '@/app/components/Card';
 import { SharkModeSheet } from '@/app/components/SharkModeSheet';
-import { ArrowLeft, Copy, Share2, Settings, AlertTriangle, UserX, Image, MessageSquare, Smile, Waves, Sparkles, Calendar } from 'lucide-react';
+import { ArrowLeft, Copy, Share2, Settings, AlertTriangle, UserX, Image, MessageSquare, Smile, Waves, Sparkles } from 'lucide-react';
 import { pairingAPI, coupleAPI, sharkModeAPI } from '@/utils/api';
 import { storage } from '@/utils/storage';
 import { copyToClipboard } from '@/utils/clipboard';
@@ -22,7 +22,6 @@ interface ProfileScreenProps {
   onMoodArchive?: () => void;
   onSharkModeArchive?: () => void;
   onDailyChallengeArchive?: () => void;
-  onCoupleCalendar?: () => void;
 }
 
 export function ProfileScreen({
@@ -41,7 +40,6 @@ export function ProfileScreen({
   onMoodArchive,
   onSharkModeArchive,
   onDailyChallengeArchive,
-  onCoupleCalendar,
 }: ProfileScreenProps) {
   const [codeData, setCodeData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -309,20 +307,6 @@ export function ProfileScreen({
             Log Out
           </button>
         </div>
-
-        {/* Relationship */}
-        {onCoupleCalendar && coupleId && (
-          <div className="space-y-3 pt-4">
-            <h3 className="text-lg font-semibold">Relationship</h3>
-            <button
-              onClick={onCoupleCalendar}
-              className="w-full px-4 py-3 bg-accent hover:bg-accent/80 rounded-2xl transition-colors flex items-center justify-center space-x-2"
-            >
-              <Calendar className="w-5 h-5" />
-              <span>Couple Calendar</span>
-            </button>
-          </div>
-        )}
 
         {/* Additional Actions */}
         <div className="space-y-3 pt-4">

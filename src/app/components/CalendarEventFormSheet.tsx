@@ -24,6 +24,8 @@ interface CalendarEventFormSheetProps {
   event: CalendarEventItem | null;
   initialDate: string;
   initialEndDate?: string;
+  initialType?: CalendarEventType;
+  initialTitle?: string;
   currentUserId: string;
   userName: string;
   partnerName: string;
@@ -48,6 +50,8 @@ export function CalendarEventFormSheet({
   event,
   initialDate,
   initialEndDate,
+  initialType,
+  initialTitle,
   currentUserId,
   userName,
   partnerName,
@@ -76,8 +80,8 @@ export function CalendarEventFormSheet({
     }
     if (mode === 'add') {
       setFormKey((k) => k + 1);
-      setType('important');
-      setTitle('');
+      setType(initialType ?? 'important');
+      setTitle(initialTitle ?? '');
       setDate(initialDate);
       setEndDate(initialEndDate && initialEndDate > initialDate ? initialEndDate : '');
       setTime('');
@@ -90,7 +94,7 @@ export function CalendarEventFormSheet({
       setTime(event.time ?? '');
       setNotes(event.notes ?? '');
     }
-  }, [open, mode, event?.id, initialDate, initialEndDate]);
+  }, [open, mode, event?.id, initialDate, initialEndDate, initialType, initialTitle]);
 
   if (!open) return null;
 
