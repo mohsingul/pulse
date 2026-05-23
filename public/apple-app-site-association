@@ -1,5 +1,10 @@
 {
   "webcredentials": {
-    "apps": []
+    "apps": [],
+    "details": []
+  },
+  "applinks": {
+    "apps": [],
+    "details": []
   }
 }

@@ -1,22 +1,24 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Input } from '@/app/components/Input';
 import { Button } from '@/app/components/Button';
-import { GradientBlob } from '@/app/components/GradientBlob';
-import { ArrowLeft, AlertTriangle, Info } from 'lucide-react';
+import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import { userAPI } from '@/utils/api';
 import { storage } from '@/utils/storage';
-import { loadSavedLoginCredential, storeLoginCredential } from '@/utils/credentials';
-import { projectId, publicAnonKey } from '/utils/supabase/info';
-
+import {
+  loadSavedLoginCredential,
+  requestConditionalPasswordAutofill,
+  storeLoginCredential,
+} from '@/utils/credentials';
 interface LoginScreenProps {
   onBack: () => void;
   onSuccess: (user: any) => void;
 }
 
 export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [saveOnDevice, setSaveOnDevice] = useState(true);
+  const formRef = useRef<HTMLFormElement>(null);
+  const usernameRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -26,48 +28,35 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
   const [resetErrors, setResetErrors] = useState<Record<string, string>>({});
   const [resetLoading, setResetLoading] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
-  const [showDebug, setShowDebug] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<any>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  const applyLoginToFields = (username: string, password: string) => {
+    if (usernameRef.current) usernameRef.current.value = username;
+    if (passwordRef.current) passwordRef.current.value = password;
+  };
+
+  const enableAutofillOnField = (el: HTMLInputElement | null) => {
+    if (!el) return;
+    el.removeAttribute('readonly');
+  };
 
   useEffect(() => {
     loadSavedLoginCredential().then((saved) => {
-      if (saved) {
-        setUsername(saved.username);
-        setPassword(saved.password);
-      }
+      if (saved) applyLoginToFields(saved.username, saved.password);
     });
+
+    requestConditionalPasswordAutofill(applyLoginToFields);
+
+    const unlockTimer = window.setTimeout(() => {
+      enableAutofillOnField(usernameRef.current);
+      enableAutofillOnField(passwordRef.current);
+    }, 400);
+
+    return () => window.clearTimeout(unlockTimer);
   }, []);
 
-  const loadDebugInfo = async () => {
-    try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-494d91eb/debug/users`,
-        {
-          headers: {
-            'Authorization': `Bearer ${publicAnonKey}`,
-            'apikey': publicAnonKey,
-          },
-        }
-      );
-      const data = await response.json();
-      setDebugInfo(data);
-      console.log('[Debug Info]', data);
-    } catch (error) {
-      console.error('[Debug Info] Error:', error);
-    }
-  };
-
-  const createDemoUser = async () => {
-    try {
-      const response = await userAPI.initDemo();
-      console.log('[Create Demo] Response:', response);
-      alert(`Demo users created! Total users: ${response.totalUsers}\nUsernames: ${response.usernames.join(', ')}`);
-      loadDebugInfo();
-    } catch (error: any) {
-      console.error('[Create Demo] Error:', error);
-      alert('Error creating demo users: ' + (error.message || 'Unknown error'));
-    }
+  const handleAutofillFocus = () => {
+    requestConditionalPasswordAutofill(applyLoginToFields);
   };
 
   const getLoginErrorMessage = (message: string) => {
@@ -87,17 +76,24 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
     e.preventDefault();
     setErrors({});
 
-    if (!username.trim() || !password) {
+    const username = usernameRef.current?.value?.trim() ?? '';
+    const password = passwordRef.current?.value ?? '';
+
+    if (!username || !password) {
       setErrors({ general: 'Please enter username and password' });
       return;
     }
 
     setLoading(true);
     try {
-      const trimmedUsername = username.trim();
-      const response = await userAPI.login(trimmedUsername, password);
+      const response = await userAPI.login(username, password);
       storage.setUser(response.user);
-      await storeLoginCredential(trimmedUsername, password, { saveOnDevice });
+
+      await storeLoginCredential(username, password);
+
+      // Brief pause so iOS can show "Save Password?" before the screen changes
+      await new Promise((resolve) => setTimeout(resolve, 350));
+
       onSuccess(response.user);
     } catch (error: any) {
       setErrors({ general: getLoginErrorMessage(error.message || 'An unknown error occurred') });
@@ -109,8 +105,8 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
   const handleReset = () => {
     storage.clearAllLocalData();
     setShowResetConfirm(false);
-    setUsername('');
-    setPassword('');
+    if (usernameRef.current) usernameRef.current.value = '';
+    if (passwordRef.current) passwordRef.current.value = '';
   };
 
   const handleForgotPassword = () => {
@@ -126,7 +122,6 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
     e.preventDefault();
     setResetErrors({});
 
-    // Validation
     if (!resetUsername.trim()) {
       setResetErrors({ username: 'Username is required' });
       return;
@@ -159,9 +154,9 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
 
   return (
     <div className="h-full w-full flex flex-col px-6 py-8 safe-top safe-bottom overflow-y-auto">
-      {/* Header */}
       <div className="flex items-center mb-8">
         <button
+          type="button"
           onClick={onBack}
           className="p-2 hover:bg-accent rounded-full transition-colors -ml-2"
         >
@@ -169,51 +164,60 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
         </button>
       </div>
 
-      {/* Content */}
       <div className="flex-1 flex flex-col max-w-md mx-auto w-full">
         <div className="space-y-6">
           <div className="space-y-2">
             <h1 className="text-3xl font-bold">Welcome Back</h1>
-            <p className="text-muted-foreground">
-              Log in to your profile
-            </p>
+            <p className="text-muted-foreground">Log in to your profile</p>
           </div>
 
           <form
+            ref={formRef}
+            id="aimo-login-form"
             onSubmit={handleSubmit}
             method="post"
-            action="."
+            action="/"
             autoComplete="on"
             className="space-y-5"
           >
             <Input
+              ref={usernameRef}
               label="Username"
               name="username"
               type="text"
               inputMode="text"
               placeholder="Enter your username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              defaultValue=""
               autoComplete="username"
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
               enterKeyHint="next"
+              readOnly
+              onFocus={(e) => {
+                enableAutofillOnField(e.currentTarget);
+                handleAutofillFocus();
+              }}
               required
             />
 
             <Input
+              ref={passwordRef}
               label="Password"
               name="password"
               type="password"
               placeholder="Enter your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              defaultValue=""
               autoComplete="current-password"
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
               enterKeyHint="go"
+              readOnly
+              onFocus={(e) => {
+                enableAutofillOnField(e.currentTarget);
+                handleAutofillFocus();
+              }}
               required
             />
 
@@ -223,19 +227,11 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
               </div>
             )}
 
-            <label className="flex items-center space-x-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={saveOnDevice}
-                onChange={(e) => setSaveOnDevice(e.target.checked)}
-                className="w-5 h-5 rounded border-border text-[#A83FFF] focus:ring-[#A83FFF] focus:ring-offset-0"
-              />
-              <span className="text-sm text-muted-foreground">
-                Save password on this device (works in home-screen app)
-              </span>
-            </label>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Tap the username or password field to see your saved login from iPhone Passwords
+              (key icon above the keyboard), then tap Fill Password.
+            </p>
 
-            {/* Forgot Password Link */}
             <div className="flex justify-end">
               <button
                 type="button"
@@ -246,20 +242,14 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
               </button>
             </div>
 
-            <Button
-              type="submit"
-              variant="gradient"
-              size="lg"
-              className="w-full"
-              disabled={loading}
-            >
+            <Button type="submit" variant="gradient" size="lg" className="w-full" disabled={loading}>
               {loading ? 'Logging In...' : 'Log In'}
             </Button>
           </form>
 
-          {/* Reset Profile */}
           <div className="pt-8 border-t border-border space-y-3">
             <button
+              type="button"
               onClick={() => setShowResetConfirm(true)}
               className="text-muted-foreground hover:text-destructive transition-colors text-sm"
             >
@@ -269,10 +259,9 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
         </div>
       </div>
 
-      {/* Reset Confirmation Modal */}
       {showResetConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
-          <div 
+          <div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={() => setShowResetConfirm(false)}
           />
@@ -284,16 +273,12 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
               <div>
                 <h3 className="text-lg font-semibold mb-2">Reset Profile?</h3>
                 <p className="text-sm text-muted-foreground">
-                  This will clear all local data. You'll need to create a new profile.
+                  This will clear all local data. You&apos;ll need to create a new profile.
                 </p>
               </div>
             </div>
             <div className="flex space-x-3">
-              <Button
-                variant="secondary"
-                onClick={() => setShowResetConfirm(false)}
-                className="flex-1"
-              >
+              <Button variant="secondary" onClick={() => setShowResetConfirm(false)} className="flex-1">
                 Cancel
               </Button>
               <Button
@@ -307,10 +292,9 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
         </div>
       )}
 
-      {/* Forgot Password Modal */}
       {showForgotPassword && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
-          <div 
+          <div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={() => setShowForgotPassword(false)}
           />
@@ -324,15 +308,12 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
                 <p className="text-sm text-muted-foreground">
                   Enter your username and new password to reset.
                 </p>
-                <p className="text-xs text-muted-foreground mt-2 opacity-75">
-                  Note: You must have an existing account to reset your password.
-                </p>
               </div>
             </div>
             <form
               onSubmit={handleResetPassword}
               method="post"
-              action="."
+              action="/"
               autoComplete="on"
               className="space-y-5"
             >
@@ -417,11 +398,7 @@ export function LoginScreen({ onBack, onSuccess }: LoginScreenProps) {
               </Button>
             </form>
             <div className="flex space-x-3 mt-4">
-              <Button
-                variant="secondary"
-                onClick={() => setShowForgotPassword(false)}
-                className="flex-1"
-              >
+              <Button variant="secondary" onClick={() => setShowForgotPassword(false)} className="flex-1">
                 Cancel
               </Button>
             </div>

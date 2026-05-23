@@ -1,6 +1,7 @@
 /**
- * Saved login for home-screen PWA (iOS Passwords API is unreliable in standalone mode).
- * Stored on device only; cleared via "Reset local profile" in login settings.
+ * Password autofill + save for Safari and home-screen PWA.
+ * Uses Credential Management API (conditional UI = iOS "Fill Password" bar).
+ * Device localStorage is a fallback when the system UI is unavailable.
  */
 const DEVICE_LOGIN_KEY = 'pulse_device_login';
 
@@ -39,22 +40,47 @@ export function clearDeviceLogin(): void {
   localStorage.removeItem(DEVICE_LOGIN_KEY);
 }
 
-/** Store login — device storage for PWA + Credential API where supported. */
-export async function storeLoginCredential(
-  username: string,
-  password: string,
-  options?: { saveOnDevice?: boolean },
-): Promise<void> {
-  if (!username || !password) return;
+function getPasswordCredentialConstructor():
+  | (new (data: PasswordCredentialData) => Credential)
+  | undefined {
+  return (window as unknown as { PasswordCredential?: new (data: PasswordCredentialData) => Credential })
+    .PasswordCredential;
+}
 
-  if (options?.saveOnDevice !== false) {
-    saveDeviceLogin(username, password);
+/**
+ * Shows the native "Fill Password" bar (iOS) when saved Passwords exist for this site.
+ * Call on page load and when username/password fields are focused.
+ */
+export function requestConditionalPasswordAutofill(
+  onFilled?: (login: SavedDeviceLogin) => void,
+): void {
+  if (!('credentials' in navigator) || !navigator.credentials?.get) {
+    return;
   }
 
-  const PasswordCredential = (
-    window as unknown as { PasswordCredential?: new (data: PasswordCredentialData) => Credential }
-  ).PasswordCredential;
+  navigator.credentials
+    .get({
+      password: true,
+      mediation: 'conditional',
+    } as CredentialRequestOptions)
+    .then((credential) => {
+      const pwd = credential as PasswordCredential | null;
+      if (pwd?.id && pwd.password) {
+        onFilled?.({ username: pwd.id, password: pwd.password });
+      }
+    })
+    .catch(() => {
+      // No saved password or user dismissed
+    });
+}
 
+/** Prompt iOS / browser to save login in Passwords after successful sign-in. */
+export async function storeLoginCredential(username: string, password: string): Promise<void> {
+  if (!username || !password) return;
+
+  saveDeviceLogin(username, password);
+
+  const PasswordCredential = getPasswordCredentialConstructor();
   if (!('credentials' in navigator) || !PasswordCredential) {
     return;
   }
@@ -67,31 +93,11 @@ export async function storeLoginCredential(
     });
     await navigator.credentials.store(credential);
   } catch (error) {
-    console.warn('[Credentials] Password manager API store failed:', error);
+    console.warn('[Credentials] Password manager store failed:', error);
   }
 }
 
-/** Load saved login — device storage first (works in home-screen PWA). */
+/** Pre-fill from device fallback, then offer conditional system autofill. */
 export async function loadSavedLoginCredential(): Promise<SavedDeviceLogin | null> {
-  const device = loadDeviceLogin();
-  if (device) return device;
-
-  if (!('credentials' in navigator) || !navigator.credentials?.get) {
-    return null;
-  }
-
-  try {
-    const credential = (await navigator.credentials.get({
-      password: true,
-      mediation: 'optional',
-    })) as PasswordCredential | null;
-
-    if (credential?.password && credential.id) {
-      return { username: credential.id, password: credential.password };
-    }
-  } catch {
-    // User dismissed or unavailable
-  }
-
-  return null;
+  return loadDeviceLogin();
 }

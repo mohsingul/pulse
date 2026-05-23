@@ -35,6 +35,7 @@ export default defineConfig({
         "logo.svg",
       ],
       manifest: {
+        id: "/",
         name: "Aimo Pulse",
         short_name: "Aimo Pulse",
         description: "A little window into your day.",
@@ -42,7 +43,7 @@ export default defineConfig({
         background_color: "#000000",
         display: "standalone",
         scope: "/",
-        start_url: "/",
+        start_url: "/?source=pwa",
         categories: ["health", "social", "productivity"],
         icons: [
           {

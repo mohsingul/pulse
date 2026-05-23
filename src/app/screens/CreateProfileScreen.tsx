@@ -38,7 +38,7 @@ export function CreateProfileScreen({ onBack, onSuccess }: CreateProfileScreenPr
       const trimmedUsername = username.trim();
       const response = await userAPI.create(trimmedUsername, password, displayName.trim());
       storage.setUser(response.user);
-      await storeLoginCredential(trimmedUsername, password, { saveOnDevice: true });
+      await storeLoginCredential(trimmedUsername, password);
       onSuccess(response.user);
     } catch (error: any) {
       setErrors({ general: error.message });
