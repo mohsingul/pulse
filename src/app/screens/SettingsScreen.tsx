@@ -214,25 +214,31 @@ export function SettingsScreen({
         </div>
 
         {coupleId && user1Id && user2Id && partnerName && (
-          <CalendarSettingsPanel
-            coupleId={coupleId}
-            userId={userId}
-            user1Id={user1Id}
-            user2Id={user2Id}
-            userName={userName}
-            partnerName={partnerName}
-          />
+          <div className="space-y-3">
+            <h3 className="text-lg font-semibold">Shared calendar</h3>
+            <p className="text-sm text-muted-foreground">
+              Partner colors and shift patterns. You and your partner receive a daily push reminder for events in the next 5 days.
+            </p>
+            <CalendarSettingsPanel
+              coupleId={coupleId}
+              userId={userId}
+              user1Id={user1Id}
+              user2Id={user2Id}
+              userName={userName}
+              partnerName={partnerName}
+            />
+          </div>
         )}
 
         {/* Reminder Notifications */}
         <div className="space-y-3">
           <h3 className="text-lg font-semibold">Reminder Notifications</h3>
           <p className="text-sm text-muted-foreground">
-            We'll gently remind you to update your Pulse
+            We'll gently remind you to update your Pulse. Reminders are sent as push notifications at your chosen times, even when the app is closed.
           </p>
           {pushNotifications.permission !== 'granted' && (
             <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-700">
-              Reminder notifications require browser notification permission. Enable push notifications above to receive them.
+              Enable push notifications above to receive morning, midday, and evening Pulse reminders on your phone.
             </div>
           )}
 

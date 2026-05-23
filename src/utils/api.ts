@@ -159,6 +159,23 @@ export const userAPI = {
     apiRequest(`/users/${userId}/fcm`, {
       method: 'DELETE',
     }),
+
+  getReminderPreferences: (userId: string) =>
+    apiRequest(`/users/${userId}/reminder-preferences`),
+
+  saveReminderPreferences: (
+    userId: string,
+    prefs: {
+      morning: { enabled: boolean; time: string };
+      midday: { enabled: boolean; time: string };
+      evening: { enabled: boolean; time: string };
+      timezoneOffset: number;
+    },
+  ) =>
+    apiRequest(`/users/${userId}/reminder-preferences`, {
+      method: 'PUT',
+      body: JSON.stringify(prefs),
+    }),
 };
 
 // Pairing API
@@ -427,6 +444,12 @@ export const calendarAPI = {
     apiRequest(`/calendar/${coupleId}/${eventId}`, {
       method: 'PUT',
       body: JSON.stringify({ userId, ...data }),
+    }),
+
+  processReminders: (coupleId: string, userId: string) =>
+    apiRequest(`/calendar/${coupleId}/process-reminders`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
     }),
 };
 

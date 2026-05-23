@@ -6,7 +6,7 @@ import {
   getCalendarTypeMeta,
   getReminderLabel,
   daysUntilEvent,
-  CALENDAR_PUSH_REMINDER_DAYS,
+  isInCalendarPushReminderWindow,
   type CalendarEventType,
 } from '@/app/constants/calendar';
 import { format, parseISO } from 'date-fns';
@@ -29,8 +29,7 @@ export function CalendarEventDetail({ event, onClose }: CalendarEventDetailProps
   const meta = getCalendarTypeMeta(event.type);
   const days = daysUntilEvent(event.date, event.type);
   const daysLabel = days < 0 ? 'Past' : getReminderLabel(days);
-  const hasPushSoon =
-    days >= 0 && CALENDAR_PUSH_REMINDER_DAYS.includes(days as (typeof CALENDAR_PUSH_REMINDER_DAYS)[number]);
+  const hasPushSoon = isInCalendarPushReminderWindow(days);
 
   return (
     <Card className="p-5 border-2 border-[#A83FFF]/40 bg-gradient-to-br from-[#FB3094]/5 via-[#A83FFF]/5 to-[#2571FF]/5">

@@ -43,11 +43,13 @@ export function daysUntilEvent(dateStr: string, type?: CalendarEventType): numbe
   return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-/** Show reminders on home when event is within push schedule (5, 3, 1, 0 days). */
+/** Show reminders on home when event is within push schedule (0–5 days). */
 export const CALENDAR_REMINDER_WINDOW_DAYS = 5;
 
-/** Push notification schedule (matches server). */
-export const CALENDAR_PUSH_REMINDER_DAYS = [5, 3, 1, 0] as const;
+/** Daily push reminders while an event is within this window (matches server). */
+export function isInCalendarPushReminderWindow(daysUntil: number): boolean {
+  return daysUntil >= 0 && daysUntil <= CALENDAR_REMINDER_WINDOW_DAYS;
+}
 
 export function getReminderLabel(daysUntil: number): string {
   if (daysUntil === 0) return 'Today';
@@ -188,6 +190,18 @@ export function isMultiDayEvent(event: { date: string; endDate?: string }): bool
 
 export function isOvertimeDay(overtime: OvertimeMap, userId: string, day: Date): boolean {
   return (overtime[userId] ?? []).includes(toDateKey(day));
+}
+
+/** Scheduled shift or manually marked extra shift day (stored as overtime). */
+export function isUserOnShiftForDay(
+  userId: string,
+  shiftPatterns: ShiftPatternMap,
+  overtimeDays: OvertimeMap,
+  day: Date,
+): boolean {
+  const pattern = shiftPatterns[userId];
+  if (pattern && isShiftOnDay(pattern, day)) return true;
+  return isOvertimeDay(overtimeDays, userId, day);
 }
 
 export function sortDateKeys(keys: string[]): string[] {

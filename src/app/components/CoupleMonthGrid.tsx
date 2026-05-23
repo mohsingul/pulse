@@ -15,8 +15,7 @@ import {
 import {
   getEventsOnDate,
   getUserCalendarHex,
-  isOvertimeDay,
-  isShiftOnDay,
+  isUserOnShiftForDay,
   toDateKey,
   type CalendarColorMap,
   type CalendarEventItem,
@@ -121,13 +120,10 @@ export function CoupleMonthGrid({
           const today = isToday(date);
           const shiftBars: { hex: string }[] = [];
           for (const uid of [user1Id, user2Id]) {
-            const pat = shiftPatterns[uid];
-            if (pat && isShiftOnDay(pat, date)) {
+            if (isUserOnShiftForDay(uid, shiftPatterns, overtimeDays, date)) {
               shiftBars.push({ hex: getUserCalendarHex(uid, colorMap, uid) });
             }
           }
-          const myOt = isOvertimeDay(overtimeDays, currentUserId, date);
-          const partnerOt = isOvertimeDay(overtimeDays, user1Id === currentUserId ? user2Id : user1Id, date);
 
           return (
             <button
@@ -148,26 +144,6 @@ export function CoupleMonthGrid({
                 ${today && !selected ? 'bg-accent/40' : ''}
               `}
             >
-              {(myOt || partnerOt) && (
-                <div className="absolute top-0.5 right-0.5 flex flex-col gap-px">
-                  {myOt && (
-                    <span
-                      className="text-[7px] font-bold leading-none px-0.5 rounded bg-amber-500 text-white"
-                      title="Your overtime"
-                    >
-                      OT
-                    </span>
-                  )}
-                  {partnerOt && (
-                    <span
-                      className="text-[7px] font-bold leading-none px-0.5 rounded bg-amber-500/70 text-white"
-                      title="Partner overtime"
-                    >
-                      OT
-                    </span>
-                  )}
-                </div>
-              )}
               <span
                 className={`
                   text-xs font-semibold w-7 h-7 flex items-center justify-center rounded-full

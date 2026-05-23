@@ -34,6 +34,8 @@ import { NotificationPermissionPrompt } from '@/app/components/NotificationPermi
 
 // Hooks
 import { useFirebaseNotifications } from '@/hooks/useFirebaseNotifications';
+import { useReminderNotifications, syncReminderPreferencesToServer } from '@/hooks/useReminderNotifications';
+import { calendarAPI } from '@/utils/api';
 import {
   parseAppDeepLink,
   savePendingCalendarEvent,
@@ -79,6 +81,9 @@ export default function App() {
 
   // Initialize Firebase notifications
   const notifications = useFirebaseNotifications(user?.userId);
+
+  // Pulse reminder notifications (local fallback + server sync for push)
+  useReminderNotifications(!!user?.userId && notificationPermission === 'granted');
 
   const openCalendarEvent = (eventId: string) => {
     setHighlightCalendarEventId(eventId);
@@ -159,8 +164,29 @@ export default function App() {
       notifications.checkNotificationStatus().catch((err) => {
         console.error('[Notifications] Token sync failed:', err);
       });
+      syncReminderPreferencesToServer().catch((err) => {
+        console.error('[Reminders] Preference sync failed:', err);
+      });
     }
   }, [user?.userId, notificationPermission]);
+
+  // Sync calendar event reminders once per day when the app is opened
+  useEffect(() => {
+    if (!user?.userId || !couple?.coupleId || notificationPermission !== 'granted') {
+      return;
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const storageKey = `calendar_reminders_synced_${couple.coupleId}`;
+    if (localStorage.getItem(storageKey) === today) {
+      return;
+    }
+
+    calendarAPI
+      .processReminders(couple.coupleId, user.userId)
+      .then(() => localStorage.setItem(storageKey, today))
+      .catch((err) => console.warn('[Calendar] Reminder sync failed:', err));
+  }, [user?.userId, couple?.coupleId, notificationPermission]);
 
   // Show notification onboarding after successful pairing
   useEffect(() => {

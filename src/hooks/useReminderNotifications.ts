@@ -1,5 +1,6 @@
 import { useEffect, useRef, type MutableRefObject } from 'react';
 import { storage } from '@/utils/storage';
+import { userAPI } from '@/utils/api';
 
 const REMINDER_EVENT_NAME = 'pulse-reminder-preferences-changed';
 
@@ -18,6 +19,23 @@ interface ReminderPreferences {
 
 function getReminderPreferences(): ReminderPreferences {
   return storage.getNotifications();
+}
+
+export async function syncReminderPreferencesToServer(): Promise<void> {
+  const user = storage.getUser();
+  if (!user?.userId) return;
+
+  const prefs = storage.getNotifications();
+  try {
+    await userAPI.saveReminderPreferences(user.userId, {
+      morning: prefs.morning,
+      midday: prefs.midday,
+      evening: prefs.evening,
+      timezoneOffset: new Date().getTimezoneOffset(),
+    });
+  } catch (error) {
+    console.warn('[Reminders] Failed to sync preferences to server:', error);
+  }
 }
 
 function getNextTriggerDelay(time: string): number {
@@ -119,19 +137,21 @@ async function scheduleAllReminders(
   }
 }
 
-export function useReminderNotifications() {
+export function useReminderNotifications(enabled: boolean) {
   const timersRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
+    if (!enabled || typeof window === 'undefined') {
       return;
     }
 
     const preferences = getReminderPreferences();
+    syncReminderPreferencesToServer();
     scheduleAllReminders(preferences, timersRef);
 
     const handleUpdate = () => {
       const updatedPreferences = getReminderPreferences();
+      syncReminderPreferencesToServer();
       scheduleAllReminders(updatedPreferences, timersRef);
     };
 
@@ -142,12 +162,13 @@ export function useReminderNotifications() {
       Object.values(timersRef.current).forEach((timerId) => window.clearTimeout(timerId));
       timersRef.current = {};
     };
-  }, []);
+  }, [enabled]);
 }
 
 export function dispatchReminderPreferenceUpdate() {
   if (typeof window === 'undefined') {
     return;
   }
+  syncReminderPreferencesToServer();
   window.dispatchEvent(new Event(REMINDER_EVENT_NAME));
 }

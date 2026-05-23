@@ -167,7 +167,7 @@ export function CoupleCalendarScreen({
       const res = await calendarAPI.toggleOvertime(coupleId, userId, selectedDateKey);
       if (res.overtimeDays) setOvertimeDays(res.overtimeDays);
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : 'Failed to update overtime');
+      alert(e instanceof Error ? e.message : 'Failed to update shift');
     } finally {
       setOvertimeSaving(false);
     }

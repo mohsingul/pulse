@@ -4,6 +4,11 @@ import { logger } from "npm:hono/logger";
 import * as kv from "./kv_store.ts";
 import { processCalendarReminders } from "./calendar_reminders.ts";
 import {
+  processPulseReminders,
+  saveUserReminderPreferences,
+  getUserReminderPreferences,
+} from "./pulse_reminders.ts";
+import {
   getPartnerStatusRecord,
   validateStatusPayload,
   getStatusNotificationCopy,
@@ -694,6 +699,43 @@ app.delete("/make-server-494d91eb/users/:userId/fcm", async (c) => {
   } catch (error) {
     console.log(`[FCM Unregister] Error removing token: ${error}`);
     return c.json({ error: "Failed to unregister FCM token" }, 500);
+  }
+});
+
+app.get("/make-server-494d91eb/users/:userId/reminder-preferences", async (c) => {
+  try {
+    const userId = c.req.param("userId");
+    const prefs = await getUserReminderPreferences(userId);
+    return c.json({ preferences: prefs });
+  } catch (error) {
+    console.error(`[Reminder Prefs] Get failed:`, error);
+    return c.json({ error: "Failed to get reminder preferences" }, 500);
+  }
+});
+
+app.put("/make-server-494d91eb/users/:userId/reminder-preferences", async (c) => {
+  try {
+    const userId = c.req.param("userId");
+    const body = await c.req.json();
+    const { morning, midday, evening, timezoneOffset } = body;
+
+    if (!morning || !midday || !evening) {
+      return c.json({ error: "morning, midday, and evening preferences are required" }, 400);
+    }
+
+    await saveUserReminderPreferences(userId, {
+      morning,
+      midday,
+      evening,
+      timezoneOffset: typeof timezoneOffset === "number"
+        ? timezoneOffset
+        : new Date().getTimezoneOffset(),
+    });
+
+    return c.json({ success: true });
+  } catch (error) {
+    console.error(`[Reminder Prefs] Save failed:`, error);
+    return c.json({ error: "Failed to save reminder preferences" }, 500);
   }
 });
 
@@ -3000,7 +3042,7 @@ app.get("/make-server-494d91eb/calendar/:coupleId/event/:eventId", async (c) => 
   }
 });
 
-// Daily cron: send FCM reminders 5, 3, 1, and 0 days before each event
+// Daily cron: calendar + pulse reminders (run every 15 min for pulse time matching)
 app.post("/make-server-494d91eb/calendar/process-reminders", async (c) => {
   try {
     const cronSecret = Deno.env.get("CRON_SECRET");
@@ -3011,10 +3053,34 @@ app.post("/make-server-494d91eb/calendar/process-reminders", async (c) => {
       }
     }
 
-    const result = await processCalendarReminders(sendFcmPush);
-    return c.json({ success: true, ...result });
+    const calendar = await processCalendarReminders(sendFcmPush);
+    const pulse = await processPulseReminders(sendFcmPush);
+    return c.json({ success: true, calendar, pulse });
   } catch (error: any) {
     console.error(`[Calendar] process-reminders failed:`, error);
+    return c.json({ error: error.message || "Failed to process calendar reminders" }, 500);
+  }
+});
+
+// Client-triggered calendar reminders for one couple (once per day per device)
+app.post("/make-server-494d91eb/calendar/:coupleId/process-reminders", async (c) => {
+  try {
+    const coupleId = c.req.param("coupleId");
+    const { userId } = await c.req.json();
+
+    if (!userId) {
+      return c.json({ error: "userId is required" }, 400);
+    }
+
+    const couple = await kv.get(`couple:${coupleId}`);
+    if (!couple || (couple.user1Id !== userId && couple.user2Id !== userId)) {
+      return c.json({ error: "Not authorized for this couple" }, 403);
+    }
+
+    const result = await processCalendarReminders(sendFcmPush, coupleId);
+    return c.json({ success: true, ...result });
+  } catch (error: any) {
+    console.error(`[Calendar] couple process-reminders failed:`, error);
     return c.json({ error: error.message || "Failed to process calendar reminders" }, 500);
   }
 });

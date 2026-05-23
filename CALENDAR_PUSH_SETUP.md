@@ -1,6 +1,14 @@
-# Calendar push reminders
+# Calendar & pulse push reminders
 
-Automatic Firebase notifications are sent **5, 3, and 1 days before**, and **on the day** of each shared calendar event — even when the app is closed.
+## Calendar events
+
+Automatic Firebase notifications are sent **once per day** for each upcoming shared calendar event while it is **0–5 days away** (including the day of the event) — even when the app is closed.
+
+Opening the app also triggers a daily sync for your couple’s calendar reminders.
+
+## Pulse reminders (Settings → Reminder Notifications)
+
+Morning, midday, and evening Pulse reminders are stored on the server and delivered via **FCM push** at the times you choose in Settings.
 
 ## Supabase secrets (required)
 
@@ -12,9 +20,13 @@ In [Supabase Dashboard → Project Settings → Edge Functions → Secrets](http
 | `APP_URL` | `https://aimopulse.vercel.app` |
 | `CRON_SECRET` | A long random string (protects the cron endpoint) |
 
-## Daily schedule
+## Schedule
 
-The edge function runs **`POST /calendar/process-reminders`** daily at **09:00 UTC** via `supabase/config.toml` schedule.
+Run **`POST /calendar/process-reminders`** on a schedule (recommended: **every 15 minutes**):
+
+`*/15 * * * *`
+
+This endpoint processes both **calendar event** and **pulse** reminders.
 
 After deploy, confirm the schedule in:  
 **Dashboard → Edge Functions → make-server-494d91eb → Schedules**
@@ -32,13 +44,14 @@ curl -X POST \
 ## User requirements
 
 - Both partners must **allow notifications** and open the app once while logged in (registers FCM token).
-- Notifications open **Couple Calendar** on the tapped event.
+- Reminder notification times are saved from **Settings → Reminder Notifications**.
+- Calendar notifications open **Couple Calendar** on the tapped event.
 
 ## Message examples
 
 | Days before | Example |
 |-------------|---------|
 | 5 | ❤️ Your Anniversary is in 5 days |
-| 3 | ❤️ Your Anniversary is in 3 days |
+| 4 | ❤️ Your Trip is in 4 days |
 | 1 | ❤️ Tomorrow is your Anniversary |
 | 0 | ❤️ Happy Anniversary! |

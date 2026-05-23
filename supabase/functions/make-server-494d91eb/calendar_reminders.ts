@@ -1,6 +1,6 @@
 import * as kv from "./kv_store.ts";
 
-const REMINDER_DAYS = [5, 3, 1, 0] as const;
+const REMINDER_WINDOW_MAX = 5;
 const APP_URL = Deno.env.get("APP_URL") || "https://aimopulse.vercel.app";
 
 type CalendarEventType = "anniversary" | "birthday" | "trip" | "holiday" | "important";
@@ -11,6 +11,7 @@ type CalendarEvent = {
   type: CalendarEventType;
   title: string;
   date: string;
+  endDate?: string;
   notes?: string;
 };
 
@@ -20,12 +21,35 @@ type SendFcmPush = (
   data?: Record<string, unknown>,
 ) => Promise<unknown>;
 
-export function daysUntilCalendarEvent(dateStr: string, type: CalendarEventType): number {
+function parseDateOnly(dateStr: string): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function todayAtMidnight(): Date {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  return today;
+}
+
+function todayDateKey(): string {
+  return todayAtMidnight().toISOString().split("T")[0];
+}
+
+export function daysUntilCalendarEvent(
+  dateStr: string,
+  type: CalendarEventType,
+  endDate?: string,
+): number {
+  const today = todayAtMidnight();
   const [y, m, d] = dateStr.split("-").map(Number);
 
-  if (type === "anniversary" || type === "birthday" || type === "holiday") {
+  const isAnnual =
+    type === "anniversary" || type === "birthday" || type === "holiday";
+
+  if (isAnnual) {
     let next = new Date(today.getFullYear(), m - 1, d);
     if (next < today) {
       next = new Date(today.getFullYear() + 1, m - 1, d);
@@ -33,14 +57,26 @@ export function daysUntilCalendarEvent(dateStr: string, type: CalendarEventType)
     return Math.round((next.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   }
 
-  const target = new Date(y, m - 1, d);
-  if (target < today) return -1;
-  return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const start = parseDateOnly(dateStr);
+  if (endDate && (type === "trip" || type === "important" || type === "holiday")) {
+    const end = parseDateOnly(endDate);
+    if (end < today) return -1;
+    if (start <= today && today <= end) return 0;
+    if (start > today) {
+      return Math.round((start.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    }
+  }
+
+  if (start < today) return -1;
+  return Math.round((start.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-export function getNextOccurrenceDate(dateStr: string, type: CalendarEventType): string | null {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+export function getNextOccurrenceDate(
+  dateStr: string,
+  type: CalendarEventType,
+  endDate?: string,
+): string | null {
+  const today = todayAtMidnight();
   const [y, m, d] = dateStr.split("-").map(Number);
 
   if (type === "anniversary" || type === "birthday" || type === "holiday") {
@@ -51,8 +87,16 @@ export function getNextOccurrenceDate(dateStr: string, type: CalendarEventType):
     return next.toISOString().split("T")[0];
   }
 
-  const target = new Date(y, m - 1, d);
-  if (target < today) return null;
+  const start = parseDateOnly(dateStr);
+  if (endDate && (type === "trip" || type === "important" || type === "holiday")) {
+    const end = parseDateOnly(endDate);
+    if (end < today) return null;
+    if (start <= today && today <= end) return today.toISOString().split("T")[0];
+    if (start >= today) return dateStr;
+    return null;
+  }
+
+  if (start < today) return null;
   return dateStr;
 }
 
@@ -80,18 +124,22 @@ export function getCalendarReminderMessage(
 ): { title: string; body: string } {
   const name = displayNameForEvent(event);
 
-  if (daysUntil === 5) {
-    return {
-      title: "Aimo Pulse",
-      body: `❤️ Your ${name} is in 5 days`,
-    };
+  if (daysUntil === 0) {
+    if (event.type === "anniversary") {
+      return { title: "Aimo Pulse", body: "❤️ Happy Anniversary!" };
+    }
+    if (event.type === "birthday") {
+      return { title: "Aimo Pulse", body: `❤️ Happy Birthday — ${name}!` };
+    }
+    if (event.type === "holiday") {
+      return { title: "Aimo Pulse", body: `❤️ Happy Holiday — ${name}!` };
+    }
+    if (event.endDate && event.endDate !== event.date) {
+      return { title: "Aimo Pulse", body: `❤️ ${name} is happening today` };
+    }
+    return { title: "Aimo Pulse", body: `❤️ Today is ${name}!` };
   }
-  if (daysUntil === 3) {
-    return {
-      title: "Aimo Pulse",
-      body: `❤️ Your ${name} is in 3 days`,
-    };
-  }
+
   if (daysUntil === 1) {
     return {
       title: "Aimo Pulse",
@@ -99,16 +147,10 @@ export function getCalendarReminderMessage(
     };
   }
 
-  if (event.type === "anniversary") {
-    return { title: "Aimo Pulse", body: "❤️ Happy Anniversary!" };
-  }
-  if (event.type === "birthday") {
-    return { title: "Aimo Pulse", body: `❤️ Happy Birthday — ${name}!` };
-  }
-  if (event.type === "holiday") {
-    return { title: "Aimo Pulse", body: `❤️ Happy Holiday — ${name}!` };
-  }
-  return { title: "Aimo Pulse", body: `❤️ Today is ${name}!` };
+  return {
+    title: "Aimo Pulse",
+    body: `❤️ Your ${name} is in ${daysUntil} days`,
+  };
 }
 
 function buildCalendarDeepLink(coupleId: string, eventId: string): string {
@@ -120,23 +162,21 @@ function buildCalendarDeepLink(coupleId: string, eventId: string): string {
   return `${APP_URL}/?${params.toString()}`;
 }
 
-async function wasReminderSent(
+async function wasReminderSentToday(
   coupleId: string,
   eventId: string,
   occurrenceDate: string,
-  daysBefore: number,
 ): Promise<boolean> {
-  const key = `calendar_reminder_sent:${coupleId}:${eventId}:${occurrenceDate}:${daysBefore}`;
+  const key = `calendar_reminder_sent:${coupleId}:${eventId}:${occurrenceDate}:${todayDateKey()}`;
   return !!(await kv.get(key));
 }
 
-async function markReminderSent(
+async function markReminderSentToday(
   coupleId: string,
   eventId: string,
   occurrenceDate: string,
-  daysBefore: number,
 ): Promise<void> {
-  const key = `calendar_reminder_sent:${coupleId}:${eventId}:${occurrenceDate}:${daysBefore}`;
+  const key = `calendar_reminder_sent:${coupleId}:${eventId}:${occurrenceDate}:${todayDateKey()}`;
   await kv.set(key, { sentAt: new Date().toISOString() });
 }
 
@@ -147,7 +187,7 @@ async function sendReminderToCouple(
   daysUntil: number,
   occurrenceDate: string,
 ): Promise<boolean> {
-  if (await wasReminderSent(event.coupleId, event.id, occurrenceDate, daysUntil)) {
+  if (await wasReminderSentToday(event.coupleId, event.id, occurrenceDate)) {
     return false;
   }
 
@@ -175,7 +215,7 @@ async function sendReminderToCouple(
           eventId: event.id,
           daysUntil: String(daysUntil),
           url,
-          tag: `calendar-${event.id}-${occurrenceDate}-${daysUntil}`,
+          tag: `calendar-${event.id}-${occurrenceDate}-${todayDateKey()}`,
         },
       );
       anySent = true;
@@ -185,7 +225,7 @@ async function sendReminderToCouple(
   }
 
   if (anySent) {
-    await markReminderSent(event.coupleId, event.id, occurrenceDate, daysUntil);
+    await markReminderSentToday(event.coupleId, event.id, occurrenceDate);
   }
 
   return anySent;
@@ -213,13 +253,13 @@ export async function processCalendarReminders(
       continue;
     }
 
-    const daysUntil = daysUntilCalendarEvent(event.date, event.type);
-    if (!REMINDER_DAYS.includes(daysUntil as typeof REMINDER_DAYS[number])) {
+    const daysUntil = daysUntilCalendarEvent(event.date, event.type, event.endDate);
+    if (daysUntil < 0 || daysUntil > REMINDER_WINDOW_MAX) {
       skipped++;
       continue;
     }
 
-    const occurrenceDate = getNextOccurrenceDate(event.date, event.type);
+    const occurrenceDate = getNextOccurrenceDate(event.date, event.type, event.endDate);
     if (!occurrenceDate) {
       skipped++;
       continue;

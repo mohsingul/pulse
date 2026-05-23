@@ -45,6 +45,9 @@ messaging.onBackgroundMessage((payload) => {
       notificationOptions.vibrate = [200, 100, 200, 100, 200];
       notificationOptions.requireInteraction = false;
       break;
+    case 'pulse-reminder':
+      notificationOptions.vibrate = [150, 100, 150];
+      break;
     case 'partner-status':
       notificationOptions.vibrate = [150, 100, 150];
       break;

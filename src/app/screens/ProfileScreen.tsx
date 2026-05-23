@@ -6,8 +6,6 @@ import { ArrowLeft, Copy, Share2, Settings, AlertTriangle, UserX, Image, Message
 import { pairingAPI, coupleAPI, sharkModeAPI } from '@/utils/api';
 import { storage } from '@/utils/storage';
 import { copyToClipboard } from '@/utils/clipboard';
-import { CalendarSettingsPanel } from '@/app/components/CalendarSettingsPanel';
-
 interface ProfileScreenProps {
   userId: string;
   userName: string;
@@ -311,20 +309,6 @@ export function ProfileScreen({
             Log Out
           </button>
         </div>
-
-        {coupleId && user1Id && user2Id && partnerName && (
-          <div className="space-y-3 pt-4 border-t border-border">
-            <h3 className="text-lg font-semibold">Shared calendar</h3>
-            <CalendarSettingsPanel
-              coupleId={coupleId}
-              userId={userId}
-              user1Id={user1Id}
-              user2Id={user2Id}
-              userName={userName}
-              partnerName={partnerName}
-            />
-          </div>
-        )}
 
         {/* Relationship */}
         {onCoupleCalendar && coupleId && (

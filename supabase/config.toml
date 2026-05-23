@@ -4,6 +4,7 @@ project_id = "iqwfevbjeohdvdbemgxp"
 [functions.make-server-494d91eb]
 verify_jwt = false
 
-# Schedule daily calendar reminders in Supabase Dashboard:
-# Edge Functions → make-server-494d91eb → Schedules → 0 9 * * * (09:00 UTC)
+# Schedule reminders in Supabase Dashboard:
+# Edge Functions → make-server-494d91eb → Schedules → */15 * * * * (every 15 min)
 # POST /calendar/process-reminders with header X-Cron-Secret
+# Sends daily calendar event reminders (0–5 days out) + pulse reminders at user-set times

@@ -6,8 +6,8 @@ import {
   getCalendarTypeMeta,
   getUserCalendarHex,
   isMultiDayEvent,
-  isOvertimeDay,
   isShiftOnDay,
+  isUserOnShiftForDay,
   parseDateKey,
   type CalendarColorMap,
   type CalendarEventItem,
@@ -61,14 +61,16 @@ export function CalendarDaySheet({
   const labelFor = (uid: string) =>
     uid === currentUserId ? 'You' : partnerName.split(' ')[0];
   const shiftNotes: string[] = [];
-  if (shiftPatterns[user1Id] && isShiftOnDay(shiftPatterns[user1Id], day)) {
+  if (isUserOnShiftForDay(user1Id, shiftPatterns, overtimeDays, day)) {
     shiftNotes.push(`${labelFor(user1Id)} — on shift`);
   }
-  if (shiftPatterns[user2Id] && isShiftOnDay(shiftPatterns[user2Id], day)) {
+  if (isUserOnShiftForDay(user2Id, shiftPatterns, overtimeDays, day)) {
     shiftNotes.push(`${labelFor(user2Id)} — on shift`);
   }
-  const partnerId = user1Id === currentUserId ? user2Id : user1Id;
-  const partnerOt = isOvertimeDay(overtimeDays, partnerId, day);
+  const onScheduledShift = Boolean(
+    shiftPatterns[currentUserId] && isShiftOnDay(shiftPatterns[currentUserId], day),
+  );
+  const showExtraShiftToggle = !onScheduledShift || isMyOvertime;
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col justify-end">
@@ -102,19 +104,20 @@ export function CalendarDaySheet({
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
-          <Button
-            variant={isMyOvertime ? 'gradient' : 'secondary'}
-            className="w-full"
-            onClick={onToggleOvertime}
-            disabled={overtimeSaving}
-          >
-            <Clock className="w-4 h-4 mr-2 inline" />
-            {overtimeSaving ? 'Saving…' : isMyOvertime ? 'Remove overtime' : 'Mark overtime'}
-          </Button>
-          {partnerOt && (
-            <p className="text-xs text-center text-muted-foreground">
-              {partnerName.split(' ')[0]} is on overtime this day
-            </p>
+          {showExtraShiftToggle && (
+            <Button
+              variant={isMyOvertime ? 'gradient' : 'secondary'}
+              className="w-full"
+              onClick={onToggleOvertime}
+              disabled={overtimeSaving}
+            >
+              <Clock className="w-4 h-4 mr-2 inline" />
+              {overtimeSaving
+                ? 'Saving…'
+                : isMyOvertime
+                  ? 'Remove shift'
+                  : 'Mark as on shift'}
+            </Button>
           )}
 
           {shiftNotes.length > 0 && (
