@@ -381,14 +381,18 @@ export function CoupleCalendarScreen({
         </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-4 space-y-4">
+      <div
+        className={`flex-1 overflow-y-auto overscroll-contain py-3 space-y-4 ${
+          tab === 'month' ? 'px-2 sm:px-4' : 'px-4 sm:px-6'
+        }`}
+      >
         {tab === 'month' && (
           <>
             {loading ? (
               <p className="text-center text-muted-foreground py-8">Loading calendar…</p>
             ) : (
               <>
-              <Card className="p-3 sm:p-4">
+              <Card className="!p-2 sm:!p-3 shadow-md">
                 <div className="flex gap-2 mb-3">
                   <Button
                     variant={multiSelectMode ? 'gradient' : 'secondary'}

@@ -24,7 +24,7 @@ import {
   type ShiftPatternMap,
 } from '@/app/constants/calendar';
 
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 interface CoupleMonthGridProps {
   viewMonth: Date;
@@ -80,32 +80,32 @@ export function CoupleMonthGrid({
   }, [viewMonth]);
 
   return (
-    <div className="select-none">
-      <div className="flex items-center justify-between mb-4">
+    <div className="select-none w-full">
+      <div className="flex items-center justify-between mb-5 px-0.5">
         <button
           type="button"
           onClick={() => onViewMonthChange(subMonths(viewMonth, 1))}
-          className="p-2.5 rounded-full hover:bg-accent active:scale-95 transition-transform"
+          className="p-3 rounded-full hover:bg-accent active:scale-95 transition-transform"
           aria-label="Previous month"
         >
-          <ChevronLeft className="w-5 h-5" />
+          <ChevronLeft className="w-6 h-6" />
         </button>
-        <h2 className="text-lg font-bold tabular-nums">{format(viewMonth, 'MMMM yyyy')}</h2>
+        <h2 className="text-2xl font-bold tabular-nums tracking-tight">{format(viewMonth, 'MMMM yyyy')}</h2>
         <button
           type="button"
           onClick={() => onViewMonthChange(addMonths(viewMonth, 1))}
-          className="p-2.5 rounded-full hover:bg-accent active:scale-95 transition-transform"
+          className="p-3 rounded-full hover:bg-accent active:scale-95 transition-transform"
           aria-label="Next month"
         >
-          <ChevronRight className="w-5 h-5" />
+          <ChevronRight className="w-6 h-6" />
         </button>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 mb-1">
-        {WEEKDAYS.map((d) => (
+      <div className="grid grid-cols-7 gap-1 mb-2">
+        {WEEKDAYS.map((d, i) => (
           <div
-            key={d}
-            className="text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground py-1"
+            key={`${d}-${i}`}
+            className="text-center text-xs font-semibold uppercase text-muted-foreground py-1"
           >
             {d}
           </div>
@@ -114,7 +114,7 @@ export function CoupleMonthGrid({
 
       <div
         key={format(viewMonth, 'yyyy-MM')}
-        className="grid grid-cols-7 gap-1 animate-in fade-in duration-200"
+        className="grid grid-cols-7 gap-1.5 sm:gap-2 animate-in fade-in duration-200"
       >
         {days.map(({ date, inMonth, key }) => {
           const dayEvents = getEventsOnDate(events, date);
@@ -134,52 +134,61 @@ export function CoupleMonthGrid({
               type="button"
               onClick={() => onDayPress(key)}
               className={`
-                relative flex flex-col items-center justify-start min-h-[52px] sm:min-h-[58px]
-                rounded-xl p-0.5 transition-all duration-150 active:scale-[0.97] overflow-hidden
-                ${!inMonth ? 'opacity-35' : ''}
+                relative flex flex-col items-center justify-between w-full aspect-square
+                rounded-2xl p-1 pt-1.5 transition-all duration-150 active:scale-[0.97] overflow-hidden
+                ${!inMonth ? 'opacity-30' : ''}
                 ${
                   selected
                     ? multiSelectMode
                       ? 'ring-2 ring-[#A83FFF] bg-[#A83FFF]/25'
-                      : 'ring-2 ring-[#A83FFF] bg-[#A83FFF]/10 scale-[1.02]'
-                    : 'hover:bg-accent/60'
+                      : 'ring-2 ring-[#A83FFF] bg-[#A83FFF]/15'
+                    : 'hover:bg-accent/50'
                 }
-                ${today && !selected ? 'bg-accent/40' : ''}
+                ${today && !selected ? 'bg-accent/50' : ''}
               `}
             >
               <span
                 className={`
-                  text-xs font-semibold w-7 h-7 flex items-center justify-center rounded-full
-                  ${today ? 'bg-[image:var(--pulse-gradient)] text-white' : ''}
+                  text-lg sm:text-xl font-semibold tabular-nums leading-none
+                  min-w-[2rem] min-h-[2rem] sm:min-w-[2.25rem] sm:min-h-[2.25rem]
+                  flex items-center justify-center rounded-full
+                  ${today ? 'bg-[image:var(--pulse-gradient)] text-white shadow-sm' : ''}
                 `}
               >
                 {format(date, 'd')}
               </span>
-              {shiftBars.length > 0 && (
-                <div className="absolute bottom-0 left-0.5 right-0.5 flex gap-px h-1 rounded-full overflow-hidden">
-                  {shiftBars.map((b, i) => (
-                    <span key={i} className="flex-1 rounded-full opacity-90" style={{ backgroundColor: b.hex }} />
-                  ))}
-                </div>
-              )}
-              {dayEvents.length > 0 && (
-                <div className="flex flex-wrap justify-center gap-0.5 mt-0.5 px-0.5 w-full max-w-[40px]">
-                  {dayEvents.slice(0, 4).map((ev) => {
-                    const hex = getUserCalendarHex(ev.createdBy, colorMap, currentUserId);
-                    return (
+
+              <div className="flex flex-col items-center justify-end w-full gap-1 pb-1 min-h-[1.25rem]">
+                {dayEvents.length > 0 && (
+                  <div className="flex flex-wrap justify-center gap-1 px-0.5 max-w-full">
+                    {dayEvents.slice(0, 3).map((ev) => {
+                      const hex = getUserCalendarHex(ev.createdBy, colorMap, currentUserId);
+                      return (
+                        <span
+                          key={ev.id}
+                          className="h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: hex }}
+                          title={ev.title}
+                        />
+                      );
+                    })}
+                    {dayEvents.length > 3 && (
+                      <span className="text-[10px] font-semibold text-muted-foreground leading-none">+</span>
+                    )}
+                  </div>
+                )}
+                {shiftBars.length > 0 && (
+                  <div className="w-[85%] flex gap-0.5 h-1.5 rounded-full overflow-hidden">
+                    {shiftBars.map((b, i) => (
                       <span
-                        key={ev.id}
-                        className="h-1.5 w-1.5 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: hex }}
-                        title={ev.title}
+                        key={i}
+                        className="flex-1 rounded-full opacity-95"
+                        style={{ backgroundColor: b.hex }}
                       />
-                    );
-                  })}
-                  {dayEvents.length > 4 && (
-                    <span className="text-[8px] text-muted-foreground leading-none">+</span>
-                  )}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
             </button>
           );
         })}
