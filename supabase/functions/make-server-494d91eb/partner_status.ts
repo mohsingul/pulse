@@ -126,12 +126,51 @@ function migrateLegacyRecord(raw: any, coupleId: string): PartnerStatusRecord {
   };
 }
 
-export async function getPartnerStatusRecord(coupleId: string): Promise<PartnerStatusRecord> {
+/** Calendar day in the user's local timezone (JS getTimezoneOffset convention). */
+function localDateKey(date: Date, timezoneOffsetMinutes: number): string {
+  const shifted = new Date(date.getTime() - timezoneOffsetMinutes * 60 * 1000);
+  const y = shifted.getUTCFullYear();
+  const m = String(shifted.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(shifted.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+export function isStatusFromToday(
+  updatedAt: string | null | undefined,
+  timezoneOffsetMinutes: number,
+): boolean {
+  if (!updatedAt) return false;
+  const todayKey = localDateKey(new Date(), timezoneOffsetMinutes);
+  const statusKey = localDateKey(new Date(updatedAt), timezoneOffsetMinutes);
+  return todayKey === statusKey;
+}
+
+export async function getPartnerStatusRecord(
+  coupleId: string,
+  timezoneOffsetMinutes = 0,
+): Promise<PartnerStatusRecord> {
   const raw = await kv.get(`partner_needs:${coupleId}`);
-  if (!raw) {
-    return { coupleId, user1: null, user2: null };
+  const record = raw
+    ? migrateLegacyRecord(raw, coupleId)
+    : { coupleId, user1: null, user2: null };
+
+  let changed = false;
+
+  if (record.user1 && !isStatusFromToday(record.user1.updatedAt, timezoneOffsetMinutes)) {
+    record.user1 = null;
+    changed = true;
   }
-  return migrateLegacyRecord(raw, coupleId);
+  if (record.user2 && !isStatusFromToday(record.user2.updatedAt, timezoneOffsetMinutes)) {
+    record.user2 = null;
+    changed = true;
+  }
+
+  if (changed) {
+    await kv.set(`partner_needs:${coupleId}`, record);
+    console.log(`[Partner Status] Cleared expired status for couple ${coupleId}`);
+  }
+
+  return record;
 }
 
 export function validateStatusPayload(body: Record<string, unknown>): {

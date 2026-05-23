@@ -2626,7 +2626,15 @@ app.get("/make-server-494d91eb/partner-needs/:coupleId", async (c) => {
       return c.json({ error: "Couple not found" }, 404);
     }
 
-    const partnerStatus = await getPartnerStatusRecord(coupleId);
+    const tzParam = c.req.query("timezoneOffset");
+    const timezoneOffset = tzParam !== undefined && tzParam !== ""
+      ? Number(tzParam)
+      : 0;
+
+    const partnerStatus = await getPartnerStatusRecord(
+      coupleId,
+      Number.isFinite(timezoneOffset) ? timezoneOffset : 0,
+    );
     return c.json({
       partnerStatus,
       partnerNeeds: partnerStatus,

@@ -351,8 +351,10 @@ export const challengesAPI = {
 
 // Partner Status API (route: partner-needs for backwards compatibility)
 export const partnerStatusAPI = {
-  get: (coupleId: string) =>
-    apiRequest(`/partner-needs/${coupleId}`),
+  get: (coupleId: string) => {
+    const timezoneOffset = new Date().getTimezoneOffset();
+    return apiRequest(`/partner-needs/${coupleId}?timezoneOffset=${timezoneOffset}`);
+  },
 
   update: (
     coupleId: string,

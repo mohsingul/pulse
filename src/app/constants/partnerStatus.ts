@@ -288,13 +288,32 @@ export function getPartnerStatusMeta(id: PartnerStatusId | string | undefined) {
   return PARTNER_STATUSES.find((s) => s.id === id) ?? null;
 }
 
+function localDateKey(date: Date, timezoneOffsetMinutes: number): string {
+  const shifted = new Date(date.getTime() - timezoneOffsetMinutes * 60 * 1000);
+  const y = shifted.getUTCFullYear();
+  const m = String(shifted.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(shifted.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/** True if status was set today (local midnight boundary). */
+export function isPartnerStatusFromToday(updatedAt?: string | null): boolean {
+  if (!updatedAt) return false;
+  const tz = new Date().getTimezoneOffset();
+  const todayKey = localDateKey(new Date(), tz);
+  const statusKey = localDateKey(new Date(updatedAt), tz);
+  return todayKey === statusKey;
+}
+
 export function getUserStatusFromRecord(
   record: PartnerStatusRecord | null,
   userId: string,
   user1Id: string,
 ): PartnerStatusData | null {
   if (!record) return null;
-  return userId === user1Id ? record.user1 : record.user2;
+  const status = userId === user1Id ? record.user1 : record.user2;
+  if (!status || !isPartnerStatusFromToday(status.updatedAt)) return null;
+  return status;
 }
 
 export function getEnergyDisplay(id?: EnergyLevel) {
