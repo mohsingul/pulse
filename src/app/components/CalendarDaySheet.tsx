@@ -6,6 +6,7 @@ import {
   getCalendarTypeMeta,
   getUserCalendarHex,
   isMultiDayEvent,
+  getShiftDayNightKind,
   isUserOnShiftForDay,
   parseDateKey,
   type CalendarColorMap,
@@ -62,13 +63,17 @@ export function CalendarDaySheet({
   const day = parseDateKey(dateKey);
   const labelFor = (uid: string) =>
     uid === currentUserId ? 'You' : partnerName.split(' ')[0];
-  const shiftNotes: string[] = [];
-  if (isUserOnShiftForDay(user1Id, shiftPatterns, overtimeDays, shiftExcludedDays, day)) {
-    shiftNotes.push(`${labelFor(user1Id)} — on shift`);
-  }
-  if (isUserOnShiftForDay(user2Id, shiftPatterns, overtimeDays, shiftExcludedDays, day)) {
-    shiftNotes.push(`${labelFor(user2Id)} — on shift`);
-  }
+  const shiftLabel = (uid: string) => {
+    const pattern = shiftPatterns[uid];
+    const kind = pattern ? getShiftDayNightKind(pattern, day) : null;
+    if (kind === 'day') return `${labelFor(uid)} — day shift ☀️`;
+    if (kind === 'night') return `${labelFor(uid)} — night shift 🌙`;
+    if (isUserOnShiftForDay(uid, shiftPatterns, overtimeDays, shiftExcludedDays, day)) {
+      return `${labelFor(uid)} — on shift`;
+    }
+    return null;
+  };
+  const shiftNotes = [shiftLabel(user1Id), shiftLabel(user2Id)].filter(Boolean) as string[];
   const isMyOnShift = isUserOnShiftForDay(
     currentUserId,
     shiftPatterns,

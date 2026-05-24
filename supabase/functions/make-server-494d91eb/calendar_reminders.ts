@@ -3,6 +3,16 @@ import * as kv from "./kv_store.ts";
 const REMINDER_WINDOW_MAX = 5;
 const APP_URL = Deno.env.get("APP_URL") || "https://aimopulse.vercel.app";
 
+/** Two reminder passes per day while an event is 0–5 days away (morning + evening). */
+const REMINDER_SLOTS = [
+  { id: "morning", targetMinutes: 9 * 60 },
+  { id: "evening", targetMinutes: 18 * 60 },
+] as const;
+
+type ReminderSlotId = (typeof REMINDER_SLOTS)[number]["id"];
+
+const SLOT_WINDOW_MINUTES = 20;
+
 type CalendarEventType = "anniversary" | "birthday" | "trip" | "holiday" | "important";
 
 type CalendarEvent = {
@@ -162,73 +172,95 @@ function buildCalendarDeepLink(coupleId: string, eventId: string): string {
   return `${APP_URL}/?${params.toString()}`;
 }
 
-async function wasReminderSentToday(
+function localMinutesNow(timezoneOffset: number): number {
+  const now = new Date();
+  const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+  const local = utcMinutes - timezoneOffset;
+  return ((local % 1440) + 1440) % 1440;
+}
+
+function isWithinTimeWindow(localMinutes: number, targetMinutes: number): boolean {
+  const diff = Math.abs(localMinutes - targetMinutes);
+  return diff <= SLOT_WINDOW_MINUTES || diff >= 1440 - SLOT_WINDOW_MINUTES;
+}
+
+async function getUserTimezoneOffset(userId: string): Promise<number> {
+  const prefs = await kv.get(`user_reminder_prefs:${userId}`);
+  return typeof prefs?.timezoneOffset === "number" ? prefs.timezoneOffset : 0;
+}
+
+async function wasReminderSentForSlot(
   coupleId: string,
   eventId: string,
   occurrenceDate: string,
+  slot: ReminderSlotId,
 ): Promise<boolean> {
-  const key = `calendar_reminder_sent:${coupleId}:${eventId}:${occurrenceDate}:${todayDateKey()}`;
+  const key =
+    `calendar_reminder_sent:${coupleId}:${eventId}:${occurrenceDate}:${todayDateKey()}:${slot}`;
   return !!(await kv.get(key));
 }
 
-async function markReminderSentToday(
+async function markReminderSentForSlot(
   coupleId: string,
   eventId: string,
   occurrenceDate: string,
+  slot: ReminderSlotId,
 ): Promise<void> {
-  const key = `calendar_reminder_sent:${coupleId}:${eventId}:${occurrenceDate}:${todayDateKey()}`;
-  await kv.set(key, { sentAt: new Date().toISOString() });
+  const key =
+    `calendar_reminder_sent:${coupleId}:${eventId}:${occurrenceDate}:${todayDateKey()}:${slot}`;
+  await kv.set(key, { sentAt: new Date().toISOString(), slot });
 }
 
-async function sendReminderToCouple(
+function activeReminderSlotsForUser(timezoneOffset: number): ReminderSlotId[] {
+  const localNow = localMinutesNow(timezoneOffset);
+  return REMINDER_SLOTS.filter((s) => isWithinTimeWindow(localNow, s.targetMinutes)).map((s) =>
+    s.id
+  );
+}
+
+async function sendReminderToUser(
   sendFcmPush: SendFcmPush,
-  couple: { user1Id: string; user2Id: string },
+  userId: string,
   event: CalendarEvent,
   daysUntil: number,
   occurrenceDate: string,
+  slot: ReminderSlotId,
 ): Promise<boolean> {
-  if (await wasReminderSentToday(event.coupleId, event.id, occurrenceDate)) {
+  if (await wasReminderSentForSlot(event.coupleId, event.id, occurrenceDate, slot)) {
     return false;
   }
 
+  const user = await kv.get(`user:${userId}`);
+  if (!user?.fcmToken) return false;
+
   const copy = getCalendarReminderMessage(event, daysUntil);
   const url = buildCalendarDeepLink(event.coupleId, event.id);
-  const userIds = [couple.user1Id, couple.user2Id];
-  let anySent = false;
 
-  for (const uid of userIds) {
-    const user = await kv.get(`user:${uid}`);
-    if (!user?.fcmToken) continue;
-
-    try {
-      await sendFcmPush(
-        user.fcmToken,
-        {
-          title: copy.title,
-          body: copy.body,
-          icon: "/icon-192.png",
-          badge: "/icon-192.png",
-        },
-        {
-          type: "calendar-reminder",
-          coupleId: event.coupleId,
-          eventId: event.id,
-          daysUntil: String(daysUntil),
-          url,
-          tag: `calendar-${event.id}-${occurrenceDate}-${todayDateKey()}`,
-        },
-      );
-      anySent = true;
-    } catch (err) {
-      console.error(`[Calendar Reminder] FCM failed for user ${uid}:`, err);
-    }
+  try {
+    await sendFcmPush(
+      user.fcmToken,
+      {
+        title: copy.title,
+        body: copy.body,
+        icon: "/icon-192.png",
+        badge: "/icon-192.png",
+      },
+      {
+        type: "calendar-reminder",
+        coupleId: event.coupleId,
+        eventId: event.id,
+        daysUntil: String(daysUntil),
+        reminderSlot: slot,
+        url,
+        tag: `calendar-${event.id}-${occurrenceDate}-${todayDateKey()}-${slot}`,
+      },
+    );
+    await markReminderSentForSlot(event.coupleId, event.id, occurrenceDate, slot);
+    return true;
+  } catch (err) {
+    console.error(`[Calendar Reminder] FCM failed for user ${userId}:`, err);
+    return false;
   }
-
-  if (anySent) {
-    await markReminderSentToday(event.coupleId, event.id, occurrenceDate);
-  }
-
-  return anySent;
 }
 
 export async function processCalendarReminders(
@@ -265,16 +297,38 @@ export async function processCalendarReminders(
       continue;
     }
 
-    const didSend = await sendReminderToCouple(
-      sendFcmPush,
-      couple,
-      event,
-      daysUntil,
-      occurrenceDate,
-    );
+    const userIds = [couple.user1Id, couple.user2Id] as const;
+    let eventSent = false;
 
-    if (didSend) sent++;
-    else skipped++;
+    for (const uid of userIds) {
+      const tz = await getUserTimezoneOffset(uid);
+      const activeSlots = activeReminderSlotsForUser(tz);
+      if (activeSlots.length === 0) {
+        skipped++;
+        continue;
+      }
+
+      for (const slot of activeSlots) {
+        const didSend = await sendReminderToUser(
+          sendFcmPush,
+          uid,
+          event,
+          daysUntil,
+          occurrenceDate,
+          slot,
+        );
+        if (didSend) {
+          sent++;
+          eventSent = true;
+        } else {
+          skipped++;
+        }
+      }
+    }
+
+    if (!eventSent) {
+      skipped++;
+    }
   }
 
   console.log(`[Calendar Reminder] Done: sent=${sent}, skipped=${skipped}, processed=${processed}`);

@@ -3,6 +3,7 @@ import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
 import * as kv from "./kv_store.ts";
 import { processCalendarReminders } from "./calendar_reminders.ts";
+import { notifyPartnerCalendarEventAdded } from "./calendar_event_notifications.ts";
 import {
   processPulseReminders,
   saveUserReminderPreferences,
@@ -3081,7 +3082,18 @@ app.post("/make-server-494d91eb/calendar/:coupleId", async (c) => {
 
     await kv.set(`calendar_event:${coupleId}:${eventId}`, event);
 
-    // Check if a push reminder applies today (5/3/1/0 days before)
+    notifyPartnerCalendarEventAdded(sendFcmPush, couple, userId, event as {
+      id: string;
+      coupleId: string;
+      type: CalendarEventType;
+      title: string;
+      date: string;
+      endDate?: string;
+      createdByName?: string;
+    }).catch((err) => {
+      console.error(`[Calendar] Partner event notify failed:`, err);
+    });
+
     processCalendarReminders(sendFcmPush, coupleId).catch((err) => {
       console.error(`[Calendar] Post-create reminder check failed:`, err);
     });

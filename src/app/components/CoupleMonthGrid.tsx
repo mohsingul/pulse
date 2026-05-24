@@ -14,6 +14,7 @@ import {
 } from 'date-fns';
 import {
   getEventsOnDate,
+  getShiftDayNightKind,
   getUserCalendarHex,
   isUserOnShiftForDay,
   toDateKey,
@@ -121,10 +122,16 @@ export function CoupleMonthGrid({
           const inMulti = selectedSet.has(key);
           const selected = multiSelectMode ? inMulti : selectedDateKey === key;
           const today = isToday(date);
-          const shiftBars: { hex: string }[] = [];
+          const shiftMarkers: { hex: string; kind: 'day' | 'night' | 'extra' }[] = [];
           for (const uid of [user1Id, user2Id]) {
-            if (isUserOnShiftForDay(uid, shiftPatterns, overtimeDays, shiftExcludedDays, date)) {
-              shiftBars.push({ hex: getUserCalendarHex(uid, colorMap, uid) });
+            const pattern = shiftPatterns[uid];
+            const kind = pattern ? getShiftDayNightKind(pattern, date) : null;
+            if (kind) {
+              shiftMarkers.push({ hex: getUserCalendarHex(uid, colorMap, uid), kind });
+            } else if (
+              isUserOnShiftForDay(uid, shiftPatterns, overtimeDays, shiftExcludedDays, date)
+            ) {
+              shiftMarkers.push({ hex: getUserCalendarHex(uid, colorMap, uid), kind: 'extra' });
             }
           }
 
@@ -177,14 +184,22 @@ export function CoupleMonthGrid({
                     )}
                   </div>
                 )}
-                {shiftBars.length > 0 && (
-                  <div className="w-[85%] flex gap-0.5 h-1.5 rounded-full overflow-hidden">
-                    {shiftBars.map((b, i) => (
+                {shiftMarkers.length > 0 && (
+                  <div className="flex justify-center gap-0.5 flex-wrap px-0.5">
+                    {shiftMarkers.map((m, i) => (
                       <span
                         key={i}
-                        className="flex-1 rounded-full opacity-95"
-                        style={{ backgroundColor: b.hex }}
-                      />
+                        className="text-sm leading-none"
+                        title={
+                          m.kind === 'day'
+                            ? 'Day shift'
+                            : m.kind === 'night'
+                              ? 'Night shift'
+                              : 'Extra shift'
+                        }
+                      >
+                        {m.kind === 'night' ? '🌙' : '☀️'}
+                      </span>
                     ))}
                   </div>
                 )}

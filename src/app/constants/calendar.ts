@@ -46,7 +46,7 @@ export function daysUntilEvent(dateStr: string, type?: CalendarEventType): numbe
 /** Show reminders on home when event is within push schedule (0–5 days). */
 export const CALENDAR_REMINDER_WINDOW_DAYS = 5;
 
-/** Daily push reminders while an event is within this window (matches server). */
+/** Push reminders twice daily (morning + evening) while in window (matches server). */
 export function isInCalendarPushReminderWindow(daysUntil: number): boolean {
   return daysUntil >= 0 && daysUntil <= CALENDAR_REMINDER_WINDOW_DAYS;
 }
@@ -242,19 +242,37 @@ export interface ShiftPattern {
 
 export type ShiftPatternMap = Record<string, ShiftPattern>;
 
+export type ShiftDayNightKind = 'day' | 'night';
+
+/** First 4 on-days = day shift (☀️), next 4 on-days = night shift (🌙). */
+export const SHIFT_DAY_BLOCK = 4;
+export const SHIFT_NIGHT_BLOCK = 4;
+export const DEFAULT_SHIFT_DAYS_ON = SHIFT_DAY_BLOCK + SHIFT_NIGHT_BLOCK;
+export const DEFAULT_SHIFT_DAYS_OFF = 4;
+
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
-/** True when this day falls in an "on" portion of the repeating shift cycle. */
-export function isShiftWorkDay(pattern: ShiftPattern, day: Date): boolean {
+export function getShiftCycleMod(pattern: ShiftPattern, day: Date): number {
   const start = parseDateKey(pattern.startDate);
   start.setHours(0, 0, 0, 0);
   const d = new Date(day);
   d.setHours(0, 0, 0, 0);
   const diffDays = Math.round((d.getTime() - start.getTime()) / MS_PER_DAY);
   const cycle = pattern.daysOn + pattern.daysOff;
-  if (cycle <= 0) return false;
-  const mod = ((diffDays % cycle) + cycle) % cycle;
-  return mod < pattern.daysOn;
+  if (cycle <= 0) return 0;
+  return ((diffDays % cycle) + cycle) % cycle;
+}
+
+/** True when this day falls in an "on" portion of the repeating shift cycle. */
+export function isShiftWorkDay(pattern: ShiftPattern, day: Date): boolean {
+  return getShiftCycleMod(pattern, day) < pattern.daysOn;
+}
+
+/** Day vs night within the on-block; null when off shift. */
+export function getShiftDayNightKind(pattern: ShiftPattern, day: Date): ShiftDayNightKind | null {
+  if (!isShiftWorkDay(pattern, day)) return null;
+  const mod = getShiftCycleMod(pattern, day);
+  return mod < SHIFT_DAY_BLOCK ? 'day' : 'night';
 }
 
 /** Shift display window: from start date through one year ahead. */

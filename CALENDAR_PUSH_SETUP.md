@@ -2,7 +2,9 @@
 
 ## Calendar events
 
-Automatic Firebase notifications are sent **once per day** for each upcoming shared calendar event while it is **0–5 days away** (including the day of the event) — even when the app is closed.
+Automatic Firebase notifications are sent **twice per day** (morning ~9:00 and evening ~6:00 in your timezone) for each upcoming shared calendar event while it is **0–5 days away** (including the day of the event) — even when the app is closed.
+
+When either partner **adds** a calendar event, the other receives a push immediately with the event type and title.
 
 Opening the app also triggers a daily sync for your couple’s calendar reminders.
 
