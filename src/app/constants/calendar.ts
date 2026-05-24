@@ -244,11 +244,8 @@ export type ShiftPatternMap = Record<string, ShiftPattern>;
 
 export type ShiftDayNightKind = 'day' | 'night';
 
-/** First 4 on-days = day shift (☀️), next 4 on-days = night shift (🌙). */
-export const SHIFT_DAY_BLOCK = 4;
-export const SHIFT_NIGHT_BLOCK = 4;
-export const DEFAULT_SHIFT_DAYS_ON = SHIFT_DAY_BLOCK + SHIFT_NIGHT_BLOCK;
-export const DEFAULT_SHIFT_DAYS_OFF = 4;
+/** First 4 days in each on-block = day shift (☀️); next on-days = night (🌙). */
+const SHIFT_DAY_ICON_COUNT = 4;
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
@@ -272,7 +269,7 @@ export function isShiftWorkDay(pattern: ShiftPattern, day: Date): boolean {
 export function getShiftDayNightKind(pattern: ShiftPattern, day: Date): ShiftDayNightKind | null {
   if (!isShiftWorkDay(pattern, day)) return null;
   const mod = getShiftCycleMod(pattern, day);
-  return mod < SHIFT_DAY_BLOCK ? 'day' : 'night';
+  return mod < SHIFT_DAY_ICON_COUNT ? 'day' : 'night';
 }
 
 /** Shift display window: from start date through one year ahead. */

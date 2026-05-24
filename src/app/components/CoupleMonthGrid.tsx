@@ -122,17 +122,17 @@ export function CoupleMonthGrid({
           const inMulti = selectedSet.has(key);
           const selected = multiSelectMode ? inMulti : selectedDateKey === key;
           const today = isToday(date);
-          const shiftMarkers: { hex: string; kind: 'day' | 'night' | 'extra' }[] = [];
+          const shiftBars: { hex: string; kind: 'day' | 'night' }[] = [];
           for (const uid of [user1Id, user2Id]) {
-            const pattern = shiftPatterns[uid];
-            const kind = pattern ? getShiftDayNightKind(pattern, date) : null;
-            if (kind) {
-              shiftMarkers.push({ hex: getUserCalendarHex(uid, colorMap, uid), kind });
-            } else if (
-              isUserOnShiftForDay(uid, shiftPatterns, overtimeDays, shiftExcludedDays, date)
-            ) {
-              shiftMarkers.push({ hex: getUserCalendarHex(uid, colorMap, uid), kind: 'extra' });
+            if (!isUserOnShiftForDay(uid, shiftPatterns, overtimeDays, shiftExcludedDays, date)) {
+              continue;
             }
+            const pattern = shiftPatterns[uid];
+            const kind = pattern ? getShiftDayNightKind(pattern, date) : 'day';
+            shiftBars.push({
+              hex: getUserCalendarHex(uid, colorMap, uid),
+              kind: kind ?? 'day',
+            });
           }
 
           return (
@@ -184,22 +184,21 @@ export function CoupleMonthGrid({
                     )}
                   </div>
                 )}
-                {shiftMarkers.length > 0 && (
-                  <div className="flex justify-center gap-0.5 flex-wrap px-0.5">
-                    {shiftMarkers.map((m, i) => (
-                      <span
-                        key={i}
-                        className="text-sm leading-none"
-                        title={
-                          m.kind === 'day'
-                            ? 'Day shift'
-                            : m.kind === 'night'
-                              ? 'Night shift'
-                              : 'Extra shift'
-                        }
-                      >
-                        {m.kind === 'night' ? '🌙' : '☀️'}
-                      </span>
+                {shiftBars.length > 0 && (
+                  <div className="w-[85%] flex flex-col items-center gap-0.5">
+                    {shiftBars.map((b, i) => (
+                      <div key={i} className="w-full flex items-center gap-0.5">
+                        <span
+                          className="text-[10px] leading-none flex-shrink-0"
+                          title={b.kind === 'night' ? 'Night shift' : 'Day shift'}
+                        >
+                          {b.kind === 'night' ? '🌙' : '☀️'}
+                        </span>
+                        <span
+                          className="flex-1 h-1 rounded-full opacity-95"
+                          style={{ backgroundColor: b.hex }}
+                        />
+                      </div>
                     ))}
                   </div>
                 )}

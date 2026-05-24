@@ -9,8 +9,6 @@ import {
   getShiftDayNightKind,
   isShiftOnDay,
   mergeColorMap,
-  DEFAULT_SHIFT_DAYS_OFF,
-  DEFAULT_SHIFT_DAYS_ON,
   parseDateKey,
   toDateKey,
   type CalendarColorId,
@@ -53,8 +51,8 @@ export function CalendarSettingsPanel({
 
   const myShift = shiftPatterns[userId];
   const [shiftStart, setShiftStart] = useState(toDateKey(new Date()));
-  const [daysOn, setDaysOn] = useState(DEFAULT_SHIFT_DAYS_ON);
-  const [daysOff, setDaysOff] = useState(DEFAULT_SHIFT_DAYS_OFF);
+  const [daysOn, setDaysOn] = useState(4);
+  const [daysOff, setDaysOff] = useState(4);
 
   const loadPrefs = useCallback(async () => {
     try {
@@ -144,8 +142,8 @@ export function CalendarSettingsPanel({
       const res = await calendarAPI.clearShift(coupleId, userId);
       if (res.shiftPatterns) setShiftPatterns(res.shiftPatterns);
       setShiftStart(toDateKey(new Date()));
-      setDaysOn(DEFAULT_SHIFT_DAYS_ON);
-      setDaysOff(DEFAULT_SHIFT_DAYS_OFF);
+      setDaysOn(4);
+      setDaysOff(4);
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : 'Could not clear shift');
     } finally {
@@ -216,8 +214,8 @@ export function CalendarSettingsPanel({
       <div className="space-y-3">
         <h3 className="text-lg font-semibold">Work shift pattern</h3>
         <p className="text-sm text-muted-foreground">
-          4 day shifts (☀️) and 4 night shifts (🌙), then {daysOff} days off — shown on the shared
-          calendar for the next year. Your partner sees when you&apos;re working days vs nights.
+          Show your {daysOn}-on / {daysOff}-off schedule on the shared calendar for the next year. Your
+          partner sees when you&apos;re on shift (☀️ days, 🌙 nights).
         </p>
         <Card className="p-4 space-y-4">
           <Input
@@ -228,14 +226,12 @@ export function CalendarSettingsPanel({
           />
           <div className="grid grid-cols-2 gap-3">
             <Input
-              label="Days on (4 day + 4 night)"
+              label="Days on"
               type="number"
-              min={8}
+              min={1}
               max={14}
               value={daysOn}
-              onChange={(e) =>
-                setDaysOn(Math.max(8, Math.min(14, Number(e.target.value) || DEFAULT_SHIFT_DAYS_ON)))
-              }
+              onChange={(e) => setDaysOn(Math.max(1, Math.min(14, Number(e.target.value) || 4)))}
             />
             <Input
               label="Days off"
@@ -264,7 +260,7 @@ export function CalendarSettingsPanel({
               ))}
             </div>
             <p className="text-[10px] text-muted-foreground mt-2">
-              ☀️ day shift · 🌙 night shift · Shown for 12 months from start date
+              Highlighted = on shift (☀️ day / 🌙 night) · Shown for 12 months from start date
             </p>
           </div>
 
