@@ -10,6 +10,9 @@ interface UserData {
 
 const USER_KEY = 'pulse_user';
 const SESSION_ACTIVE_KEY = 'pulse_session_active';
+/** Survives session end so server push (FCM) still targets this account */
+const PUSH_USER_ID_KEY = 'pulse_push_user_id';
+const PAIRED_COUPLE_ID_KEY = 'pulse_paired_couple_id';
 
 export const storage = {
   /**
@@ -26,6 +29,34 @@ export const storage = {
   setUser: (user: UserData) => {
     sessionStorage.setItem(SESSION_ACTIVE_KEY, 'true');
     sessionStorage.setItem(USER_KEY, JSON.stringify(user));
+    storage.setPushUserId(user.userId);
+  },
+
+  /** User id for push — persists after session ends (until explicit logout). */
+  getPushUserId: (): string | null => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(PUSH_USER_ID_KEY);
+  },
+
+  setPushUserId: (userId: string) => {
+    if (!userId) return;
+    localStorage.setItem(PUSH_USER_ID_KEY, userId);
+  },
+
+  getPairedCoupleId: (): string | null => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(PAIRED_COUPLE_ID_KEY);
+  },
+
+  setPairedCoupleId: (coupleId: string) => {
+    if (!coupleId) return;
+    localStorage.setItem(PAIRED_COUPLE_ID_KEY, coupleId);
+  },
+
+  /** Clears push targeting (explicit logout only — not on app close). */
+  clearPushContext: () => {
+    localStorage.removeItem(PUSH_USER_ID_KEY);
+    localStorage.removeItem(PAIRED_COUPLE_ID_KEY);
   },
 
   /** End login session (logout or app fully closed). */
@@ -41,6 +72,7 @@ export const storage = {
 
   clearAllLocalData: () => {
     storage.clearSession();
+    storage.clearPushContext();
     localStorage.removeItem('pulse_theme');
     localStorage.removeItem('pulse_notifications');
     localStorage.removeItem('pulse_notification_prompt_state');

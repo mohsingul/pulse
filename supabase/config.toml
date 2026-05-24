@@ -4,7 +4,8 @@ project_id = "iqwfevbjeohdvdbemgxp"
 [functions.make-server-494d91eb]
 verify_jwt = false
 
-# Schedule reminders in Supabase Dashboard:
-# Edge Functions → make-server-494d91eb → Schedules → */15 * * * * (every 15 min)
-# POST /calendar/process-reminders with header X-Cron-Secret
-# Sends daily calendar event reminders (0–5 days out) + pulse reminders at user-set times
+# REQUIRED for push when the app is closed:
+# Dashboard → Edge Functions → make-server-494d91eb → Schedules → */15 * * * * (every 15 min)
+# Method: POST  Path: /calendar/process-reminders
+# Header: X-Cron-Secret = value of CRON_SECRET
+# Sends calendar reminders (0–5 days out) + morning/midday/evening pulse reminders via FCM

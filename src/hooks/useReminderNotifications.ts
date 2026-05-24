@@ -21,13 +21,13 @@ function getReminderPreferences(): ReminderPreferences {
   return storage.getNotifications();
 }
 
-export async function syncReminderPreferencesToServer(): Promise<void> {
-  const user = storage.getUser();
-  if (!user?.userId) return;
+export async function syncReminderPreferencesToServer(userId?: string): Promise<void> {
+  const uid = userId ?? storage.getPushUserId() ?? storage.getUser()?.userId;
+  if (!uid) return;
 
   const prefs = storage.getNotifications();
   try {
-    await userAPI.saveReminderPreferences(user.userId, {
+    await userAPI.saveReminderPreferences(uid, {
       morning: prefs.morning,
       midday: prefs.midday,
       evening: prefs.evening,
@@ -146,12 +146,13 @@ export function useReminderNotifications(enabled: boolean) {
     }
 
     const preferences = getReminderPreferences();
-    syncReminderPreferencesToServer();
+    const uid = storage.getPushUserId() ?? storage.getUser()?.userId;
+    syncReminderPreferencesToServer(uid ?? undefined);
     scheduleAllReminders(preferences, timersRef);
 
     const handleUpdate = () => {
       const updatedPreferences = getReminderPreferences();
-      syncReminderPreferencesToServer();
+      syncReminderPreferencesToServer(uid ?? undefined);
       scheduleAllReminders(updatedPreferences, timersRef);
     };
 

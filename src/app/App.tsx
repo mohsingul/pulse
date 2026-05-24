@@ -45,6 +45,7 @@ import {
   consumePendingCalendarEvent,
   clearAppUrlParams,
 } from '@/utils/deepLink';
+import { bootstrapPushRegistration, refreshPushRegistrationIfNeeded } from '@/utils/pushBootstrap';
 
 type Screen =
   | 'welcome'
@@ -83,11 +84,13 @@ export default function App() {
   );
   const [highlightCalendarEventId, setHighlightCalendarEventId] = useState<string | null>(null);
 
-  // Initialize Firebase notifications
-  const notifications = useFirebaseNotifications(user?.userId);
+  // Push works without an active login session (FCM token + prefs stay on server)
+  const pushUserId = user?.userId ?? storage.getPushUserId() ?? undefined;
+  const pairedCoupleId = couple?.coupleId ?? storage.getPairedCoupleId() ?? undefined;
 
-  // Pulse reminder notifications (local fallback + server sync for push)
-  useReminderNotifications(!!user?.userId && notificationPermission === 'granted');
+  const notifications = useFirebaseNotifications(pushUserId);
+
+  useReminderNotifications(!!pushUserId && notificationPermission === 'granted');
 
   // Log out when the app is closed (sessionStorage session ends)
   useSessionLifecycle(() => {
@@ -139,6 +142,12 @@ export default function App() {
       setNotificationPermission(Notification.permission);
     }
 
+    if (Notification.permission === 'granted') {
+      refreshPushRegistrationIfNeeded().catch((err) =>
+        console.warn('[Push] Startup refresh failed:', err),
+      );
+    }
+
     applyDeepLinkNavigation();
   }, []);
 
@@ -167,40 +176,58 @@ export default function App() {
   }, [couple]);
 
   useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (Notification.permission === 'granted') {
+        refreshPushRegistrationIfNeeded().catch((err) =>
+          console.warn('[Push] Resume refresh failed:', err),
+        );
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
+
+  useEffect(() => {
     if (user && notificationPermission !== 'granted') {
       setShowNotificationPermissionPrompt(true);
     }
   }, [user, notificationPermission]);
 
-  // Register FCM token with backend whenever user is logged in and permission is granted
+  // Register FCM + reminder prefs whenever notifications are allowed (session optional)
   useEffect(() => {
-    if (user?.userId && notificationPermission === 'granted') {
-      notifications.checkNotificationStatus().catch((err) => {
-        console.error('[Notifications] Token sync failed:', err);
-      });
-      syncReminderPreferencesToServer().catch((err) => {
-        console.error('[Reminders] Preference sync failed:', err);
-      });
+    if (!pushUserId || notificationPermission !== 'granted') {
+      return;
     }
-  }, [user?.userId, notificationPermission]);
 
-  // Sync calendar event reminders once per day when the app is opened
+    notifications.checkNotificationStatus().catch((err) => {
+      console.error('[Notifications] Token sync failed:', err);
+    });
+    bootstrapPushRegistration(pushUserId).catch((err) => {
+      console.error('[Notifications] Push bootstrap failed:', err);
+    });
+    syncReminderPreferencesToServer(pushUserId).catch((err) => {
+      console.error('[Reminders] Preference sync failed:', err);
+    });
+  }, [pushUserId, notificationPermission]);
+
+  // Sync calendar event reminders once per day (works after re-open without logging in)
   useEffect(() => {
-    if (!user?.userId || !couple?.coupleId || notificationPermission !== 'granted') {
+    if (!pushUserId || !pairedCoupleId || notificationPermission !== 'granted') {
       return;
     }
 
     const today = new Date().toISOString().slice(0, 10);
-    const storageKey = `calendar_reminders_synced_${couple.coupleId}`;
+    const storageKey = `calendar_reminders_synced_${pairedCoupleId}`;
     if (localStorage.getItem(storageKey) === today) {
       return;
     }
 
     calendarAPI
-      .processReminders(couple.coupleId, user.userId)
+      .processReminders(pairedCoupleId, pushUserId)
       .then(() => localStorage.setItem(storageKey, today))
       .catch((err) => console.warn('[Calendar] Reminder sync failed:', err));
-  }, [user?.userId, couple?.coupleId, notificationPermission]);
+  }, [pushUserId, pairedCoupleId, notificationPermission]);
 
   // Show notification onboarding after successful pairing
   useEffect(() => {
@@ -243,6 +270,7 @@ export default function App() {
     try {
       const response = await coupleAPI.get(userId);
       if (response.coupleId) {
+        storage.setPairedCoupleId(response.coupleId);
         setCouple(response);
         setCurrentScreen('home');
       } else {
@@ -255,22 +283,29 @@ export default function App() {
   };
 
   const handleAuthSuccess = (userData: any) => {
+    storage.setPushUserId(userData.userId);
     setUser(userData);
     checkCouple(userData.userId);
 
     if (notificationPermission !== 'granted') {
       setShowNotificationPermissionPrompt(true);
     } else {
-      notifications.checkNotificationStatus().catch(console.error);
+      bootstrapPushRegistration(userData.userId).catch(console.error);
     }
   };
 
   const handlePairingSuccess = (coupleData: any) => {
+    if (coupleData?.coupleId) {
+      storage.setPairedCoupleId(coupleData.coupleId);
+    }
     setCouple(coupleData);
     setCurrentScreen('success');
   };
 
   const handleReconnect = (coupleData: any) => {
+    if (coupleData?.coupleId) {
+      storage.setPairedCoupleId(coupleData.coupleId);
+    }
     setCouple(coupleData);
     setCurrentScreen('home');
   };
@@ -347,6 +382,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    storage.clearPushContext();
     storage.clearSession();
     setUser(null);
     setCouple(null);
@@ -355,8 +391,11 @@ export default function App() {
 
   const handleEnableNotifications = async () => {
     try {
-      if (user?.userId) {
+      const uid = user?.userId ?? storage.getPushUserId();
+      if (uid) {
+        storage.setPushUserId(uid);
         await notifications.enableNotifications();
+        await bootstrapPushRegistration(uid);
         setNotificationPermission('granted');
         setShowNotificationPermissionPrompt(false);
         console.log('[Notifications] FCM enabled and token registered');

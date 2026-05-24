@@ -43,7 +43,8 @@ curl -X POST \
 
 ## User requirements
 
-- Both partners must **allow notifications** and open the app once while logged in (registers FCM token).
+- Both partners must **allow notifications** and open the app once while logged in (registers FCM token on the server).
+- After that, pushes continue when the app is closed or you are logged out locally — the device token stays registered until you tap **Log out**.
 - Reminder notification times are saved from **Settings → Reminder Notifications**.
 - Calendar notifications open **Couple Calendar** on the tapped event.
 
