@@ -6,10 +6,12 @@ import { calendarAPI } from '@/utils/api';
 import {
   CALENDAR_COLOR_PALETTE,
   getPaletteColor,
-  getShiftDayNightKind,
-  isShiftOnDay,
+  getShiftCyclePhase,
   mergeColorMap,
   parseDateKey,
+  SHIFT_DAYS_DAY,
+  SHIFT_DAYS_NIGHT,
+  SHIFT_DAYS_OFF,
   toDateKey,
   type CalendarColorId,
   type CalendarColorMap,
@@ -51,8 +53,6 @@ export function CalendarSettingsPanel({
 
   const myShift = shiftPatterns[userId];
   const [shiftStart, setShiftStart] = useState(toDateKey(new Date()));
-  const [daysOn, setDaysOn] = useState(4);
-  const [daysOff, setDaysOff] = useState(4);
 
   const loadPrefs = useCallback(async () => {
     try {
@@ -62,10 +62,8 @@ export function CalendarSettingsPanel({
       setMyColorId(merged[userId] ?? 'rose');
       setShiftPatterns(data.shiftPatterns ?? {});
       const mine = data.shiftPatterns?.[userId];
-      if (mine) {
+      if (mine?.startDate) {
         setShiftStart(mine.startDate);
-        setDaysOn(mine.daysOn);
-        setDaysOff(mine.daysOff);
       }
     } catch (e) {
       console.error('[CalendarSettings] load failed', e);
@@ -79,20 +77,23 @@ export function CalendarSettingsPanel({
   }, [loadPrefs]);
 
   const previewDays = useMemo(() => {
-    const pattern: ShiftPattern = { startDate: shiftStart, daysOn, daysOff };
+    const pattern: ShiftPattern = {
+      startDate: shiftStart,
+      daysDay: SHIFT_DAYS_DAY,
+      daysOff: SHIFT_DAYS_OFF,
+      daysNight: SHIFT_DAYS_NIGHT,
+    };
     const start = parseDateKey(shiftStart);
-    return Array.from({ length: 14 }, (_, i) => {
+    return Array.from({ length: 21 }, (_, i) => {
       const day = addDays(start, i);
-      const on = isShiftOnDay(pattern, day);
-      const kind = on ? getShiftDayNightKind(pattern, day) : null;
+      const phase = getShiftCyclePhase(pattern, day);
       return {
         key: toDateKey(day),
         label: format(day, 'EEE d'),
-        on,
-        kind,
+        phase,
       };
     });
-  }, [shiftStart, daysOn, daysOff]);
+  }, [shiftStart]);
 
   const handleColorSelect = async (colorId: CalendarColorId) => {
     setMyColorId(colorId);
@@ -122,8 +123,9 @@ export function CalendarSettingsPanel({
     try {
       const res = await calendarAPI.setShift(coupleId, userId, {
         startDate: shiftStart,
-        daysOn,
-        daysOff,
+        daysDay: SHIFT_DAYS_DAY,
+        daysOff: SHIFT_DAYS_OFF,
+        daysNight: SHIFT_DAYS_NIGHT,
       });
       if (res.shiftPatterns) setShiftPatterns(res.shiftPatterns);
       setShiftSaved(true);
@@ -142,8 +144,6 @@ export function CalendarSettingsPanel({
       const res = await calendarAPI.clearShift(coupleId, userId);
       if (res.shiftPatterns) setShiftPatterns(res.shiftPatterns);
       setShiftStart(toDateKey(new Date()));
-      setDaysOn(4);
-      setDaysOff(4);
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : 'Could not clear shift');
     } finally {
@@ -214,53 +214,38 @@ export function CalendarSettingsPanel({
       <div className="space-y-3">
         <h3 className="text-lg font-semibold">Work shift pattern</h3>
         <p className="text-sm text-muted-foreground">
-          Show your {daysOn}-on / {daysOff}-off schedule on the shared calendar for the next year. Your
-          partner sees when you&apos;re on shift (☀️ days, 🌙 nights).
+          Repeating cycle: <strong>4 days</strong> ☀️ → <strong>4 days off</strong> → <strong>4 nights</strong>{' '}
+          🌙. Shown on the shared calendar for one year from your start date.
         </p>
         <Card className="p-4 space-y-4">
           <Input
-            label="First day on shift"
+            label="First day of day shift (☀️)"
             type="date"
             value={shiftStart}
             onChange={(e) => setShiftStart(e.target.value)}
           />
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="Days on"
-              type="number"
-              min={1}
-              max={14}
-              value={daysOn}
-              onChange={(e) => setDaysOn(Math.max(1, Math.min(14, Number(e.target.value) || 4)))}
-            />
-            <Input
-              label="Days off"
-              type="number"
-              min={1}
-              max={14}
-              value={daysOff}
-              onChange={(e) => setDaysOff(Math.max(1, Math.min(14, Number(e.target.value) || 4)))}
-            />
-          </div>
 
           <div>
-            <p className="text-xs font-semibold text-muted-foreground mb-2">Preview (next 2 weeks)</p>
+            <p className="text-xs font-semibold text-muted-foreground mb-2">Preview (3 weeks)</p>
             <div className="flex flex-wrap gap-1">
-              {previewDays.map((d) => (
-                <span
-                  key={d.key}
-                  className={`text-[10px] px-2 py-1 rounded-md font-medium ${
-                    d.on ? 'text-white' : 'bg-accent text-muted-foreground'
-                  }`}
-                  style={d.on ? { backgroundColor: getPaletteColor(myColorId) } : undefined}
-                >
-                  {d.on ? (d.kind === 'night' ? '🌙 ' : '☀️ ') : ''}
-                  {d.label}
-                </span>
-              ))}
+              {previewDays.map((d) => {
+                const isWork = d.phase === 'day' || d.phase === 'night';
+                return (
+                  <span
+                    key={d.key}
+                    className={`text-[10px] px-2 py-1 rounded-md font-medium min-w-[2.5rem] text-center ${
+                      isWork ? 'text-white' : 'bg-accent text-muted-foreground'
+                    }`}
+                    style={isWork ? { backgroundColor: getPaletteColor(myColorId) } : undefined}
+                  >
+                    {d.phase === 'night' ? '🌙 ' : d.phase === 'day' ? '☀️ ' : ''}
+                    {d.label}
+                  </span>
+                );
+              })}
             </div>
             <p className="text-[10px] text-muted-foreground mt-2">
-              Highlighted = on shift (☀️ day / 🌙 night) · Shown for 12 months from start date
+              ☀️ day · blank = off · 🌙 night
             </p>
           </div>
 

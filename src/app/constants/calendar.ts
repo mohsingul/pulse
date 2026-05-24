@@ -236,18 +236,43 @@ export function getEventsOnDate<T extends { date: string; type?: CalendarEventTy
 
 export interface ShiftPattern {
   startDate: string;
-  daysOn: number;
   daysOff: number;
+  /** Day shifts (☀️) at the start of each cycle */
+  daysDay?: number;
+  /** Night shifts (🌙) after the off block */
+  daysNight?: number;
+  /** @deprecated Legacy — treated as daysDay when daysDay is omitted */
+  daysOn?: number;
 }
 
 export type ShiftPatternMap = Record<string, ShiftPattern>;
 
 export type ShiftDayNightKind = 'day' | 'night';
 
-/** First 4 days in each on-block = day shift (☀️); next on-days = night (🌙). */
-const SHIFT_DAY_ICON_COUNT = 4;
+export type ShiftCyclePhase = 'day' | 'off' | 'night';
+
+export const SHIFT_DAYS_DAY = 4;
+export const SHIFT_DAYS_OFF = 4;
+export const SHIFT_DAYS_NIGHT = 4;
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+export function normalizeShiftPattern(pattern: ShiftPattern): {
+  daysDay: number;
+  daysOff: number;
+  daysNight: number;
+} {
+  return {
+    daysDay: pattern.daysDay ?? pattern.daysOn ?? SHIFT_DAYS_DAY,
+    daysOff: pattern.daysOff ?? SHIFT_DAYS_OFF,
+    daysNight: pattern.daysNight ?? SHIFT_DAYS_NIGHT,
+  };
+}
+
+export function getShiftCycleLength(pattern: ShiftPattern): number {
+  const { daysDay, daysOff, daysNight } = normalizeShiftPattern(pattern);
+  return daysDay + daysOff + daysNight;
+}
 
 export function getShiftCycleMod(pattern: ShiftPattern, day: Date): number {
   const start = parseDateKey(pattern.startDate);
@@ -255,21 +280,9 @@ export function getShiftCycleMod(pattern: ShiftPattern, day: Date): number {
   const d = new Date(day);
   d.setHours(0, 0, 0, 0);
   const diffDays = Math.round((d.getTime() - start.getTime()) / MS_PER_DAY);
-  const cycle = pattern.daysOn + pattern.daysOff;
+  const cycle = getShiftCycleLength(pattern);
   if (cycle <= 0) return 0;
   return ((diffDays % cycle) + cycle) % cycle;
-}
-
-/** True when this day falls in an "on" portion of the repeating shift cycle. */
-export function isShiftWorkDay(pattern: ShiftPattern, day: Date): boolean {
-  return getShiftCycleMod(pattern, day) < pattern.daysOn;
-}
-
-/** Day vs night within the on-block; null when off shift. */
-export function getShiftDayNightKind(pattern: ShiftPattern, day: Date): ShiftDayNightKind | null {
-  if (!isShiftWorkDay(pattern, day)) return null;
-  const mod = getShiftCycleMod(pattern, day);
-  return mod < SHIFT_DAY_ICON_COUNT ? 'day' : 'night';
 }
 
 /** Shift display window: from start date through one year ahead. */
@@ -283,8 +296,30 @@ export function isShiftPatternActive(pattern: ShiftPattern, day: Date): boolean 
   return d >= start && d <= end;
 }
 
+/**
+ * Repeating cycle: daysDay (☀️) → daysOff → daysNight (🌙).
+ * Default 4 + 4 + 4.
+ */
+export function getShiftCyclePhase(pattern: ShiftPattern, day: Date): ShiftCyclePhase | null {
+  if (!isShiftPatternActive(pattern, day)) return null;
+  const { daysDay, daysOff, daysNight } = normalizeShiftPattern(pattern);
+  const mod = getShiftCycleMod(pattern, day);
+  if (mod < daysDay) return 'day';
+  if (mod < daysDay + daysOff) return 'off';
+  return 'night';
+}
+
 export function isShiftOnDay(pattern: ShiftPattern, day: Date): boolean {
-  return isShiftPatternActive(pattern, day) && isShiftWorkDay(pattern, day);
+  const phase = getShiftCyclePhase(pattern, day);
+  return phase === 'day' || phase === 'night';
+}
+
+/** ☀️ or 🌙 when on a day or night shift; null on off days. */
+export function getShiftDayNightKind(pattern: ShiftPattern, day: Date): ShiftDayNightKind | null {
+  const phase = getShiftCyclePhase(pattern, day);
+  if (phase === 'day') return 'day';
+  if (phase === 'night') return 'night';
+  return null;
 }
 
 export function getUpcomingCalendarReminders(

@@ -14,9 +14,10 @@ import {
 } from 'date-fns';
 import {
   getEventsOnDate,
-  getShiftDayNightKind,
+  getShiftCyclePhase,
   getUserCalendarHex,
-  isUserOnShiftForDay,
+  isOvertimeDay,
+  isShiftExcluded,
   toDateKey,
   type CalendarColorMap,
   type CalendarEventItem,
@@ -42,6 +43,24 @@ interface CoupleMonthGridProps {
   selectedDateKey: string | null;
   selectedDateKeys: string[];
   onDayPress: (dateKey: string) => void;
+}
+
+function shiftIconForUser(
+  userId: string,
+  date: Date,
+  shiftPatterns: ShiftPatternMap,
+  overtimeDays: OvertimeMap,
+  shiftExcludedDays: ShiftExcludedMap,
+): 'day' | 'night' | null {
+  if (isShiftExcluded(shiftExcludedDays, userId, date)) return null;
+  const pattern = shiftPatterns[userId];
+  if (pattern) {
+    const phase = getShiftCyclePhase(pattern, date);
+    if (phase === 'day') return 'day';
+    if (phase === 'night') return 'night';
+  }
+  if (isOvertimeDay(overtimeDays, userId, date)) return 'day';
+  return null;
 }
 
 export function CoupleMonthGrid({
@@ -122,17 +141,23 @@ export function CoupleMonthGrid({
           const inMulti = selectedSet.has(key);
           const selected = multiSelectMode ? inMulti : selectedDateKey === key;
           const today = isToday(date);
-          const shiftBars: { hex: string; kind: 'day' | 'night' }[] = [];
+
+          const topIcons: { emoji: string; hex: string; label: string }[] = [];
           for (const uid of [user1Id, user2Id]) {
-            if (!isUserOnShiftForDay(uid, shiftPatterns, overtimeDays, shiftExcludedDays, date)) {
-              continue;
+            const kind = shiftIconForUser(
+              uid,
+              date,
+              shiftPatterns,
+              overtimeDays,
+              shiftExcludedDays,
+            );
+            if (kind) {
+              topIcons.push({
+                emoji: kind === 'night' ? '🌙' : '☀️',
+                hex: getUserCalendarHex(uid, colorMap, uid),
+                label: kind === 'night' ? 'Night shift' : 'Day shift',
+              });
             }
-            const pattern = shiftPatterns[uid];
-            const kind = pattern ? getShiftDayNightKind(pattern, date) : 'day';
-            shiftBars.push({
-              hex: getUserCalendarHex(uid, colorMap, uid),
-              kind: kind ?? 'day',
-            });
           }
 
           return (
@@ -141,8 +166,8 @@ export function CoupleMonthGrid({
               type="button"
               onClick={() => onDayPress(key)}
               className={`
-                relative flex flex-col items-center justify-between w-full aspect-square
-                rounded-2xl p-1 pt-1.5 transition-all duration-150 active:scale-[0.97] overflow-hidden
+                relative flex flex-col items-center w-full aspect-square
+                rounded-2xl transition-all duration-150 active:scale-[0.97]
                 ${!inMonth ? 'opacity-30' : ''}
                 ${
                   selected
@@ -154,53 +179,59 @@ export function CoupleMonthGrid({
                 ${today && !selected ? 'bg-accent/50' : ''}
               `}
             >
-              <span
-                className={`
-                  text-lg sm:text-xl font-semibold tabular-nums leading-none
-                  min-w-[2rem] min-h-[2rem] sm:min-w-[2.25rem] sm:min-h-[2.25rem]
-                  flex items-center justify-center rounded-full
-                  ${today ? 'bg-[image:var(--pulse-gradient)] text-white shadow-sm' : ''}
-                `}
-              >
-                {format(date, 'd')}
-              </span>
+              {/* Fixed-height top row — keeps every cell aligned */}
+              <div className="h-5 w-full flex items-center justify-center gap-0.5 shrink-0 pt-0.5">
+                {topIcons.length > 0 ? (
+                  topIcons.map((icon, i) => (
+                    <span
+                      key={i}
+                      className="text-sm leading-none"
+                      title={icon.label}
+                      style={{ textShadow: `0 0 6px ${icon.hex}55` }}
+                    >
+                      {icon.emoji}
+                    </span>
+                  ))
+                ) : (
+                  <span className="h-4 w-4" aria-hidden />
+                )}
+              </div>
 
-              <div className="flex flex-col items-center justify-end w-full gap-1 pb-1 min-h-[1.25rem]">
-                {dayEvents.length > 0 && (
-                  <div className="flex flex-wrap justify-center gap-1 px-0.5 max-w-full">
+              <div className="flex-1 flex items-center justify-center w-full min-h-0">
+                <span
+                  className={`
+                    text-lg sm:text-xl font-semibold tabular-nums leading-none
+                    flex items-center justify-center rounded-full
+                    min-w-[2rem] min-h-[2rem] sm:min-w-[2.25rem] sm:min-h-[2.25rem]
+                    ${today ? 'bg-[image:var(--pulse-gradient)] text-white shadow-sm' : ''}
+                  `}
+                >
+                  {format(date, 'd')}
+                </span>
+              </div>
+
+              <div className="h-3.5 w-full flex items-center justify-center gap-0.5 shrink-0 pb-1">
+                {dayEvents.length > 0 ? (
+                  <>
                     {dayEvents.slice(0, 3).map((ev) => {
                       const hex = getUserCalendarHex(ev.createdBy, colorMap, currentUserId);
                       return (
                         <span
                           key={ev.id}
-                          className="h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full flex-shrink-0"
+                          className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full flex-shrink-0"
                           style={{ backgroundColor: hex }}
                           title={ev.title}
                         />
                       );
                     })}
                     {dayEvents.length > 3 && (
-                      <span className="text-[10px] font-semibold text-muted-foreground leading-none">+</span>
+                      <span className="text-[9px] font-semibold text-muted-foreground leading-none">
+                        +
+                      </span>
                     )}
-                  </div>
-                )}
-                {shiftBars.length > 0 && (
-                  <div className="w-[85%] flex flex-col items-center gap-0.5">
-                    {shiftBars.map((b, i) => (
-                      <div key={i} className="w-full flex items-center gap-0.5">
-                        <span
-                          className="text-[10px] leading-none flex-shrink-0"
-                          title={b.kind === 'night' ? 'Night shift' : 'Day shift'}
-                        >
-                          {b.kind === 'night' ? '🌙' : '☀️'}
-                        </span>
-                        <span
-                          className="flex-1 h-1 rounded-full opacity-95"
-                          style={{ backgroundColor: b.hex }}
-                        />
-                      </div>
-                    ))}
-                  </div>
+                  </>
+                ) : (
+                  <span className="h-1.5 w-1.5" aria-hidden />
                 )}
               </div>
             </button>

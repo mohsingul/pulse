@@ -2964,16 +2964,17 @@ app.post("/make-server-494d91eb/calendar/:coupleId/colors", async (c) => {
 app.put("/make-server-494d91eb/calendar/:coupleId/shift", async (c) => {
   try {
     const coupleId = c.req.param("coupleId");
-    const { userId, startDate, daysOn, daysOff } = await c.req.json();
+    const { userId, startDate, daysDay, daysNight, daysOn, daysOff } = await c.req.json();
 
     if (!coupleId || !userId || !startDate) {
       return c.json({ error: "Couple ID, user ID, and startDate are required" }, 400);
     }
 
-    const on = Number(daysOn) || 4;
+    const day = Number(daysDay ?? daysOn) || 4;
     const off = Number(daysOff) || 4;
-    if (on < 1 || on > 14 || off < 1 || off > 14) {
-      return c.json({ error: "daysOn and daysOff must be between 1 and 14" }, 400);
+    const night = Number(daysNight) || 4;
+    if (day < 1 || day > 14 || off < 1 || off > 14 || night < 1 || night > 14) {
+      return c.json({ error: "daysDay, daysOff, and daysNight must be between 1 and 14" }, 400);
     }
 
     const couple = await kv.get(`couple:${coupleId}`);
@@ -2985,7 +2986,7 @@ app.put("/make-server-494d91eb/calendar/:coupleId/shift", async (c) => {
     const existing = (await kv.get(calendarPrefsKey(coupleId))) ?? {};
     const shiftPatterns = {
       ...(existing.shiftPatterns ?? {}),
-      [userId]: { startDate, daysOn: on, daysOff: off },
+      [userId]: { startDate, daysDay: day, daysOff: off, daysNight: night },
     };
     await kv.set(calendarPrefsKey(coupleId), {
       ...existing,

@@ -390,7 +390,13 @@ export const calendarAPI = {
   setShift: (
     coupleId: string,
     userId: string,
-    data: { startDate: string; daysOn: number; daysOff: number },
+    data: {
+      startDate: string;
+      daysDay?: number;
+      daysOff: number;
+      daysNight?: number;
+      daysOn?: number;
+    },
   ) =>
     apiRequest(`/calendar/${coupleId}/shift`, {
       method: 'PUT',
