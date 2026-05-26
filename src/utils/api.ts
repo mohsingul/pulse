@@ -409,10 +409,33 @@ export const calendarAPI = {
       method: 'DELETE',
     }),
 
-  toggleOvertime: (coupleId: string, userId: string, date: string, enabled?: boolean) =>
+  toggleOvertime: (
+    coupleId: string,
+    userId: string,
+    date: string,
+    enabled?: boolean,
+    kind?: 'day' | 'night',
+  ) =>
     apiRequest(`/calendar/${coupleId}/overtime`, {
       method: 'POST',
-      body: JSON.stringify({ userId, date, enabled }),
+      body: JSON.stringify({ userId, date, enabled, kind }),
+    }),
+
+  setShiftOverride: (
+    coupleId: string,
+    userId: string,
+    date: string,
+    kind: 'day' | 'night',
+  ) =>
+    apiRequest(`/calendar/${coupleId}/overtime`, {
+      method: 'POST',
+      body: JSON.stringify({ userId, date, enabled: true, kind }),
+    }),
+
+  clearShiftOverride: (coupleId: string, userId: string, date: string) =>
+    apiRequest(`/calendar/${coupleId}/overtime`, {
+      method: 'POST',
+      body: JSON.stringify({ userId, date, enabled: false }),
     }),
 
   excludeShiftDay: (coupleId: string, userId: string, date: string, excluded = true) =>
@@ -465,6 +488,15 @@ export const calendarAPI = {
     apiRequest(`/calendar/${coupleId}/process-reminders`, {
       method: 'POST',
       body: JSON.stringify({ userId }),
+    }),
+};
+
+export const reminderAPI = {
+  /** Triggers pulse + calendar reminder processing for this user (when app opens). */
+  processForUser: (userId: string, coupleId?: string) =>
+    apiRequest(`/users/${userId}/process-reminders`, {
+      method: 'POST',
+      body: JSON.stringify({ coupleId }),
     }),
 };
 

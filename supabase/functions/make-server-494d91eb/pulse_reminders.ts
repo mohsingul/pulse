@@ -112,6 +112,72 @@ async function markPulseReminderSent(
   await kv.set(key, { sentAt: new Date().toISOString() });
 }
 
+export async function processPulseRemindersForUser(
+  sendFcmPush: SendFcmPush,
+  userId: string,
+): Promise<{ sent: number; skipped: number; processed: number }> {
+  let sent = 0;
+  let skipped = 0;
+  let processed = 0;
+
+  const prefs = (await getUserReminderPreferences(userId)) as UserReminderPreferences | null;
+  if (!prefs?.morning || !prefs?.midday || !prefs?.evening) {
+    return { sent, skipped: 1, processed };
+  }
+
+  processed++;
+
+  const user = await kv.get(`user:${userId}`);
+  if (!user?.fcmToken) {
+    return { sent, skipped: 1, processed };
+  }
+
+  const tz = typeof prefs.timezoneOffset === "number" ? prefs.timezoneOffset : 0;
+  const dateKey = localDateKey(tz);
+  const localNow = localMinutesNow(tz);
+
+  for (const period of PERIODS) {
+    const slot = prefs[period];
+    if (!slot?.enabled || !slot.time) continue;
+
+    if (await wasPulseReminderSent(userId, period, dateKey)) {
+      skipped++;
+      continue;
+    }
+
+    const target = parseTimeToMinutes(slot.time);
+    if (!isWithinTimeWindow(localNow, target)) {
+      skipped++;
+      continue;
+    }
+
+    const copy = PERIOD_COPY[period];
+    try {
+      await sendFcmPush(
+        user.fcmToken,
+        {
+          title: copy.title,
+          body: copy.body,
+          icon: "/icon-192.png",
+          badge: "/icon-192.png",
+        },
+        {
+          type: "pulse-reminder",
+          period,
+          tag: `pulse-${period}-${dateKey}`,
+        },
+      );
+      await markPulseReminderSent(userId, period, dateKey);
+      sent++;
+    } catch (err) {
+      console.error(`[Pulse Reminder] FCM failed for user ${userId}:`, err);
+      skipped++;
+    }
+  }
+
+  return { sent, skipped, processed };
+}
+
 export async function processPulseReminders(
   sendFcmPush: SendFcmPush,
 ): Promise<{ sent: number; skipped: number; processed: number }> {

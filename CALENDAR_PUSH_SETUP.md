@@ -33,6 +33,8 @@ This endpoint processes both **calendar event** and **pulse** reminders.
 After deploy, confirm the schedule in:  
 **Dashboard → Edge Functions → make-server-494d91eb → Schedules**
 
+Or use the included GitHub Action (`.github/workflows/reminder-cron.yml`) with repo secrets `SUPABASE_ANON_KEY` and `CRON_SECRET`.
+
 ## Manual test
 
 ```bash

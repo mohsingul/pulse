@@ -19,17 +19,19 @@ import {
   daysUntilEvent,
   dateRangeFromKeys,
   isMultiDayEvent,
-  isOvertimeDay,
   isShiftOnDay,
   mergeColorMap,
   migrateShiftPatternMap,
+  normalizeShiftOverrides,
+  getShiftOverrideKind,
+  isShiftExcluded,
   parseDateKey,
   formatEventTime,
   toDateKey,
   type CalendarColorMap,
   type CalendarEventType,
   type CalendarEventItem,
-  type OvertimeMap,
+  type ShiftOverrideMap,
   type ShiftExcludedMap,
   type ShiftPatternMap,
 } from '@/app/constants/calendar';
@@ -67,7 +69,7 @@ export function CoupleCalendarScreen({
     mergeColorMap(user1Id, user2Id, null),
   );
   const [shiftPatterns, setShiftPatterns] = useState<ShiftPatternMap>({});
-  const [overtimeDays, setOvertimeDays] = useState<OvertimeMap>({});
+  const [shiftOverrides, setShiftOverrides] = useState<ShiftOverrideMap>({});
   const [shiftExcludedDays, setShiftExcludedDays] = useState<ShiftExcludedMap>({});
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<CalendarTab>('month');
@@ -96,7 +98,12 @@ export function CoupleCalendarScreen({
         setColorMap(mergeColorMap(user1Id, user2Id, response.colors));
       }
       if (response.shiftPatterns) setShiftPatterns(migrateShiftPatternMap(response.shiftPatterns));
-      if (response.overtimeDays) setOvertimeDays(response.overtimeDays);
+      setShiftOverrides(
+        normalizeShiftOverrides(
+          response.shiftOverrides,
+          response.overtimeDays,
+        ),
+      );
       if (response.shiftExcludedDays) setShiftExcludedDays(response.shiftExcludedDays);
     } catch (error) {
       console.error('Error fetching calendar:', error);
@@ -177,21 +184,37 @@ export function CoupleCalendarScreen({
   };
 
   const applyCalendarPrefs = (res: {
-    overtimeDays?: OvertimeMap;
+    shiftOverrides?: ShiftOverrideMap;
+    overtimeDays?: Record<string, string[]>;
     shiftExcludedDays?: ShiftExcludedMap;
   }) => {
-    if (res.overtimeDays) setOvertimeDays(res.overtimeDays);
+    if (res.shiftOverrides || res.overtimeDays) {
+      setShiftOverrides(normalizeShiftOverrides(res.shiftOverrides, res.overtimeDays));
+    }
     if (res.shiftExcludedDays) setShiftExcludedDays(res.shiftExcludedDays);
   };
 
-  const handleMarkOnShift = async () => {
+  const handleAddDayShift = async () => {
     if (!selectedDateKey) return;
     setShiftActionSaving(true);
     try {
-      const res = await calendarAPI.toggleOvertime(coupleId, userId, selectedDateKey, true);
+      const res = await calendarAPI.setShiftOverride(coupleId, userId, selectedDateKey, 'day');
       applyCalendarPrefs(res);
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : 'Failed to update shift');
+      alert(e instanceof Error ? e.message : 'Failed to add day shift');
+    } finally {
+      setShiftActionSaving(false);
+    }
+  };
+
+  const handleAddNightShift = async () => {
+    if (!selectedDateKey) return;
+    setShiftActionSaving(true);
+    try {
+      const res = await calendarAPI.setShiftOverride(coupleId, userId, selectedDateKey, 'night');
+      applyCalendarPrefs(res);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Failed to add night shift');
     } finally {
       setShiftActionSaving(false);
     }
@@ -202,12 +225,21 @@ export function CoupleCalendarScreen({
     const onScheduled = Boolean(
       shiftPatterns[userId] && isShiftOnDay(shiftPatterns[userId], day),
     );
-    if (onScheduled) {
+    const hasOverride = Boolean(getShiftOverrideKind(shiftOverrides, userId, day));
+
+    if (onScheduled && !hasOverride) {
       const res = await calendarAPI.excludeShiftDay(coupleId, userId, dateKey, true);
       applyCalendarPrefs(res);
     }
-    if (isOvertimeDay(overtimeDays, userId, day)) {
-      const res = await calendarAPI.toggleOvertime(coupleId, userId, dateKey, false);
+    if (hasOverride) {
+      const res = await calendarAPI.clearShiftOverride(coupleId, userId, dateKey);
+      applyCalendarPrefs(res);
+    }
+    if (
+      isShiftExcluded(shiftExcludedDays, userId, day) &&
+      onScheduled
+    ) {
+      const res = await calendarAPI.excludeShiftDay(coupleId, userId, dateKey, false);
       applyCalendarPrefs(res);
     }
   };
@@ -432,7 +464,7 @@ export function CoupleCalendarScreen({
                   currentUserId={userId}
                   colorMap={colorMap}
                   shiftPatterns={shiftPatterns}
-                  overtimeDays={overtimeDays}
+                  shiftOverrides={shiftOverrides}
                   shiftExcludedDays={shiftExcludedDays}
                   user1Id={user1Id}
                   user2Id={user2Id}
@@ -611,15 +643,28 @@ export function CoupleCalendarScreen({
           partnerName={partnerName}
           colorMap={colorMap}
           shiftPatterns={shiftPatterns}
-          overtimeDays={overtimeDays}
+          shiftOverrides={shiftOverrides}
           shiftExcludedDays={shiftExcludedDays}
           user1Id={user1Id}
           user2Id={user2Id}
           onClose={() => setDaySheetOpen(false)}
           onAdd={() => openAdd(selectedDateKey)}
           onEventClick={openView}
-          onMarkOnShift={handleMarkOnShift}
-          onRemoveShift={() => setShiftRemovePromptOpen(true)}
+          onAddDayShift={handleAddDayShift}
+          onAddNightShift={handleAddNightShift}
+          onRemoveShift={() => {
+            const day = selectedDateKey ? parseDateKey(selectedDateKey) : null;
+            const onScheduled =
+              day &&
+              shiftPatterns[userId] &&
+              isShiftOnDay(shiftPatterns[userId], day) &&
+              !getShiftOverrideKind(shiftOverrides, userId, day);
+            if (onScheduled) {
+              setShiftRemovePromptOpen(true);
+            } else {
+              void clearShiftForDay(selectedDateKey!);
+            }
+          }}
           shiftActionSaving={shiftActionSaving}
         />
       )}
