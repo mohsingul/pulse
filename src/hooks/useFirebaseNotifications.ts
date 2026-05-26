@@ -11,10 +11,11 @@ import {
 } from '@/utils/firebase-notifications';
 import { userAPI } from '@/utils/api';
 import { showLocalNotification } from '@/utils/firebase-notifications';
+import { getBrowserNotificationPermission } from '@/utils/notification-guard';
 
 function onForegroundPush(payload: any) {
   console.log('[Notifications] Foreground message:', payload);
-  if (Notification.permission !== 'granted') return;
+  if (getBrowserNotificationPermission() !== 'granted') return;
 
   const tag = payload.data?.tag || `${payload.data?.type || 'aimo'}-${payload.data?.notificationId || payload.data?.senderId || ''}`;
   showLocalNotification(payload.data?.title || payload.notification?.title || 'Aimo Pulse', {

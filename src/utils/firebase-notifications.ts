@@ -4,6 +4,13 @@
 import { initializeApp } from 'firebase/app';
 import { getMessaging, getToken, onMessage, deleteToken, type Messaging } from 'firebase/messaging';
 import { firebaseConfig, vapidKey } from './firebase-config';
+import {
+  getBrowserNotificationPermission,
+  hasBrowserNotificationApi,
+  requestBrowserNotificationPermission,
+  showBrowserNotification,
+  type BrowserNotificationOptions,
+} from './notification-guard';
 
 let firebaseApp: any = null;
 let messaging: Messaging | null = null;
@@ -46,10 +53,10 @@ export function getFirebaseMessaging(): Messaging | null {
  */
 export function isPushSupported(): boolean {
   return (
+    typeof window !== 'undefined' &&
     'serviceWorker' in navigator &&
-    'Notification' in window &&
-    'PushManager' in window &&
-    typeof window !== 'undefined'
+    hasBrowserNotificationApi() &&
+    'PushManager' in window
   );
 }
 
@@ -57,21 +64,18 @@ export function isPushSupported(): boolean {
  * Get current notification permission status
  */
 export function getNotificationPermission(): NotificationPermission {
-  if (!('Notification' in window)) {
-    return 'denied';
-  }
-  return Notification.permission;
+  return getBrowserNotificationPermission();
 }
 
 /**
  * Request notification permission
  */
 export async function requestNotificationPermission(): Promise<NotificationPermission> {
-  if (!('Notification' in window)) {
+  if (!hasBrowserNotificationApi()) {
     throw new Error('Notifications not supported');
   }
 
-  const permission = await Notification.requestPermission();
+  const permission = await requestBrowserNotificationPermission();
   console.log('[Firebase] Permission:', permission);
   return permission;
 }
@@ -120,7 +124,7 @@ export async function getFCMToken(): Promise<string | null> {
     }
 
     // Check permission (should already be granted by initializeNotifications)
-    const permission = Notification.permission;
+    const permission = getBrowserNotificationPermission();
     if (permission !== 'granted') {
       throw new Error(
         permission === 'denied'
@@ -168,23 +172,12 @@ export function setupForegroundMessageListener(
  */
 export function showLocalNotification(
   title: string,
-  options: NotificationOptions
+  options: BrowserNotificationOptions
 ): void {
-  if (Notification.permission !== 'granted') {
-    console.warn('[Firebase] Notification permission not granted');
-    return;
-  }
-
-  try {
-    new Notification(title, {
-      icon: '/icon-192.png',
-      badge: '/icon-192.png',
-      vibrate: [200, 100, 200],
-      ...options,
-    });
-  } catch (error) {
-    console.error('[Firebase] Error showing notification:', error);
-  }
+  showBrowserNotification(title, {
+    vibrate: [200, 100, 200],
+    ...options,
+  });
 }
 
 /**

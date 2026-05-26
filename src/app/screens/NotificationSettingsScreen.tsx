@@ -3,6 +3,12 @@ import { Button } from '@/app/components/Button';
 import { Card } from '@/app/components/Card';
 import { ArrowLeft, Bell, MessageCircle, Heart, Sparkles, Moon, Volume2, AlertCircle, CheckCircle2, XCircle, Settings } from 'lucide-react';
 import { motion } from 'motion/react';
+import {
+  getBrowserNotificationPermission,
+  hasBrowserNotificationApi,
+  requestBrowserNotificationPermission,
+  showBrowserNotification,
+} from '@/utils/notification-guard';
 
 interface NotificationSettingsScreenProps {
   onBack: () => void;
@@ -26,28 +32,26 @@ export function NotificationSettingsScreen({ onBack }: NotificationSettingsScree
   }, []);
 
   const checkPermissionStatus = async () => {
-    if ('Notification' in window) {
-      setPermissionState(Notification.permission as PermissionState);
+    if (hasBrowserNotificationApi()) {
+      setPermissionState(getBrowserNotificationPermission() as PermissionState);
     }
   };
 
   const requestPermission = async () => {
-    if ('Notification' in window) {
-      const permission = await Notification.requestPermission();
+    if (hasBrowserNotificationApi()) {
+      const permission = await requestBrowserNotificationPermission();
       setPermissionState(permission as PermissionState);
     }
   };
 
   const testNotification = () => {
-    if (Notification.permission === 'granted') {
-      new Notification('Aimo Pulse', {
-        body: 'Your partner sent you a message 💗',
-        icon: '/icon-192.png',
-        badge: '/icon-192.png',
-        tag: 'test',
-        vibrate: [200, 100, 200],
-      });
-    }
+    showBrowserNotification('Aimo Pulse', {
+      body: 'Your partner sent you a message 💗',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: 'test',
+      vibrate: [200, 100, 200],
+    });
   };
 
   return (

@@ -1,6 +1,12 @@
 import { useEffect, useRef, type MutableRefObject } from 'react';
 import { storage } from '@/utils/storage';
 import { userAPI } from '@/utils/api';
+import {
+  getBrowserNotificationPermission,
+  hasBrowserNotificationApi,
+  showBrowserNotification,
+  type BrowserNotificationOptions,
+} from '@/utils/notification-guard';
 
 const REMINDER_EVENT_NAME = 'pulse-reminder-preferences-changed';
 
@@ -69,11 +75,11 @@ async function showReminderNotification(
   body: string,
   registration: ServiceWorkerRegistration | null
 ) {
-  if (Notification.permission !== 'granted') {
+  if (!hasBrowserNotificationApi() || getBrowserNotificationPermission() !== 'granted') {
     return;
   }
 
-  const options: NotificationOptions = {
+  const options: BrowserNotificationOptions = {
     body,
     icon: '/icon-192.png',
     badge: '/icon-192.png',
@@ -88,7 +94,7 @@ async function showReminderNotification(
       return;
     }
 
-    new Notification(title, options);
+    showBrowserNotification(title, options);
   } catch (error) {
     console.error('[Reminders] Failed to show notification:', error);
   }

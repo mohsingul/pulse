@@ -46,6 +46,11 @@ import {
   clearAppUrlParams,
 } from '@/utils/deepLink';
 import { bootstrapPushRegistration, refreshPushRegistrationIfNeeded } from '@/utils/pushBootstrap';
+import {
+  getBrowserNotificationPermission,
+  hasBrowserNotificationApi,
+  requestBrowserNotificationPermission,
+} from '@/utils/notification-guard';
 
 type Screen =
   | 'welcome'
@@ -80,7 +85,7 @@ export default function App() {
   const [showNotificationOnboarding, setShowNotificationOnboarding] = useState(false);
   const [showNotificationPermissionPrompt, setShowNotificationPermissionPrompt] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
-    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default'
+    () => getBrowserNotificationPermission(),
   );
   const [highlightCalendarEventId, setHighlightCalendarEventId] = useState<string | null>(null);
 
@@ -138,11 +143,9 @@ export default function App() {
       checkCouple(savedUser.userId);
     }
 
-    if ('Notification' in window) {
-      setNotificationPermission(Notification.permission);
-    }
+    setNotificationPermission(getBrowserNotificationPermission());
 
-    if (Notification.permission === 'granted') {
+    if (getBrowserNotificationPermission() === 'granted') {
       refreshPushRegistrationIfNeeded().catch((err) =>
         console.warn('[Push] Startup refresh failed:', err),
       );
@@ -178,7 +181,7 @@ export default function App() {
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState !== 'visible') return;
-      if (Notification.permission === 'granted') {
+      if (getBrowserNotificationPermission() === 'granted') {
         refreshPushRegistrationIfNeeded().catch((err) =>
           console.warn('[Push] Resume refresh failed:', err),
         );
@@ -189,7 +192,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (user && notificationPermission !== 'granted') {
+    if (user && hasBrowserNotificationApi() && notificationPermission !== 'granted') {
       setShowNotificationPermissionPrompt(true);
     }
   }, [user, notificationPermission]);
@@ -405,7 +408,7 @@ export default function App() {
         return;
       }
 
-      const permission = await Notification.requestPermission();
+      const permission = await requestBrowserNotificationPermission();
       setNotificationPermission(permission);
       if (permission === 'granted') {
         setShowNotificationPermissionPrompt(false);
