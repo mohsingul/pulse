@@ -37,8 +37,6 @@ interface HomeScreenProps {
   // onPlaySexyDice?: () => void;
 }
 
-const REACTIONS = ['❤️', '🫶', '😘', '😄', '🥺'];
-
 export function HomeScreen({
   userId,
   coupleId,
@@ -149,15 +147,6 @@ export function HomeScreen({
       console.error('Failed to send reassurance:', error);
       alert(error.message || 'Failed to send reassurance');
       throw error;
-    }
-  };
-
-  const handleReaction = async (emoji: string) => {
-    try {
-      await todayAPI.react(coupleId, userId, emoji);
-      await fetchTodayCard();
-    } catch (error) {
-      console.error('Error adding reaction:', error);
     }
   };
 
@@ -453,21 +442,6 @@ export function HomeScreen({
 
         {/* Actions */}
         <div className="space-y-4">
-          {/* Quick Reactions */}
-          {partnerMood && (
-            <div className="flex items-center justify-center space-x-3">
-              {REACTIONS.map((emoji) => (
-                <button
-                  key={emoji}
-                  onClick={() => handleReaction(emoji)}
-                  className="w-12 h-12 bg-accent hover:bg-accent/80 rounded-full flex items-center justify-center text-2xl transition-all hover:scale-110 active:scale-95"
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          )}
-
           {/* Update Button */}
           <Button
             variant="gradient"
