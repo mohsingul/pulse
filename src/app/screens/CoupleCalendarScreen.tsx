@@ -652,19 +652,7 @@ export function CoupleCalendarScreen({
           onEventClick={openView}
           onAddDayShift={handleAddDayShift}
           onAddNightShift={handleAddNightShift}
-          onRemoveShift={() => {
-            const day = selectedDateKey ? parseDateKey(selectedDateKey) : null;
-            const onScheduled =
-              day &&
-              shiftPatterns[userId] &&
-              isShiftOnDay(shiftPatterns[userId], day) &&
-              !getShiftOverrideKind(shiftOverrides, userId, day);
-            if (onScheduled) {
-              setShiftRemovePromptOpen(true);
-            } else {
-              void clearShiftForDay(selectedDateKey!);
-            }
-          }}
+          onRemoveShift={() => setShiftRemovePromptOpen(true)}
           shiftActionSaving={shiftActionSaving}
         />
       )}

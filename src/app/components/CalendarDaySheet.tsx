@@ -141,7 +141,26 @@ export function CalendarDaySheet({
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
           {hasMyPattern && (
             <div className="space-y-2">
-              {canAddManual && (
+              {canRemoveShift && (
+                <Button
+                  variant="secondary"
+                  className="w-full"
+                  onClick={onRemoveShift}
+                  disabled={shiftActionSaving}
+                >
+                  <Trash2 className="w-4 h-4 mr-2 inline" />
+                  {shiftActionSaving
+                    ? 'Saving…'
+                    : myOverride
+                      ? 'Remove shift'
+                      : onScheduledPattern
+                        ? 'Remove shift'
+                        : 'Remove shift'}
+                </Button>
+              )}
+
+              {/* Only show day/night options on OFF days (no shift effective) */}
+              {canAddManual && !canRemoveShift && (
                 <div className="grid grid-cols-2 gap-2">
                   <Button
                     variant="secondary"
@@ -154,7 +173,7 @@ export function CalendarDaySheet({
                   </Button>
                   <Button
                     variant="secondary"
-                    className="w-full bg-blue-500 hover:bg-blue-600 border border-blue-600 text-white"
+                    className="w-full bg-blue-600 hover:bg-blue-700 border border-blue-700 text-white shadow-sm"
                     onClick={onAddNightShift}
                     disabled={shiftActionSaving}
                   >
@@ -162,23 +181,6 @@ export function CalendarDaySheet({
                     {shiftActionSaving ? 'Saving…' : 'Night shift'}
                   </Button>
                 </div>
-              )}
-              {canRemoveShift && (
-                <Button
-                  variant="secondary"
-                  className="w-full"
-                  onClick={onRemoveShift}
-                  disabled={shiftActionSaving}
-                >
-                  <Trash2 className="w-4 h-4 mr-2 inline" />
-                  {shiftActionSaving
-                    ? 'Saving…'
-                    : myOverride
-                      ? 'Remove manual shift'
-                      : onScheduledPattern
-                        ? 'Remove shift (day off)'
-                        : 'Remove shift'}
-                </Button>
               )}
             </div>
           )}
