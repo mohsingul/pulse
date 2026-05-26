@@ -12,9 +12,11 @@ import {
   isSameMonth,
   isToday,
 } from 'date-fns';
+import { CalendarBloodDroplet } from '@/app/components/CalendarBloodDroplet';
 import {
   getEventsOnDate,
   getEffectiveShiftKind,
+  getMenstrualCycleEventsOnDate,
   getUserCalendarHex,
   isShiftExcluded,
   toDateKey,
@@ -133,7 +135,10 @@ export function CoupleMonthGrid({
           const selected = multiSelectMode ? inMulti : selectedDateKey === key;
           const today = isToday(date);
 
-          const topIcons: { emoji: string; hex: string; label: string }[] = [];
+          const topIcons: (
+            | { kind: 'shift'; emoji: string; label: string }
+            | { kind: 'cycle'; label: string }
+          )[] = [];
           for (const uid of [user1Id, user2Id]) {
             const kind = shiftIconForUser(
               uid,
@@ -144,9 +149,24 @@ export function CoupleMonthGrid({
             );
             if (kind) {
               topIcons.push({
+                kind: 'shift',
                 emoji: kind === 'night' ? '🌙' : '☀️',
-                hex: getUserCalendarHex(uid, colorMap, uid),
                 label: kind === 'night' ? 'Night shift' : 'Day shift',
+              });
+            }
+          }
+          for (const uid of [user1Id, user2Id]) {
+            const hasCycle = getMenstrualCycleEventsOnDate(
+              dayEvents.filter((e) => e.createdBy === uid),
+              date,
+            ).length > 0;
+            if (hasCycle) {
+              topIcons.push({
+                kind: 'cycle',
+                label:
+                  uid === currentUserId
+                    ? 'Menstrual cycle'
+                    : 'Partner menstrual cycle',
               });
             }
           }
@@ -158,12 +178,19 @@ export function CoupleMonthGrid({
             shiftOverrides,
             shiftExcludedDays,
           );
+          const myCycleToday =
+            getMenstrualCycleEventsOnDate(
+              dayEvents.filter((e) => e.createdBy === currentUserId),
+              date,
+            ).length > 0;
           const shiftTint =
             myShiftKind === 'day'
               ? 'bg-amber-100 border-amber-200/80 dark:bg-amber-950/50 dark:border-amber-800/50'
               : myShiftKind === 'night'
                 ? 'bg-blue-500 border-blue-600 dark:bg-blue-600 dark:border-blue-700'
-                : '';
+                : myCycleToday
+                  ? 'bg-rose-50 border-rose-200/90 dark:bg-rose-950/40 dark:border-rose-900/60'
+                  : '';
 
           return (
             <button
@@ -193,11 +220,14 @@ export function CoupleMonthGrid({
                   topIcons.map((icon, i) => (
                     <span
                       key={i}
-                      className="text-sm leading-none"
+                      className="inline-flex items-center justify-center leading-none"
                       title={icon.label}
-                      style={{ textShadow: `0 0 6px ${icon.hex}55` }}
                     >
-                      {icon.emoji}
+                      {icon.kind === 'cycle' ? (
+                        <CalendarBloodDroplet />
+                      ) : (
+                        <span className="text-sm">{icon.emoji}</span>
+                      )}
                     </span>
                   ))
                 ) : (

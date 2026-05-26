@@ -3,7 +3,8 @@ export type CalendarEventType =
   | 'birthday'
   | 'trip'
   | 'holiday'
-  | 'important';
+  | 'important'
+  | 'menstrual_cycle';
 
 export const CALENDAR_EVENT_TYPES: {
   id: CalendarEventType;
@@ -15,7 +16,21 @@ export const CALENDAR_EVENT_TYPES: {
   { id: 'trip', label: 'Trip', emoji: '✈️' },
   { id: 'holiday', label: 'Holiday', emoji: '🏖️' },
   { id: 'important', label: 'Important event', emoji: '⭐' },
+  { id: 'menstrual_cycle', label: 'Menstrual cycle', emoji: '🩸' },
 ];
+
+export function isMenstrualCycleEvent(
+  event: { type?: CalendarEventType },
+): boolean {
+  return event.type === 'menstrual_cycle';
+}
+
+export function getMenstrualCycleEventsOnDate<T extends { type?: CalendarEventType; createdBy?: string }>(
+  events: T[],
+  day: Date,
+): T[] {
+  return events.filter((e) => isMenstrualCycleEvent(e) && eventOccursOnDate(e, day));
+}
 
 export function getCalendarTypeMeta(type: CalendarEventType) {
   return CALENDAR_EVENT_TYPES.find((t) => t.id === type) ?? CALENDAR_EVENT_TYPES[3];
@@ -26,6 +41,12 @@ export function daysUntilEvent(dateStr: string, type?: CalendarEventType): numbe
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const [y, m, d] = dateStr.split('-').map(Number);
+
+  if (type === 'menstrual_cycle') {
+    const target = new Date(y, m - 1, d);
+    if (target < today) return -1;
+    return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  }
 
   const isAnnual =
     type === 'anniversary' || type === 'birthday' || type === 'holiday';

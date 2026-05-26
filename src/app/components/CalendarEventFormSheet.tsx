@@ -107,6 +107,7 @@ export function CalendarEventFormSheet({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !date) return;
+    if (type === 'menstrual_cycle' && (!endDate || endDate < date)) return;
     onSave({
       type,
       title: title.trim(),
@@ -217,12 +218,29 @@ export function CalendarEventFormSheet({
                   <button
                     key={t.id}
                     type="button"
-                    onClick={() => setType(t.id)}
+                    onClick={() => {
+                      setType(t.id);
+                      if (t.id === 'menstrual_cycle' && !title.trim()) {
+                        setTitle('Menstrual cycle');
+                      }
+                    }}
                     className={`p-3 rounded-xl border-2 text-sm font-medium transition-all active:scale-[0.98] ${
-                      type === t.id ? 'border-[#A83FFF] bg-[#A83FFF]/10' : 'border-border'
+                      type === t.id
+                        ? t.id === 'menstrual_cycle'
+                          ? 'border-rose-500 bg-rose-500/10'
+                          : 'border-[#A83FFF] bg-[#A83FFF]/10'
+                        : 'border-border'
                     }`}
                   >
-                    {t.emoji} {t.label}
+                    {t.id === 'menstrual_cycle' ? (
+                      <span className="inline-flex items-center gap-1">
+                        <span className="text-rose-600">🩸</span> {t.label}
+                      </span>
+                    ) : (
+                      <>
+                        {t.emoji} {t.label}
+                      </>
+                    )}
                   </button>
                 ))}
               </div>
@@ -245,20 +263,29 @@ export function CalendarEventFormSheet({
                   required
                 />
                 <Input
-                  label="End date (optional)"
+                  label={type === 'menstrual_cycle' ? 'End date' : 'End date (optional)'}
                   type="date"
                   value={endDate}
                   min={date}
                   onChange={(e) => setEndDate(e.target.value)}
+                  required={type === 'menstrual_cycle'}
                 />
               </div>
-              <Input
-                key={`time-${formKey}-${mode}-${event?.id ?? 'new'}`}
-                label="Time (optional)"
-                type="time"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-              />
+              {type === 'menstrual_cycle' && (
+                <p className="text-xs text-rose-600/90 dark:text-rose-400 -mt-2">
+                  Each day in this range shows a red droplet on the calendar. Shark Mode
+                  turns on automatically for you on those days and your partner is notified.
+                </p>
+              )}
+              {type !== 'menstrual_cycle' && (
+                <Input
+                  key={`time-${formKey}-${mode}-${event?.id ?? 'new'}`}
+                  label="Time (optional)"
+                  type="time"
+                  value={time}
+                  onChange={(e) => setTime(e.target.value)}
+                />
+              )}
               <Input
                 label="Notes"
                 placeholder="Optional notes"

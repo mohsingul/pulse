@@ -448,7 +448,13 @@ export const calendarAPI = {
     coupleId: string,
     userId: string,
     data: {
-      type: 'anniversary' | 'birthday' | 'trip' | 'holiday' | 'important';
+      type:
+        | 'anniversary'
+        | 'birthday'
+        | 'trip'
+        | 'holiday'
+        | 'important'
+        | 'menstrual_cycle';
       title: string;
       date: string;
       endDate?: string;
@@ -471,7 +477,13 @@ export const calendarAPI = {
     eventId: string,
     userId: string,
     data: {
-      type: 'anniversary' | 'birthday' | 'trip' | 'holiday' | 'important';
+      type:
+        | 'anniversary'
+        | 'birthday'
+        | 'trip'
+        | 'holiday'
+        | 'important'
+        | 'menstrual_cycle';
       title: string;
       date: string;
       endDate?: string;

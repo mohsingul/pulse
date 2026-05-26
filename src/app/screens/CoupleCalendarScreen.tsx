@@ -178,6 +178,28 @@ export function CoupleCalendarScreen({
     openAdd(range.start, range.end !== range.start ? range.end : undefined);
   };
 
+  const saveMenstrualCycleFromSelection = async () => {
+    const range = dateRangeFromKeys(multiSelectedKeys);
+    if (!range) return;
+    setSaving(true);
+    try {
+      await calendarAPI.create(coupleId, userId, {
+        type: 'menstrual_cycle',
+        title: 'Menstrual cycle',
+        date: range.start,
+        endDate: range.end,
+      });
+      await fetchEvents();
+      const [y, m] = range.start.split('-').map(Number);
+      setViewMonth(new Date(y, m - 1, 1));
+      exitMultiSelect();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Failed to save menstrual cycle');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const exitMultiSelect = () => {
     setMultiSelectMode(false);
     setMultiSelectedKeys([]);
@@ -454,7 +476,7 @@ export function CoupleCalendarScreen({
                 </div>
                 {multiSelectMode && (
                   <p className="text-xs text-center text-muted-foreground mb-2">
-                    Tap days to select, then add one event across all selected dates
+                    Tap days to select, then mark menstrual cycle or add another event
                   </p>
                 )}
                 <CoupleMonthGrid
@@ -508,8 +530,17 @@ export function CoupleCalendarScreen({
                   <p className="text-sm font-semibold text-center">
                     {multiSelectedKeys.length} day{multiSelectedKeys.length === 1 ? '' : 's'} selected
                   </p>
-                  <Button variant="gradient" size="sm" onClick={openAddFromMultiSelect}>
-                    Add event for selected days
+                  <Button
+                    variant="gradient"
+                    size="sm"
+                    className="bg-rose-600 hover:bg-rose-700 border-rose-700"
+                    onClick={saveMenstrualCycleFromSelection}
+                    disabled={saving}
+                  >
+                    {saving ? 'Saving…' : '🩸 Mark menstrual cycle'}
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={openAddFromMultiSelect}>
+                    Add other event for selected days
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => setMultiSelectedKeys([])}>
                     Clear selection

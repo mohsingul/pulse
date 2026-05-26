@@ -14,7 +14,13 @@ type ReminderSlotId = (typeof REMINDER_SLOTS)[number]["id"];
 
 const SLOT_WINDOW_MINUTES = 20;
 
-type CalendarEventType = "anniversary" | "birthday" | "trip" | "holiday" | "important";
+type CalendarEventType =
+  | "anniversary"
+  | "birthday"
+  | "trip"
+  | "holiday"
+  | "important"
+  | "menstrual_cycle";
 
 type CalendarEvent = {
   id: string;
@@ -277,6 +283,10 @@ export async function processCalendarReminders(
   for (const event of allEvents as CalendarEvent[]) {
     if (!event?.coupleId || !event?.id || !event?.date || !event?.type) continue;
     if (coupleIdFilter && event.coupleId !== coupleIdFilter) continue;
+    if (event.type === "menstrual_cycle") {
+      skipped++;
+      continue;
+    }
 
     processed++;
 

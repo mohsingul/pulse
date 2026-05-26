@@ -1,6 +1,12 @@
 import * as kv from "./kv_store.ts";
 
-type CalendarEventType = "anniversary" | "birthday" | "trip" | "holiday" | "important";
+type CalendarEventType =
+  | "anniversary"
+  | "birthday"
+  | "trip"
+  | "holiday"
+  | "important"
+  | "menstrual_cycle";
 
 type CalendarEvent = {
   id: string;
@@ -26,6 +32,7 @@ const TYPE_LABELS: Record<CalendarEventType, string> = {
   trip: "Trip",
   holiday: "Holiday",
   important: "Important event",
+  menstrual_cycle: "Menstrual cycle",
 };
 
 function buildCalendarDeepLink(coupleId: string, eventId: string): string {

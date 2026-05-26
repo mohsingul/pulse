@@ -4,6 +4,7 @@ import { logger } from "npm:hono/logger";
 import * as kv from "./kv_store.ts";
 import { processCalendarReminders } from "./calendar_reminders.ts";
 import { notifyPartnerCalendarEventAdded } from "./calendar_event_notifications.ts";
+import { processMenstrualCycleSharkMode } from "./menstrual_cycle_shark.ts";
 import {
   processPulseReminders,
   processPulseRemindersForUser,
@@ -2762,7 +2763,13 @@ app.post("/make-server-494d91eb/partner-needs/:coupleId", async (c) => {
 
 // ===== COUPLE CALENDAR =====
 
-type CalendarEventType = "anniversary" | "birthday" | "trip" | "holiday" | "important";
+type CalendarEventType =
+  | "anniversary"
+  | "birthday"
+  | "trip"
+  | "holiday"
+  | "important"
+  | "menstrual_cycle";
 
 const CALENDAR_COLOR_IDS = ["rose", "blue", "purple", "teal", "orange", "gold", "green", "coral"];
 
@@ -3130,6 +3137,7 @@ app.post("/make-server-494d91eb/calendar/:coupleId", async (c) => {
       "trip",
       "holiday",
       "important",
+      "menstrual_cycle",
     ];
     if (!validTypes.includes(type)) {
       return c.json({ error: "Invalid event type" }, 400);
@@ -3178,6 +3186,12 @@ app.post("/make-server-494d91eb/calendar/:coupleId", async (c) => {
       console.error(`[Calendar] Post-create reminder check failed:`, err);
     });
 
+    if (type === "menstrual_cycle") {
+      processMenstrualCycleSharkMode(sendFcmPush, coupleId).catch((err) => {
+        console.error(`[Calendar] Menstrual shark mode check failed:`, err);
+      });
+    }
+
     return c.json({ success: true, event });
   } catch (error: any) {
     console.error(`[Calendar] Error creating event:`, error);
@@ -3215,7 +3229,8 @@ app.post("/make-server-494d91eb/calendar/process-reminders", async (c) => {
 
     const calendar = await processCalendarReminders(sendFcmPush);
     const pulse = await processPulseReminders(sendFcmPush);
-    return c.json({ success: true, calendar, pulse });
+    const menstrual = await processMenstrualCycleSharkMode(sendFcmPush);
+    return c.json({ success: true, calendar, pulse, menstrual });
   } catch (error: any) {
     console.error(`[Calendar] process-reminders failed:`, error);
     return c.json({ error: error.message || "Failed to process calendar reminders" }, 500);
@@ -3239,7 +3254,8 @@ app.post("/make-server-494d91eb/calendar/:coupleId/process-reminders", async (c)
 
     const calendar = await processCalendarReminders(sendFcmPush, coupleId);
     const pulse = await processPulseRemindersForUser(sendFcmPush, userId);
-    return c.json({ success: true, calendar, pulse });
+    const menstrual = await processMenstrualCycleSharkMode(sendFcmPush, coupleId);
+    return c.json({ success: true, calendar, pulse, menstrual });
   } catch (error: any) {
     console.error(`[Calendar] couple process-reminders failed:`, error);
     return c.json({ error: error.message || "Failed to process calendar reminders" }, 500);
@@ -3284,6 +3300,7 @@ app.put("/make-server-494d91eb/calendar/:coupleId/:eventId", async (c) => {
       "trip",
       "holiday",
       "important",
+      "menstrual_cycle",
     ];
     if (!validTypes.includes(type)) {
       return c.json({ error: "Invalid event type" }, 400);
@@ -3325,6 +3342,12 @@ app.put("/make-server-494d91eb/calendar/:coupleId/:eventId", async (c) => {
     processCalendarReminders(sendFcmPush, coupleId).catch((err) => {
       console.error(`[Calendar] Post-update reminder check failed:`, err);
     });
+
+    if (type === "menstrual_cycle") {
+      processMenstrualCycleSharkMode(sendFcmPush, coupleId).catch((err) => {
+        console.error(`[Calendar] Menstrual shark mode check failed:`, err);
+      });
+    }
 
     return c.json({ success: true, event });
   } catch (error: any) {
