@@ -46,7 +46,7 @@ export function daysUntilEvent(dateStr: string, type?: CalendarEventType): numbe
 /** Show reminders on home when event is within push schedule (0–5 days). */
 export const CALENDAR_REMINDER_WINDOW_DAYS = 5;
 
-/** Push reminders twice daily (morning + evening) while in window (matches server). */
+/** Push reminders 3x daily (morning + afternoon + evening) while in window (matches server). */
 export function isInCalendarPushReminderWindow(daysUntil: number): boolean {
   return daysUntil >= 0 && daysUntil <= CALENDAR_REMINDER_WINDOW_DAYS;
 }
