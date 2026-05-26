@@ -202,7 +202,7 @@ export function HomeScreen({
   const calendarReminders = getUpcomingCalendarReminders(calendarEvents);
 
   return (
-    <div className="h-full w-full flex flex-col bg-background">
+    <div className="min-h-[100dvh] min-h-screen w-full flex flex-col bg-background">
       {/* Server Error Banner */}
       {loadingError && (
         <div className="px-6 pt-4 safe-top">

@@ -18,9 +18,13 @@ export function useSessionLifecycle(onSessionEnd?: () => void) {
       endSession();
     };
 
-    window.addEventListener('pagehide', handlePageHide);
+    // Delay attaching pagehide so iOS Safari doesn't fire it during initial paint
+    const attachTimer = window.setTimeout(() => {
+      window.addEventListener('pagehide', handlePageHide);
+    }, 500);
 
     return () => {
+      window.clearTimeout(attachTimer);
       window.removeEventListener('pagehide', handlePageHide);
     };
   }, [onSessionEnd]);

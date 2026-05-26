@@ -719,7 +719,7 @@ export default function App() {
   };
 
   return (
-    <div className="h-full w-full bg-background text-foreground overflow-auto">
+    <div className="min-h-[100dvh] min-h-screen w-full bg-background text-foreground overflow-auto">
       {renderScreen()}
 
       {/* Notification permission prompt */}

@@ -112,13 +112,28 @@ self.addEventListener('notificationclick', (event) => {
 cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
 
+// Always prefer network for HTML shell so deploys don't serve stale index → missing JS chunks
 registerRoute(
   ({ request }) => request.mode === 'navigate',
   new NetworkFirst({
     cacheName: 'pages-cache',
-    plugins: [new ExpirationPlugin({ maxEntries: 50 })],
+    networkTimeoutSeconds: 5,
+    plugins: [
+      new ExpirationPlugin({
+        maxEntries: 5,
+        maxAgeSeconds: 60 * 60,
+      }),
+    ],
   })
 );
+
+self.addEventListener('install', () => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
 
 registerRoute(
   ({ request }) => ['script', 'style'].includes(request.destination),
