@@ -38,7 +38,7 @@ import { NotificationPermissionPrompt } from '@/app/components/NotificationPermi
 import { useFirebaseNotifications } from '@/hooks/useFirebaseNotifications';
 import { useReminderNotifications, syncReminderPreferencesToServer } from '@/hooks/useReminderNotifications';
 import { useSessionLifecycle } from '@/hooks/useSessionLifecycle';
-import { calendarAPI } from '@/utils/api';
+import { calendarAPI, reminderAPI } from '@/utils/api';
 import {
   parseAppDeepLink,
   savePendingCalendarEvent,
@@ -211,22 +211,25 @@ export default function App() {
     });
   }, [pushUserId, notificationPermission]);
 
-  // Sync calendar event reminders once per day (works after re-open without logging in)
+  // Server-side FCM reminders when app opens (pulse + calendar); cron handles when fully closed
   useEffect(() => {
-    if (!pushUserId || !pairedCoupleId || notificationPermission !== 'granted') {
+    if (!pushUserId || notificationPermission !== 'granted') {
       return;
     }
 
     const today = new Date().toISOString().slice(0, 10);
-    const storageKey = `calendar_reminders_synced_${pairedCoupleId}`;
-    if (localStorage.getItem(storageKey) === today) {
+    const storageKey = `reminders_synced_${pushUserId}_${today}`;
+    if (sessionStorage.getItem(storageKey) === '1') {
       return;
     }
 
-    calendarAPI
-      .processReminders(pairedCoupleId, pushUserId)
-      .then(() => localStorage.setItem(storageKey, today))
-      .catch((err) => console.warn('[Calendar] Reminder sync failed:', err));
+    const run = pairedCoupleId
+      ? calendarAPI.processReminders(pairedCoupleId, pushUserId)
+      : reminderAPI.processForUser(pushUserId);
+
+    Promise.resolve(run)
+      .then(() => sessionStorage.setItem(storageKey, '1'))
+      .catch((err) => console.warn('[Reminders] Sync failed:', err));
   }, [pushUserId, pairedCoupleId, notificationPermission]);
 
   // Show notification onboarding after successful pairing

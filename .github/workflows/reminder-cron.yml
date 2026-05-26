@@ -1,0 +1,21 @@
+# Sends calendar + pulse FCM reminders every 15 minutes when the app is closed.
+# Add repository secrets: SUPABASE_ANON_KEY, CRON_SECRET (same as Supabase Edge Function secret)
+name: Reminder push cron
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  process-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Supabase process-reminders
+        run: |
+          curl -sfS -X POST \
+            "https://iqwfevbjeohdvdbemgxp.supabase.co/functions/v1/make-server-494d91eb/calendar/process-reminders" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json"
