@@ -22,6 +22,7 @@ import {
   isOvertimeDay,
   isShiftOnDay,
   mergeColorMap,
+  migrateShiftPatternMap,
   parseDateKey,
   formatEventTime,
   toDateKey,
@@ -94,7 +95,7 @@ export function CoupleCalendarScreen({
       if (response.colors) {
         setColorMap(mergeColorMap(user1Id, user2Id, response.colors));
       }
-      if (response.shiftPatterns) setShiftPatterns(response.shiftPatterns);
+      if (response.shiftPatterns) setShiftPatterns(migrateShiftPatternMap(response.shiftPatterns));
       if (response.overtimeDays) setOvertimeDays(response.overtimeDays);
       if (response.shiftExcludedDays) setShiftExcludedDays(response.shiftExcludedDays);
     } catch (error) {

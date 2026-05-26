@@ -7,6 +7,7 @@ import {
   CALENDAR_COLOR_PALETTE,
   getPaletteColor,
   getShiftCyclePhase,
+  migrateShiftPatternMap,
   mergeColorMap,
   parseDateKey,
   SHIFT_DAYS_DAY,
@@ -60,7 +61,7 @@ export function CalendarSettingsPanel({
       const merged = mergeColorMap(user1Id, user2Id, data.colors);
       setColorMap(merged);
       setMyColorId(merged[userId] ?? 'rose');
-      setShiftPatterns(data.shiftPatterns ?? {});
+      setShiftPatterns(migrateShiftPatternMap(data.shiftPatterns));
       const mine = data.shiftPatterns?.[userId];
       if (mine?.startDate) {
         setShiftStart(mine.startDate);
@@ -82,9 +83,10 @@ export function CalendarSettingsPanel({
       daysDay: SHIFT_DAYS_DAY,
       daysOff: SHIFT_DAYS_OFF,
       daysNight: SHIFT_DAYS_NIGHT,
+      daysOffAfterNight: SHIFT_DAYS_OFF,
     };
     const start = parseDateKey(shiftStart);
-    return Array.from({ length: 21 }, (_, i) => {
+    return Array.from({ length: 28 }, (_, i) => {
       const day = addDays(start, i);
       const phase = getShiftCyclePhase(pattern, day);
       return {
@@ -126,8 +128,9 @@ export function CalendarSettingsPanel({
         daysDay: SHIFT_DAYS_DAY,
         daysOff: SHIFT_DAYS_OFF,
         daysNight: SHIFT_DAYS_NIGHT,
+        daysOffAfterNight: SHIFT_DAYS_OFF,
       });
-      if (res.shiftPatterns) setShiftPatterns(res.shiftPatterns);
+      if (res.shiftPatterns) setShiftPatterns(migrateShiftPatternMap(res.shiftPatterns));
       setShiftSaved(true);
       setTimeout(() => setShiftSaved(false), 2000);
     } catch (e: unknown) {
@@ -142,7 +145,7 @@ export function CalendarSettingsPanel({
     setShiftSaving(true);
     try {
       const res = await calendarAPI.clearShift(coupleId, userId);
-      if (res.shiftPatterns) setShiftPatterns(res.shiftPatterns);
+      if (res.shiftPatterns) setShiftPatterns(migrateShiftPatternMap(res.shiftPatterns));
       setShiftStart(toDateKey(new Date()));
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : 'Could not clear shift');
@@ -214,29 +217,31 @@ export function CalendarSettingsPanel({
       <div className="space-y-3">
         <h3 className="text-lg font-semibold">Work shift pattern</h3>
         <p className="text-sm text-muted-foreground">
-          Repeating cycle: <strong>4 days</strong> ☀️ → <strong>4 days off</strong> → <strong>4 nights</strong>{' '}
-          🌙. Shown on the shared calendar for one year from your start date.
+          Repeating cycle: <strong>4 days</strong> ☀️ → <strong>4 off</strong> → <strong>4 nights</strong> 🌙 →{' '}
+          <strong>4 off</strong>, then repeats. Shown on the shared calendar for one year from your start date.
         </p>
         <Card className="p-4 space-y-4">
           <Input
-            label="First day of day shift (☀️)"
+            label="First day of your 4 day shifts (☀️ — first yellow day in your roster)"
             type="date"
             value={shiftStart}
             onChange={(e) => setShiftStart(e.target.value)}
           />
 
           <div>
-            <p className="text-xs font-semibold text-muted-foreground mb-2">Preview (3 weeks)</p>
+            <p className="text-xs font-semibold text-muted-foreground mb-2">Preview (4 weeks)</p>
             <div className="flex flex-wrap gap-1">
               {previewDays.map((d) => {
-                const isWork = d.phase === 'day' || d.phase === 'night';
+                const tint =
+                  d.phase === 'day'
+                    ? 'bg-amber-100 text-amber-950 border border-amber-200'
+                    : d.phase === 'night'
+                      ? 'bg-blue-500 text-white border border-blue-600'
+                      : 'bg-accent text-muted-foreground border border-transparent';
                 return (
                   <span
                     key={d.key}
-                    className={`text-[10px] px-2 py-1 rounded-md font-medium min-w-[2.5rem] text-center ${
-                      isWork ? 'text-white' : 'bg-accent text-muted-foreground'
-                    }`}
-                    style={isWork ? { backgroundColor: getPaletteColor(myColorId) } : undefined}
+                    className={`text-[10px] px-2 py-1 rounded-md font-medium min-w-[2.5rem] text-center ${tint}`}
                   >
                     {d.phase === 'night' ? '🌙 ' : d.phase === 'day' ? '☀️ ' : ''}
                     {d.label}

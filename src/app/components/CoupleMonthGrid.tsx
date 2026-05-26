@@ -160,6 +160,20 @@ export function CoupleMonthGrid({
             }
           }
 
+          const myShiftKind = shiftIconForUser(
+            currentUserId,
+            date,
+            shiftPatterns,
+            overtimeDays,
+            shiftExcludedDays,
+          );
+          const shiftTint =
+            myShiftKind === 'day'
+              ? 'bg-amber-100 border-amber-200/80 dark:bg-amber-950/50 dark:border-amber-800/50'
+              : myShiftKind === 'night'
+                ? 'bg-blue-500 border-blue-600 dark:bg-blue-600 dark:border-blue-700'
+                : '';
+
           return (
             <button
               key={key}
@@ -167,16 +181,19 @@ export function CoupleMonthGrid({
               onClick={() => onDayPress(key)}
               className={`
                 relative flex flex-col items-center w-full aspect-square
-                rounded-2xl transition-all duration-150 active:scale-[0.97]
+                rounded-2xl border border-transparent transition-all duration-150 active:scale-[0.97]
+                ${shiftTint}
                 ${!inMonth ? 'opacity-30' : ''}
                 ${
                   selected
                     ? multiSelectMode
                       ? 'ring-2 ring-[#A83FFF] bg-[#A83FFF]/25'
                       : 'ring-2 ring-[#A83FFF] bg-[#A83FFF]/15'
-                    : 'hover:bg-accent/50'
+                    : !shiftTint
+                      ? 'hover:bg-accent/50'
+                      : 'hover:brightness-95'
                 }
-                ${today && !selected ? 'bg-accent/50' : ''}
+                ${today && !selected && !shiftTint ? 'bg-accent/50' : ''}
               `}
             >
               {/* Fixed-height top row — keeps every cell aligned */}
@@ -203,6 +220,7 @@ export function CoupleMonthGrid({
                     text-lg sm:text-xl font-semibold tabular-nums leading-none
                     flex items-center justify-center rounded-full
                     min-w-[2rem] min-h-[2rem] sm:min-w-[2.25rem] sm:min-h-[2.25rem]
+                    ${myShiftKind === 'night' && !today ? 'text-white' : ''}
                     ${today ? 'bg-[image:var(--pulse-gradient)] text-white shadow-sm' : ''}
                   `}
                 >

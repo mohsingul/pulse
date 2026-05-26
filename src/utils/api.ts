@@ -395,6 +395,7 @@ export const calendarAPI = {
       daysDay?: number;
       daysOff: number;
       daysNight?: number;
+      daysOffAfterNight?: number;
       daysOn?: number;
     },
   ) =>
