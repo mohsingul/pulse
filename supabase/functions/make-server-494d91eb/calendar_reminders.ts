@@ -3,10 +3,11 @@ import * as kv from "./kv_store.ts";
 const REMINDER_WINDOW_MAX = 5;
 const APP_URL = Deno.env.get("APP_URL") || "https://aimopulse.vercel.app";
 
-/** Two reminder passes per day while an event is 0–5 days away (morning + evening). */
+/** Three reminder passes per day while an event is 0–5 days away (morning + afternoon + evening). */
 const REMINDER_SLOTS = [
   { id: "morning", targetMinutes: 9 * 60 },
-  { id: "evening", targetMinutes: 18 * 60 },
+  { id: "afternoon", targetMinutes: 15 * 60 },
+  { id: "evening", targetMinutes: 21 * 60 },
 ] as const;
 
 type ReminderSlotId = (typeof REMINDER_SLOTS)[number]["id"];
