@@ -1,4 +1,4 @@
-import { reminderAPI, userAPI } from '@/utils/api';
+import { userAPI } from '@/utils/api';
 import { getFCMToken } from '@/utils/firebase-notifications';
 import { storage } from '@/utils/storage';
 import { syncReminderPreferencesToServer } from '@/hooks/useReminderNotifications';
@@ -27,17 +27,7 @@ export async function refreshPushRegistrationIfNeeded(): Promise<void> {
   try {
     await bootstrapPushRegistration(userId);
     await syncReminderPreferencesToServer(userId);
-
-    const coupleId = storage.getPairedCoupleId();
-    if (coupleId) {
-      await reminderAPI.processForUser(userId, coupleId).catch((err) => {
-        console.warn('[Push] Reminder processing failed:', err);
-      });
-    } else {
-      await reminderAPI.processForUser(userId).catch((err) => {
-        console.warn('[Push] Pulse reminder processing failed:', err);
-      });
-    }
+    // Calendar/pulse reminders run once per day from App.tsx (avoids duplicate pushes on resume).
   } catch (error) {
     console.warn('[Push] Background refresh failed:', error);
   }

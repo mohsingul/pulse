@@ -3252,7 +3252,7 @@ app.post("/make-server-494d91eb/calendar/:coupleId/process-reminders", async (c)
       return c.json({ error: "Not authorized for this couple" }, 403);
     }
 
-    const calendar = await processCalendarReminders(sendFcmPush, coupleId);
+    const calendar = await processCalendarReminders(sendFcmPush, coupleId, { onlyUserId: userId });
     const pulse = await processPulseRemindersForUser(sendFcmPush, userId);
     const menstrual = await processMenstrualCycleSharkMode(sendFcmPush, coupleId);
     return c.json({ success: true, calendar, pulse, menstrual });
@@ -3273,7 +3273,7 @@ app.post("/make-server-494d91eb/users/:userId/process-reminders", async (c) => {
     if (coupleId) {
       const couple = await kv.get(`couple:${coupleId}`);
       if (couple && (couple.user1Id === userId || couple.user2Id === userId)) {
-        calendar = await processCalendarReminders(sendFcmPush, coupleId);
+        calendar = await processCalendarReminders(sendFcmPush, coupleId, { onlyUserId: userId });
       }
     }
 

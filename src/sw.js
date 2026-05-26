@@ -23,10 +23,15 @@ messaging.onBackgroundMessage((payload) => {
   const notificationBody =
     payload.data?.body || payload.notification?.body || 'You have a new update';
 
+  const isCalendarReminder = payload.data?.type === 'calendar-reminder';
+  const defaultIcon = isCalendarReminder
+    ? '/calendar-notification-icon.png'
+    : '/icon-192.png';
+
   const notificationOptions = {
     body: notificationBody,
-    icon: payload.notification?.icon || '/icon-192.png',
-    badge: '/icon-192.png',
+    icon: payload.data?.icon || payload.notification?.icon || defaultIcon,
+    badge: isCalendarReminder ? '/calendar-notification-icon.png' : '/icon-192.png',
     tag: payload.data?.tag || payload.data?.type || 'aimo-pulse',
     data: {
       url: payload.data?.url || '/',

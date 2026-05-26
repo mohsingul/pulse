@@ -17,13 +17,17 @@ function onForegroundPush(payload: any) {
   console.log('[Notifications] Foreground message:', payload);
   if (getBrowserNotificationPermission() !== 'granted') return;
 
+  const isCalendar = payload.data?.type === 'calendar-reminder';
   const tag = payload.data?.tag || `${payload.data?.type || 'aimo'}-${payload.data?.notificationId || payload.data?.senderId || ''}`;
-  showLocalNotification(payload.data?.title || payload.notification?.title || 'Aimo Pulse', {
-    body: payload.data?.body || payload.notification?.body || '',
-    icon: '/icon-192.png',
-    tag,
-    data: payload.data,
-  });
+  showLocalNotification(
+    payload.data?.title || payload.notification?.title || (isCalendar ? 'Calendar' : 'Aimo Pulse'),
+    {
+      body: payload.data?.body || payload.notification?.body || '',
+      icon: payload.data?.icon || (isCalendar ? '/calendar-notification-icon.png' : '/icon-192.png'),
+      tag,
+      data: payload.data,
+    },
+  );
 }
 
 export interface NotificationState {

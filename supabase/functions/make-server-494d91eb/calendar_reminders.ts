@@ -2,6 +2,8 @@ import * as kv from "./kv_store.ts";
 
 const REMINDER_WINDOW_MAX = 5;
 const APP_URL = Deno.env.get("APP_URL") || "https://aimopulse.vercel.app";
+const CALENDAR_NOTIFICATION_ICON = "/calendar-notification-icon.png";
+const CALENDAR_NOTIFICATION_TITLE = "Calendar";
 
 /** Three reminder passes per day while an event is 0–5 days away (morning + afternoon + evening). */
 const REMINDER_SLOTS = [
@@ -143,30 +145,30 @@ export function getCalendarReminderMessage(
 
   if (daysUntil === 0) {
     if (event.type === "anniversary") {
-      return { title: "Aimo Pulse", body: "❤️ Happy Anniversary!" };
+      return { title: CALENDAR_NOTIFICATION_TITLE, body: "Happy Anniversary!" };
     }
     if (event.type === "birthday") {
-      return { title: "Aimo Pulse", body: `❤️ Happy Birthday — ${name}!` };
+      return { title: CALENDAR_NOTIFICATION_TITLE, body: `Happy Birthday — ${name}!` };
     }
     if (event.type === "holiday") {
-      return { title: "Aimo Pulse", body: `❤️ Happy Holiday — ${name}!` };
+      return { title: CALENDAR_NOTIFICATION_TITLE, body: `Happy Holiday — ${name}!` };
     }
     if (event.endDate && event.endDate !== event.date) {
-      return { title: "Aimo Pulse", body: `❤️ ${name} is happening today` };
+      return { title: CALENDAR_NOTIFICATION_TITLE, body: `${name} is happening today` };
     }
-    return { title: "Aimo Pulse", body: `❤️ Today is ${name}!` };
+    return { title: CALENDAR_NOTIFICATION_TITLE, body: `Today is ${name}!` };
   }
 
   if (daysUntil === 1) {
     return {
-      title: "Aimo Pulse",
-      body: `❤️ Tomorrow is your ${name}`,
+      title: CALENDAR_NOTIFICATION_TITLE,
+      body: `Tomorrow is your ${name}`,
     };
   }
 
   return {
-    title: "Aimo Pulse",
-    body: `❤️ Your ${name} is in ${daysUntil} days`,
+    title: CALENDAR_NOTIFICATION_TITLE,
+    body: `Your ${name} is in ${daysUntil} days`,
   };
 }
 
@@ -186,43 +188,60 @@ function localMinutesNow(timezoneOffset: number): number {
   return ((local % 1440) + 1440) % 1440;
 }
 
-function isWithinTimeWindow(localMinutes: number, targetMinutes: number): boolean {
-  const diff = Math.abs(localMinutes - targetMinutes);
-  return diff <= SLOT_WINDOW_MINUTES || diff >= 1440 - SLOT_WINDOW_MINUTES;
-}
-
 async function getUserTimezoneOffset(userId: string): Promise<number> {
   const prefs = await kv.get(`user_reminder_prefs:${userId}`);
   return typeof prefs?.timezoneOffset === "number" ? prefs.timezoneOffset : 0;
 }
 
-async function wasReminderSentForSlot(
+function reminderSentKey(
   coupleId: string,
   eventId: string,
   occurrenceDate: string,
+  userId: string,
+  slot: ReminderSlotId,
+): string {
+  return `calendar_reminder_sent:${coupleId}:${eventId}:${occurrenceDate}:${todayDateKey()}:${userId}:${slot}`;
+}
+
+/** Reserve the slot before sending so parallel cron/client calls cannot triple-send. */
+async function claimReminderSlot(
+  coupleId: string,
+  eventId: string,
+  occurrenceDate: string,
+  userId: string,
   slot: ReminderSlotId,
 ): Promise<boolean> {
-  const key =
-    `calendar_reminder_sent:${coupleId}:${eventId}:${occurrenceDate}:${todayDateKey()}:${slot}`;
-  return !!(await kv.get(key));
+  const key = reminderSentKey(coupleId, eventId, occurrenceDate, userId, slot);
+  if (await kv.get(key)) return false;
+  await kv.set(key, { sentAt: new Date().toISOString(), slot, userId });
+  return true;
 }
 
-async function markReminderSentForSlot(
+async function releaseReminderSlot(
   coupleId: string,
   eventId: string,
   occurrenceDate: string,
+  userId: string,
   slot: ReminderSlotId,
 ): Promise<void> {
-  const key =
-    `calendar_reminder_sent:${coupleId}:${eventId}:${occurrenceDate}:${todayDateKey()}:${slot}`;
-  await kv.set(key, { sentAt: new Date().toISOString(), slot });
+  await kv.del(reminderSentKey(coupleId, eventId, occurrenceDate, userId, slot));
 }
 
-function activeReminderSlotsForUser(timezoneOffset: number): ReminderSlotId[] {
+/** At most one reminder slot per check (morning OR afternoon OR evening). */
+function activeReminderSlotForUser(timezoneOffset: number): ReminderSlotId | null {
   const localNow = localMinutesNow(timezoneOffset);
-  return REMINDER_SLOTS.filter((s) => isWithinTimeWindow(localNow, s.targetMinutes)).map((s) =>
-    s.id
-  );
+  let best: { id: ReminderSlotId; diff: number } | null = null;
+
+  for (const slot of REMINDER_SLOTS) {
+    const rawDiff = Math.abs(localNow - slot.targetMinutes);
+    const diff = Math.min(rawDiff, 1440 - rawDiff);
+    if (diff > SLOT_WINDOW_MINUTES) continue;
+    if (!best || diff < best.diff) {
+      best = { id: slot.id, diff };
+    }
+  }
+
+  return best?.id ?? null;
 }
 
 async function sendReminderToUser(
@@ -233,15 +252,21 @@ async function sendReminderToUser(
   occurrenceDate: string,
   slot: ReminderSlotId,
 ): Promise<boolean> {
-  if (await wasReminderSentForSlot(event.coupleId, event.id, occurrenceDate, slot)) {
+  if (
+    !(await claimReminderSlot(event.coupleId, event.id, occurrenceDate, userId, slot))
+  ) {
     return false;
   }
 
   const user = await kv.get(`user:${userId}`);
-  if (!user?.fcmToken) return false;
+  if (!user?.fcmToken) {
+    await releaseReminderSlot(event.coupleId, event.id, occurrenceDate, userId, slot);
+    return false;
+  }
 
   const copy = getCalendarReminderMessage(event, daysUntil);
   const url = buildCalendarDeepLink(event.coupleId, event.id);
+  const tag = `calendar-${event.id}-${occurrenceDate}-${userId}-${todayDateKey()}-${slot}`;
 
   try {
     await sendFcmPush(
@@ -249,8 +274,8 @@ async function sendReminderToUser(
       {
         title: copy.title,
         body: copy.body,
-        icon: "/icon-192.png",
-        badge: "/icon-192.png",
+        icon: CALENDAR_NOTIFICATION_ICON,
+        badge: CALENDAR_NOTIFICATION_ICON,
       },
       {
         type: "calendar-reminder",
@@ -259,13 +284,13 @@ async function sendReminderToUser(
         daysUntil: String(daysUntil),
         reminderSlot: slot,
         url,
-        tag: `calendar-${event.id}-${occurrenceDate}-${todayDateKey()}-${slot}`,
+        tag,
       },
     );
-    await markReminderSentForSlot(event.coupleId, event.id, occurrenceDate, slot);
     return true;
   } catch (err) {
     console.error(`[Calendar Reminder] FCM failed for user ${userId}:`, err);
+    await releaseReminderSlot(event.coupleId, event.id, occurrenceDate, userId, slot);
     return false;
   }
 }
@@ -273,6 +298,7 @@ async function sendReminderToUser(
 export async function processCalendarReminders(
   sendFcmPush: SendFcmPush,
   coupleIdFilter?: string,
+  options?: { onlyUserId?: string },
 ): Promise<{ sent: number; skipped: number; processed: number }> {
   let sent = 0;
   let skipped = 0;
@@ -308,32 +334,38 @@ export async function processCalendarReminders(
       continue;
     }
 
-    const userIds = [couple.user1Id, couple.user2Id] as const;
+    const onlyUserId = options?.onlyUserId;
+    const userIds = onlyUserId
+      ? ([onlyUserId] as const)
+      : ([couple.user1Id, couple.user2Id] as const);
     let eventSent = false;
 
     for (const uid of userIds) {
-      const tz = await getUserTimezoneOffset(uid);
-      const activeSlots = activeReminderSlotsForUser(tz);
-      if (activeSlots.length === 0) {
+      if (uid !== couple.user1Id && uid !== couple.user2Id) {
         skipped++;
         continue;
       }
 
-      for (const slot of activeSlots) {
-        const didSend = await sendReminderToUser(
-          sendFcmPush,
-          uid,
-          event,
-          daysUntil,
-          occurrenceDate,
-          slot,
-        );
-        if (didSend) {
-          sent++;
-          eventSent = true;
-        } else {
-          skipped++;
-        }
+      const tz = await getUserTimezoneOffset(uid);
+      const slot = activeReminderSlotForUser(tz);
+      if (!slot) {
+        skipped++;
+        continue;
+      }
+
+      const didSend = await sendReminderToUser(
+        sendFcmPush,
+        uid,
+        event,
+        daysUntil,
+        occurrenceDate,
+        slot,
+      );
+      if (didSend) {
+        sent++;
+        eventSent = true;
+      } else {
+        skipped++;
       }
     }
 
