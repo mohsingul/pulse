@@ -6,7 +6,6 @@ import { processCalendarReminders } from "./calendar_reminders.ts";
 import { notifyPartnerCalendarEventAdded } from "./calendar_event_notifications.ts";
 import {
   processPulseReminders,
-  processPulseRemindersForUser,
   saveUserReminderPreferences,
   getUserReminderPreferences,
 } from "./pulse_reminders.ts";
@@ -693,18 +692,6 @@ app.post("/make-server-494d91eb/users/:userId/fcm", async (c) => {
     }
 
     await updateUserFcmToken(userId, fcmToken);
-
-    const existingPrefs = await getUserReminderPreferences(userId);
-    if (!existingPrefs) {
-      await saveUserReminderPreferences(userId, {
-        morning: { enabled: true, time: "09:00" },
-        midday: { enabled: true, time: "13:00" },
-        evening: { enabled: true, time: "19:00" },
-        timezoneOffset: new Date().getTimezoneOffset(),
-      });
-      console.log(`[FCM Register] Created default reminder preferences for user: ${userId}`);
-    }
-
     console.log(`[FCM Register] Stored FCM token for user: ${userId}`);
 
     return c.json({ success: true });
@@ -2809,38 +2796,13 @@ function migrateShiftPatterns(raw: Record<string, unknown> | undefined) {
   return out;
 }
 
-function normalizeShiftOverridesFromPrefs(prefs: Record<string, unknown>) {
-  const overrides: Record<string, Record<string, string>> = {};
-  const rawOverrides = prefs.shiftOverrides as Record<string, Record<string, string>> | undefined;
-  if (rawOverrides) {
-    for (const [uid, byDate] of Object.entries(rawOverrides)) {
-      if (byDate && typeof byDate === "object" && !Array.isArray(byDate)) {
-        overrides[uid] = { ...byDate };
-      }
-    }
-  }
-  const legacy = prefs.overtimeDays as Record<string, string[]> | undefined;
-  if (legacy) {
-    for (const [uid, list] of Object.entries(legacy)) {
-      if (!Array.isArray(list)) continue;
-      overrides[uid] = { ...(overrides[uid] ?? {}) };
-      for (const date of list) {
-        if (typeof date === "string" && !overrides[uid][date]) {
-          overrides[uid][date] = "day";
-        }
-      }
-    }
-  }
-  return overrides;
-}
-
 async function getCalendarPrefsPayload(coupleId: string, couple: { user1Id: string; user2Id: string }) {
   const prefs = (await kv.get(calendarPrefsKey(coupleId))) ?? {};
   const colors = await getCalendarColors(coupleId, couple);
   const shiftPatterns = migrateShiftPatterns(prefs.shiftPatterns);
-  const shiftOverrides = normalizeShiftOverridesFromPrefs(prefs);
+  const overtimeDays = prefs.overtimeDays ?? {};
   const shiftExcludedDays = prefs.shiftExcludedDays ?? {};
-  return { colors, shiftPatterns, shiftOverrides, shiftExcludedDays };
+  return { colors, shiftPatterns, overtimeDays, shiftExcludedDays };
 }
 
 async function saveCalendarColor(
@@ -2876,10 +2838,10 @@ app.get("/make-server-494d91eb/calendar/:coupleId", async (c) => {
       return new Date(a.date).getTime() - new Date(b.date).getTime();
     });
 
-    const { colors, shiftPatterns, shiftOverrides, shiftExcludedDays } =
+    const { colors, shiftPatterns, overtimeDays, shiftExcludedDays } =
       await getCalendarPrefsPayload(coupleId, couple);
 
-    return c.json({ events: sorted, colors, shiftPatterns, shiftOverrides, shiftExcludedDays });
+    return c.json({ events: sorted, colors, shiftPatterns, overtimeDays, shiftExcludedDays });
   } catch (error: any) {
     console.error(`[Calendar] Error getting events:`, error);
     return c.json({ error: error.message || "Failed to get calendar events" }, 500);
@@ -2913,7 +2875,7 @@ async function handleCalendarColorSave(c: any) {
     success: true,
     colors: merged,
     shiftPatterns: prefs.shiftPatterns,
-    shiftOverrides: prefs.shiftOverrides,
+    overtimeDays: prefs.overtimeDays,
     shiftExcludedDays: prefs.shiftExcludedDays,
   });
 }
@@ -2963,7 +2925,7 @@ app.post("/make-server-494d91eb/calendar/:coupleId/shift-exclusion", async (c) =
 app.post("/make-server-494d91eb/calendar/:coupleId/overtime", async (c) => {
   try {
     const coupleId = c.req.param("coupleId");
-    const { userId, date, enabled, kind } = await c.req.json();
+    const { userId, date, enabled } = await c.req.json();
 
     if (!coupleId || !userId || !date) {
       return c.json({ error: "Couple ID, user ID, and date are required" }, 400);
@@ -2976,29 +2938,29 @@ app.post("/make-server-494d91eb/calendar/:coupleId/overtime", async (c) => {
     }
 
     const existing = (await kv.get(calendarPrefsKey(coupleId))) ?? {};
-    const shiftOverrides = normalizeShiftOverridesFromPrefs(existing);
-    const userMap = { ...(shiftOverrides[userId] ?? {}) };
-    const shouldEnable = enabled !== undefined ? Boolean(enabled) : !(date in userMap);
+    const list: string[] = [...(existing.overtimeDays?.[userId] ?? [])];
+    const idx = list.indexOf(date);
+    const shouldEnable = enabled !== undefined ? Boolean(enabled) : idx < 0;
 
+    let next: string[];
     if (shouldEnable) {
-      const shiftKind = kind === "night" ? "night" : "day";
-      userMap[date] = shiftKind;
+      next = idx < 0 ? [...list, date].sort() : list;
     } else {
-      delete userMap[date];
+      next = list.filter((d) => d !== date);
     }
 
-    const nextOverrides = { ...shiftOverrides, [userId]: userMap };
+    const overtimeDays = { ...(existing.overtimeDays ?? {}), [userId]: next };
     await kv.set(calendarPrefsKey(coupleId), {
       ...existing,
-      shiftOverrides: nextOverrides,
+      overtimeDays,
       updatedAt: new Date().toISOString(),
     });
 
     const prefs = await getCalendarPrefsPayload(coupleId, couple);
     return c.json({ success: true, ...prefs });
   } catch (error: any) {
-    console.error(`[Calendar] Error toggling shift override:`, error);
-    return c.json({ error: error.message || "Failed to update shift override" }, 500);
+    console.error(`[Calendar] Error toggling overtime:`, error);
+    return c.json({ error: error.message || "Failed to update overtime" }, 500);
   }
 });
 
@@ -3222,7 +3184,7 @@ app.post("/make-server-494d91eb/calendar/process-reminders", async (c) => {
   }
 });
 
-// Client-triggered reminders when app opens (calendar + pulse for this user)
+// Client-triggered calendar reminders for one couple (once per day per device)
 app.post("/make-server-494d91eb/calendar/:coupleId/process-reminders", async (c) => {
   try {
     const coupleId = c.req.param("coupleId");
@@ -3237,34 +3199,11 @@ app.post("/make-server-494d91eb/calendar/:coupleId/process-reminders", async (c)
       return c.json({ error: "Not authorized for this couple" }, 403);
     }
 
-    const calendar = await processCalendarReminders(sendFcmPush, coupleId);
-    const pulse = await processPulseRemindersForUser(sendFcmPush, userId);
-    return c.json({ success: true, calendar, pulse });
+    const result = await processCalendarReminders(sendFcmPush, coupleId);
+    return c.json({ success: true, ...result });
   } catch (error: any) {
     console.error(`[Calendar] couple process-reminders failed:`, error);
     return c.json({ error: error.message || "Failed to process calendar reminders" }, 500);
-  }
-});
-
-app.post("/make-server-494d91eb/users/:userId/process-reminders", async (c) => {
-  try {
-    const userId = c.req.param("userId");
-    const { coupleId } = await c.req.json().catch(() => ({}));
-
-    const pulse = await processPulseRemindersForUser(sendFcmPush, userId);
-
-    let calendar = { sent: 0, skipped: 0, processed: 0 };
-    if (coupleId) {
-      const couple = await kv.get(`couple:${coupleId}`);
-      if (couple && (couple.user1Id === userId || couple.user2Id === userId)) {
-        calendar = await processCalendarReminders(sendFcmPush, coupleId);
-      }
-    }
-
-    return c.json({ success: true, calendar, pulse });
-  } catch (error: any) {
-    console.error(`[Reminders] user process-reminders failed:`, error);
-    return c.json({ error: error.message || "Failed to process reminders" }, 500);
   }
 });
 

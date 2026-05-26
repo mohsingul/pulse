@@ -69,13 +69,7 @@ export interface CalendarEventItem {
   createdByName?: string;
 }
 
-/** @deprecated Legacy — string[] dates; migrated to ShiftOverrideMap */
 export type OvertimeMap = Record<string, string[]>;
-
-export type ShiftDayNightKind = 'day' | 'night';
-
-/** Manual day/night marks on specific dates (userId → date → kind). */
-export type ShiftOverrideMap = Record<string, Record<string, ShiftDayNightKind>>;
 
 /** Dates excluded from the repeating shift pattern (day off / holiday override). */
 export type ShiftExcludedMap = Record<string, string[]>;
@@ -197,66 +191,8 @@ export function isMultiDayEvent(event: { date: string; endDate?: string }): bool
   return Boolean(event.endDate && event.endDate > event.date);
 }
 
-export function normalizeShiftOverrides(
-  overrides?: ShiftOverrideMap | null,
-  legacyOvertime?: OvertimeMap | null,
-): ShiftOverrideMap {
-  const out: ShiftOverrideMap = {};
-  if (overrides) {
-    for (const [uid, byDate] of Object.entries(overrides)) {
-      if (!byDate || typeof byDate !== 'object' || Array.isArray(byDate)) continue;
-      out[uid] = { ...byDate };
-    }
-  }
-  if (legacyOvertime) {
-    for (const [uid, list] of Object.entries(legacyOvertime)) {
-      if (!Array.isArray(list)) continue;
-      out[uid] = { ...(out[uid] ?? {}) };
-      for (const date of list) {
-        if (typeof date === 'string' && !out[uid][date]) {
-          out[uid][date] = 'day';
-        }
-      }
-    }
-  }
-  return out;
-}
-
-export function getShiftOverrideKind(
-  overrides: ShiftOverrideMap,
-  userId: string,
-  day: Date,
-): ShiftDayNightKind | null {
-  return overrides[userId]?.[toDateKey(day)] ?? null;
-}
-
-/** Pattern phase or manual override; null if excluded or off. */
-export function getEffectiveShiftKind(
-  userId: string,
-  shiftPatterns: ShiftPatternMap,
-  shiftOverrides: ShiftOverrideMap,
-  shiftExcludedDays: ShiftExcludedMap,
-  day: Date,
-): ShiftDayNightKind | null {
-  if (isShiftExcluded(shiftExcludedDays, userId, day)) return null;
-  const override = getShiftOverrideKind(shiftOverrides, userId, day);
-  if (override) return override;
-  const pattern = shiftPatterns[userId];
-  if (!pattern) return null;
-  const phase = getShiftCyclePhase(pattern, day);
-  if (phase === 'day' || phase === 'night') return phase;
-  return null;
-}
-
-export function isOvertimeDay(overrides: ShiftOverrideMap, userId: string, day: Date): boolean {
-  return getShiftOverrideKind(overrides, userId, day) != null;
-}
-
-export function hasShiftPatternForUser(
-  shiftPatterns: ShiftPatternMap,
-  userId: string,
-): boolean {
-  return Boolean(shiftPatterns[userId]?.startDate);
+export function isOvertimeDay(overtime: OvertimeMap, userId: string, day: Date): boolean {
+  return (overtime[userId] ?? []).includes(toDateKey(day));
 }
 
 export function isShiftExcluded(
@@ -267,15 +203,18 @@ export function isShiftExcluded(
   return (excluded[userId] ?? []).includes(toDateKey(day));
 }
 
-/** Scheduled shift, manual override, or excluded. */
+/** Scheduled shift or manually marked extra shift day (stored as overtime). */
 export function isUserOnShiftForDay(
   userId: string,
   shiftPatterns: ShiftPatternMap,
-  shiftOverrides: ShiftOverrideMap,
+  overtimeDays: OvertimeMap,
   shiftExcludedDays: ShiftExcludedMap,
   day: Date,
 ): boolean {
-  return getEffectiveShiftKind(userId, shiftPatterns, shiftOverrides, shiftExcludedDays, day) != null;
+  if (isShiftExcluded(shiftExcludedDays, userId, day)) return false;
+  const pattern = shiftPatterns[userId];
+  if (pattern && isShiftOnDay(pattern, day)) return true;
+  return isOvertimeDay(overtimeDays, userId, day);
 }
 
 export function sortDateKeys(keys: string[]): string[] {
@@ -310,6 +249,8 @@ export interface ShiftPattern {
 }
 
 export type ShiftPatternMap = Record<string, ShiftPattern>;
+
+export type ShiftDayNightKind = 'day' | 'night';
 
 export type ShiftCyclePhase = 'day' | 'off' | 'night';
 

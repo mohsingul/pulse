@@ -1,21 +1,18 @@
 import React from 'react';
 import { Button } from '@/app/components/Button';
-import { X, Plus, Sun, Moon, Trash2 } from 'lucide-react';
+import { X, Plus, Clock } from 'lucide-react';
 import {
   formatEventTime,
   getCalendarTypeMeta,
-  getEffectiveShiftKind,
-  getShiftOverrideKind,
   getUserCalendarHex,
-  hasShiftPatternForUser,
   isMultiDayEvent,
-  isShiftOnDay,
-  isShiftExcluded,
+  getShiftCyclePhase,
+  isUserOnShiftForDay,
   parseDateKey,
   type CalendarColorMap,
   type CalendarEventItem,
+  type OvertimeMap,
   type ShiftExcludedMap,
-  type ShiftOverrideMap,
   type ShiftPatternMap,
 } from '@/app/constants/calendar';
 import { format } from 'date-fns';
@@ -29,15 +26,14 @@ interface CalendarDaySheetProps {
   partnerName: string;
   colorMap: CalendarColorMap;
   shiftPatterns: ShiftPatternMap;
-  shiftOverrides: ShiftOverrideMap;
+  overtimeDays: OvertimeMap;
   shiftExcludedDays: ShiftExcludedMap;
   user1Id: string;
   user2Id: string;
   onClose: () => void;
   onAdd: () => void;
   onEventClick: (event: CalendarEventItem) => void;
-  onAddDayShift: () => void;
-  onAddNightShift: () => void;
+  onMarkOnShift: () => void;
   onRemoveShift: () => void;
   shiftActionSaving?: boolean;
 }
@@ -50,15 +46,14 @@ export function CalendarDaySheet({
   partnerName,
   colorMap,
   shiftPatterns,
-  shiftOverrides,
+  overtimeDays,
   shiftExcludedDays,
   user1Id,
   user2Id,
   onClose,
   onAdd,
   onEventClick,
-  onAddDayShift,
-  onAddNightShift,
+  onMarkOnShift,
   onRemoveShift,
   shiftActionSaving,
 }: CalendarDaySheetProps) {
@@ -66,46 +61,26 @@ export function CalendarDaySheet({
 
   const dayLabel = format(parseDateKey(dateKey), 'EEEE, MMMM d, yyyy');
   const day = parseDateKey(dateKey);
-  const hasMyPattern = hasShiftPatternForUser(shiftPatterns, currentUserId);
-
   const labelFor = (uid: string) =>
     uid === currentUserId ? 'You' : partnerName.split(' ')[0];
-
   const shiftLabel = (uid: string) => {
-    const kind = getEffectiveShiftKind(
-      uid,
-      shiftPatterns,
-      shiftOverrides,
-      shiftExcludedDays,
-      day,
-    );
-    if (kind === 'day') return `${labelFor(uid)} — day shift ☀️`;
-    if (kind === 'night') return `${labelFor(uid)} — night shift 🌙`;
+    const pattern = shiftPatterns[uid];
+    const phase = pattern ? getShiftCyclePhase(pattern, day) : null;
+    if (phase === 'day') return `${labelFor(uid)} — day shift ☀️`;
+    if (phase === 'night') return `${labelFor(uid)} — night shift 🌙`;
+    if (isUserOnShiftForDay(uid, shiftPatterns, overtimeDays, shiftExcludedDays, day)) {
+      return `${labelFor(uid)} — extra shift`;
+    }
     return null;
   };
-
   const shiftNotes = [shiftLabel(user1Id), shiftLabel(user2Id)].filter(Boolean) as string[];
-
-  const myEffectiveKind = hasMyPattern
-    ? getEffectiveShiftKind(
-        currentUserId,
-        shiftPatterns,
-        shiftOverrides,
-        shiftExcludedDays,
-        day,
-      )
-    : null;
-
-  const myOverride = getShiftOverrideKind(shiftOverrides, currentUserId, day);
-  const myPattern = shiftPatterns[currentUserId];
-  const onScheduledPattern =
-    myPattern &&
-    !isShiftExcluded(shiftExcludedDays, currentUserId, day) &&
-    isShiftOnDay(myPattern, day);
-
-  const canRemoveShift = Boolean(myEffectiveKind);
-  const canAddManual =
-    hasMyPattern && !myEffectiveKind && !isShiftExcluded(shiftExcludedDays, currentUserId, day);
+  const isMyOnShift = isUserOnShiftForDay(
+    currentUserId,
+    shiftPatterns,
+    overtimeDays,
+    shiftExcludedDays,
+    day,
+  );
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col justify-end">
@@ -139,48 +114,26 @@ export function CalendarDaySheet({
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
-          {hasMyPattern && (
-            <div className="space-y-2">
-              {canAddManual && (
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant="secondary"
-                    className="w-full bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-950 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-100"
-                    onClick={onAddDayShift}
-                    disabled={shiftActionSaving}
-                  >
-                    <Sun className="w-4 h-4 mr-1.5 inline" />
-                    {shiftActionSaving ? 'Saving…' : 'Day shift'}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    className="w-full bg-blue-500 hover:bg-blue-600 border border-blue-600 text-white"
-                    onClick={onAddNightShift}
-                    disabled={shiftActionSaving}
-                  >
-                    <Moon className="w-4 h-4 mr-1.5 inline" />
-                    {shiftActionSaving ? 'Saving…' : 'Night shift'}
-                  </Button>
-                </div>
-              )}
-              {canRemoveShift && (
-                <Button
-                  variant="secondary"
-                  className="w-full"
-                  onClick={onRemoveShift}
-                  disabled={shiftActionSaving}
-                >
-                  <Trash2 className="w-4 h-4 mr-2 inline" />
-                  {shiftActionSaving
-                    ? 'Saving…'
-                    : myOverride
-                      ? 'Remove manual shift'
-                      : onScheduledPattern
-                        ? 'Remove shift (day off)'
-                        : 'Remove shift'}
-                </Button>
-              )}
-            </div>
+          {isMyOnShift ? (
+            <Button
+              variant="secondary"
+              className="w-full"
+              onClick={onRemoveShift}
+              disabled={shiftActionSaving}
+            >
+              <Clock className="w-4 h-4 mr-2 inline" />
+              {shiftActionSaving ? 'Saving…' : 'Remove shift'}
+            </Button>
+          ) : (
+            <Button
+              variant="secondary"
+              className="w-full"
+              onClick={onMarkOnShift}
+              disabled={shiftActionSaving}
+            >
+              <Clock className="w-4 h-4 mr-2 inline" />
+              {shiftActionSaving ? 'Saving…' : 'Mark as on shift'}
+            </Button>
           )}
 
           {shiftNotes.length > 0 && (
@@ -192,7 +145,6 @@ export function CalendarDaySheet({
               ))}
             </div>
           )}
-
           {events.length === 0 ? (
             <div className="text-center py-6 space-y-3">
               <div className="text-4xl">📅</div>

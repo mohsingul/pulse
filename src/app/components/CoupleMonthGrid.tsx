@@ -14,13 +14,14 @@ import {
 } from 'date-fns';
 import {
   getEventsOnDate,
-  getEffectiveShiftKind,
+  getShiftCyclePhase,
   getUserCalendarHex,
+  isOvertimeDay,
   isShiftExcluded,
   toDateKey,
   type CalendarColorMap,
   type CalendarEventItem,
-  type ShiftOverrideMap,
+  type OvertimeMap,
   type ShiftExcludedMap,
   type ShiftPatternMap,
 } from '@/app/constants/calendar';
@@ -34,7 +35,7 @@ interface CoupleMonthGridProps {
   currentUserId: string;
   colorMap: CalendarColorMap;
   shiftPatterns: ShiftPatternMap;
-  shiftOverrides: ShiftOverrideMap;
+  overtimeDays: OvertimeMap;
   shiftExcludedDays: ShiftExcludedMap;
   user1Id: string;
   user2Id: string;
@@ -48,10 +49,18 @@ function shiftIconForUser(
   userId: string,
   date: Date,
   shiftPatterns: ShiftPatternMap,
-  shiftOverrides: ShiftOverrideMap,
+  overtimeDays: OvertimeMap,
   shiftExcludedDays: ShiftExcludedMap,
 ): 'day' | 'night' | null {
-  return getEffectiveShiftKind(userId, shiftPatterns, shiftOverrides, shiftExcludedDays, date);
+  if (isShiftExcluded(shiftExcludedDays, userId, date)) return null;
+  const pattern = shiftPatterns[userId];
+  if (pattern) {
+    const phase = getShiftCyclePhase(pattern, date);
+    if (phase === 'day') return 'day';
+    if (phase === 'night') return 'night';
+  }
+  if (isOvertimeDay(overtimeDays, userId, date)) return 'day';
+  return null;
 }
 
 export function CoupleMonthGrid({
@@ -61,7 +70,7 @@ export function CoupleMonthGrid({
   currentUserId,
   colorMap,
   shiftPatterns,
-  shiftOverrides,
+  overtimeDays,
   shiftExcludedDays,
   user1Id,
   user2Id,
@@ -139,7 +148,7 @@ export function CoupleMonthGrid({
               uid,
               date,
               shiftPatterns,
-              shiftOverrides,
+              overtimeDays,
               shiftExcludedDays,
             );
             if (kind) {
@@ -155,7 +164,7 @@ export function CoupleMonthGrid({
             currentUserId,
             date,
             shiftPatterns,
-            shiftOverrides,
+            overtimeDays,
             shiftExcludedDays,
           );
           const shiftTint =
