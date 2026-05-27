@@ -5,7 +5,8 @@ import { LoadingSpinner } from '@/app/components/LoadingSpinner';
 import { InstallPrompt } from '@/app/components/InstallPrompt';
 import { CalendarRemindersHome } from '@/app/components/CalendarRemindersHome';
 import { SharkModeHomeCard } from '@/app/components/SharkModeHomeCard';
-import { DailyChallenge } from '@/app/components/DailyChallenge';
+// Daily Challenge — hidden for now (re-enable to launch)
+// import { DailyChallenge } from '@/app/components/DailyChallenge';
 import { Sparkles, History, User, Calendar, HandHeart, Bell, Clock } from 'lucide-react';
 // import { Dices } from 'lucide-react';
 import { todayAPI, notificationAPI, sharkModeAPI, partnerStatusAPI, calendarAPI } from '@/utils/api';
@@ -32,7 +33,7 @@ interface HomeScreenProps {
   onViewHistory: () => void;
   onViewProfile: () => void;
   onViewCalendar: () => void;
-  onViewDailyChallengeArchive?: () => void;
+  // onViewDailyChallengeArchive?: () => void;
   onPlayTeaseOrPlease?: () => void;
   // onPlaySexyDice?: () => void;
 }
@@ -48,7 +49,7 @@ export function HomeScreen({
   onViewHistory,
   onViewProfile,
   onViewCalendar,
-  onViewDailyChallengeArchive,
+  // onViewDailyChallengeArchive,
   onPlayTeaseOrPlease,
   // onPlaySexyDice,
 }: HomeScreenProps) {
@@ -310,7 +311,7 @@ export function HomeScreen({
           />
         )}
 
-        {/* Daily Challenge */}
+        {/* Daily Challenge — hidden for now (re-enable to launch)
         <DailyChallenge
           coupleId={coupleId}
           userId={userId}
@@ -320,6 +321,7 @@ export function HomeScreen({
           partnerName={partnerName}
           onViewArchive={() => onViewDailyChallengeArchive?.()}
         />
+        */}
 
         {/* Your Mood Summary - Show ONLY the current user's mood */}
         {myMood && myUpdatedAt && (

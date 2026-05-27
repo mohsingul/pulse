@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/app/components/Button';
 import { Card } from '@/app/components/Card';
 import { SharkModeSheet } from '@/app/components/SharkModeSheet';
-import { ArrowLeft, Copy, Share2, Settings, AlertTriangle, UserX, Image, MessageSquare, Smile, Waves, Sparkles } from 'lucide-react';
+import { ArrowLeft, Copy, Share2, Settings, AlertTriangle, UserX, Image, MessageSquare, Smile, Waves } from 'lucide-react';
+// import { Sparkles } from 'lucide-react'; // Daily Challenge archive
 import { pairingAPI, coupleAPI, sharkModeAPI } from '@/utils/api';
 import { storage } from '@/utils/storage';
 import { copyToClipboard } from '@/utils/clipboard';
@@ -21,7 +22,7 @@ interface ProfileScreenProps {
   onMessageArchive?: () => void;
   onMoodArchive?: () => void;
   onSharkModeArchive?: () => void;
-  onDailyChallengeArchive?: () => void;
+  // onDailyChallengeArchive?: () => void;
 }
 
 export function ProfileScreen({
@@ -39,7 +40,7 @@ export function ProfileScreen({
   onMessageArchive,
   onMoodArchive,
   onSharkModeArchive,
-  onDailyChallengeArchive,
+  // onDailyChallengeArchive,
 }: ProfileScreenProps) {
   const [codeData, setCodeData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -351,6 +352,7 @@ export function ProfileScreen({
             </button>
           )}
 
+          {/* Daily Challenge Archive — hidden for now (re-enable to launch)
           {onDailyChallengeArchive && (
             <button
               onClick={onDailyChallengeArchive}
@@ -360,6 +362,7 @@ export function ProfileScreen({
               <span>Daily Challenge Archive</span>
             </button>
           )}
+          */}
         </div>
 
         {/* Shark Mode */}

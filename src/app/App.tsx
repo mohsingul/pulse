@@ -20,7 +20,8 @@ import { DoodleGalleryScreen } from '@/app/screens/DoodleGalleryScreen';
 import { MessageArchiveScreen } from '@/app/screens/MessageArchiveScreen';
 import { MoodArchiveScreen } from '@/app/screens/MoodArchiveScreen';
 import { SharkModeArchiveScreen } from '@/app/screens/SharkModeArchiveScreen';
-import { DailyChallengeArchiveScreen } from '@/app/screens/DailyChallengeArchiveScreen';
+// Daily Challenge — hidden for now (re-enable to launch)
+// import { DailyChallengeArchiveScreen } from '@/app/screens/DailyChallengeArchiveScreen';
 import { NotificationSettingsScreen } from '@/app/screens/NotificationSettingsScreen';
 import { NotificationCenterScreen } from '@/app/screens/NotificationCenterScreen';
 import { CoupleCalendarScreen } from '@/app/screens/CoupleCalendarScreen';
@@ -71,7 +72,7 @@ type Screen =
   | 'message-archive'
   | 'mood-archive'
   | 'shark-mode-archive'
-  | 'daily-challenge-archive'
+  // | 'daily-challenge-archive'
   | 'couple-calendar'
   | 'tease-or-please';
   // | 'sexy-dice';
@@ -500,7 +501,7 @@ export default function App() {
               onViewHistory={() => setCurrentScreen('history')}
               onViewProfile={() => setCurrentScreen('profile')}
               onViewCalendar={() => setCurrentScreen('couple-calendar')}
-              onViewDailyChallengeArchive={() => setCurrentScreen('daily-challenge-archive')}
+              // onViewDailyChallengeArchive={() => setCurrentScreen('daily-challenge-archive')}
               // onPlaySexyDice={() => setCurrentScreen('sexy-dice')}
             />
             <UpdatePulseSheet
@@ -536,7 +537,7 @@ export default function App() {
             onMessageArchive={() => setCurrentScreen('message-archive')}
             onMoodArchive={() => setCurrentScreen('mood-archive')}
             onSharkModeArchive={() => setCurrentScreen('shark-mode-archive')}
-            onDailyChallengeArchive={() => setCurrentScreen('daily-challenge-archive')}
+            // onDailyChallengeArchive={() => setCurrentScreen('daily-challenge-archive')}
           />
         );
 
@@ -663,18 +664,18 @@ export default function App() {
           />
         );
 
-      case 'daily-challenge-archive':
-        return (
-          <DailyChallengeArchiveScreen
-            coupleId={couple.coupleId}
-            userId={user.userId}
-            user1Id={couple.user1Id}
-            user2Id={couple.user2Id}
-            userName={user.displayName}
-            partnerName={couple.partner.displayName}
-            onBack={() => setCurrentScreen('profile')}
-          />
-        );
+      // case 'daily-challenge-archive':
+      //   return (
+      //     <DailyChallengeArchiveScreen
+      //       coupleId={couple.coupleId}
+      //       userId={user.userId}
+      //       user1Id={couple.user1Id}
+      //       user2Id={couple.user2Id}
+      //       userName={user.displayName}
+      //       partnerName={couple.partner.displayName}
+      //       onBack={() => setCurrentScreen('profile')}
+      //     />
+      //   );
 
       case 'couple-calendar':
         return couple ? (
